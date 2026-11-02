@@ -990,7 +990,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "C:\\IT_CRM\\backend\\src\\generated\\client_v2",
+      "value": "D:\\IT_CRM\\backend\\src\\generated\\client_v2",
       "fromEnvVar": null
     },
     "config": {
@@ -1004,7 +1004,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "C:\\IT_CRM\\backend\\prisma\\schema.prisma",
+    "sourceFilePath": "D:\\IT_CRM\\backend\\prisma\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

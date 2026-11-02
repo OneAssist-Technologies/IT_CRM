@@ -34,6 +34,7 @@ import { notifications } from '@mantine/notifications';
 import { ImportBatch } from '../../../types/contact';
 import { useEmployee } from '../../../context/EmployeeContext';
 import { useCRM } from '../../../context/CRMContext';
+import { usePermissions } from '../../../context/AccessControlContext';
 import contactService from '../../../services/contactService';
 
 export interface BulkImportHistoryTableProps {
@@ -67,6 +68,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
 
   const { employees, fetchEmployees } = useEmployee();
   const { currentUser } = useCRM();
+  const { isSuperAdmin } = usePermissions();
 
   const [assigningBatchId, setAssigningBatchId] = useState<string | null>(null);
   const [localBatches, setLocalBatches] = useState<ImportBatch[]>(batches);
@@ -340,111 +342,114 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                       </Group>
                     </Table.Td>
 
-                    {/* 4. Assigned Owner with Quick Assign Menu */}
+                    {/* 4. Assigned Owner with Quick Assign Menu (Super Admin Only) */}
                     <Table.Td
                       style={{ minWidth: 160, whiteSpace: 'nowrap' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Menu
-                        shadow="lg"
-                        width={250}
-                        position="bottom-start"
-                        radius="md"
-                        withinPortal
-                      >
-                        <Menu.Target>
-                          <Tooltip
-                            label={
-                              batch.assignedToName
-                                ? `Assigned to ${batch.assignedToName} (Click to change)`
-                                : 'Click to assign owner'
-                            }
-                            withArrow
-                            position="top"
-                          >
-                            <UnstyledButton
-                              style={{
+                      {!isSuperAdmin ? (
+                        <Tooltip
+                          label={`Imported & Assigned to ${batch.assignedToName || batch.createdBy || 'Assigned'}`}
+                          withArrow
+                          position="top"
+                        >
+                          <Badge
+                            radius="xl"
+                            styles={{
+                              root: {
+                                backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                                color: isDark ? '#93C5FD' : '#1D4ED8',
+                                border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #BFDBFE',
+                                fontWeight: 600,
+                                fontSize: 11.5,
+                                textTransform: 'none',
+                                padding: '4px 10px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                cursor: 'pointer',
-                                transition: 'transform 0.12s ease',
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'scale(1.03)';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'scale(1)';
-                              }}
+                                gap: 5,
+                              },
+                            }}
+                          >
+                            <IconUserCheck size={12} stroke={2.2} />
+                            <span>{batch.assignedToName || batch.createdBy || 'Assigned'}</span>
+                          </Badge>
+                        </Tooltip>
+                      ) : (
+                        <Menu
+                          shadow="lg"
+                          width={250}
+                          position="bottom-start"
+                          radius="md"
+                          withinPortal
+                        >
+                          <Menu.Target>
+                            <Tooltip
+                              label={
+                                (batch.assignedToName || batch.createdBy)
+                                  ? `Assigned to ${batch.assignedToName || batch.createdBy} (Click to change)`
+                                  : 'Click to assign owner'
+                              }
+                              withArrow
+                              position="top"
                             >
-                              {assigningBatchId === batch.batchId ? (
-                                <Badge
-                                  radius="xl"
-                                  styles={{
-                                    root: {
-                                      backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
-                                      color: isDark ? '#94A3B8' : '#64748B',
-                                      padding: '4px 10px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                    },
-                                  }}
-                                >
-                                  <Loader size={12} color="blue" />
-                                  Assigning...
-                                </Badge>
-                              ) : batch.assignedToName ? (
-                                <Badge
-                                  radius="xl"
-                                  styles={{
-                                    root: {
-                                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
-                                      color: isDark ? '#93C5FD' : '#1D4ED8',
-                                      border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #BFDBFE',
-                                      fontWeight: 600,
-                                      fontSize: 11.5,
-                                      textTransform: 'none',
-                                      padding: '4px 10px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 5,
-                                      cursor: 'pointer',
-                                    },
-                                  }}
-                                >
-                                  <IconUserCheck size={12} stroke={2.2} />
-                                  <span>{batch.assignedToName}</span>
-                                  <IconChevronDown size={11} stroke={2} style={{ opacity: 0.7 }} />
-                                </Badge>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  radius="xl"
-                                  styles={{
-                                    root: {
-                                      borderStyle: 'dashed',
-                                      borderColor: isDark ? '#60A5FA' : '#3B82F6',
-                                      color: isDark ? '#93C5FD' : '#2563EB',
-                                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.08)' : '#EFF6FF',
-                                      fontWeight: 600,
-                                      fontSize: 11,
-                                      textTransform: 'none',
-                                      padding: '4px 9px',
-                                      display: 'inline-flex',
-                                      alignItems: 'center',
-                                      gap: 4,
-                                      cursor: 'pointer',
-                                    },
-                                  }}
-                                >
-                                  <IconUserPlus size={11} stroke={2.2} />
-                                  <span>+ Assign Owner</span>
-                                  <IconChevronDown size={10} stroke={2} style={{ opacity: 0.7 }} />
-                                </Badge>
-                              )}
-                            </UnstyledButton>
-                          </Tooltip>
-                        </Menu.Target>
+                              <UnstyledButton
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.12s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.transform = 'scale(1.03)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                {assigningBatchId === batch.batchId ? (
+                                  <Badge
+                                    radius="xl"
+                                    styles={{
+                                      root: {
+                                        backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                                        color: isDark ? '#94A3B8' : '#64748B',
+                                        padding: '4px 10px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                      },
+                                    }}
+                                  >
+                                    <Loader size={12} color="blue" />
+                                    Assigning...
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    radius="xl"
+                                    styles={{
+                                      root: {
+                                        backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                                        color: isDark ? '#93C5FD' : '#1D4ED8',
+                                        border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #BFDBFE',
+                                        fontWeight: 600,
+                                        fontSize: 11.5,
+                                        textTransform: 'none',
+                                        padding: '4px 10px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        cursor: 'pointer',
+                                      },
+                                    }}
+                                  >
+                                    <IconUserCheck size={12} stroke={2.2} />
+                                    <span>{batch.assignedToName || batch.createdBy || 'Super Admin'}</span>
+                                    <IconChevronDown size={11} stroke={2} style={{ opacity: 0.7 }} />
+                                  </Badge>
+                                )}
+                              </UnstyledButton>
+                            </Tooltip>
+                          </Menu.Target>
 
                         <Menu.Dropdown p="xs" onClick={(e) => e.stopPropagation()}>
                           <Menu.Label>ASSIGNED OWNER</Menu.Label>
@@ -539,6 +544,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                           )}
                         </Menu.Dropdown>
                       </Menu>
+                      )}
                     </Table.Td>
 
                     {/* 5. Actions */}
@@ -562,7 +568,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                         >
                           View Details
                         </Button>
-                        {onDeleteBatch && (
+                        {onDeleteBatch && isSuperAdmin && (
                           <Tooltip label="Delete Batch & Records" position="top" withArrow>
                             <ActionIcon
                               size="sm"

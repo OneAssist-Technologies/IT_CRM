@@ -58,6 +58,18 @@ export const crmApi = {
     });
   },
   getMe: () => fetchWithCookies<any>('/auth/me'),
+  forgotPassword: (email: string) =>
+    fetchWithCookies<any>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+  validateResetToken: (token: string) =>
+    fetchWithCookies<any>(`/auth/validate-reset-token?token=${encodeURIComponent(token)}`),
+  resetPassword: (payload: { token?: string; email?: string; code?: string; newPassword: string; confirmPassword?: string }) =>
+    fetchWithCookies<any>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // Dashboard Stats (Cached via Redis)
   getDashboardStats: () => fetchWithCookies<any>('/dashboard/stats'),

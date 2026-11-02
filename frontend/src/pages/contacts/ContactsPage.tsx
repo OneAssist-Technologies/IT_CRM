@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -109,12 +109,19 @@ export const ContactsPage: React.FC = () => {
   const fetchImportBatches = useCallback(async (pageToLoad = batchPage) => {
     try {
       setBatchesLoading(true);
-      const res = await contactService.getImportBatches({
+      const params: Record<string, any> = {
         page: pageToLoad,
         limit: 10,
         sortBy: 'createdAt',
         sortOrder: 'desc',
-      });
+      };
+      if (filters.search && filters.search.trim()) {
+        params.search = filters.search.trim();
+      }
+      if (filters.assignedTo && filters.assignedTo !== 'All') {
+        params.assignedTo = filters.assignedTo;
+      }
+      const res = await contactService.getImportBatches(params);
       if (res.success) {
         setBatches(res.data || []);
         if (res.pagination) {
@@ -131,7 +138,7 @@ export const ContactsPage: React.FC = () => {
     } finally {
       setBatchesLoading(false);
     }
-  }, [batchPage]);
+  }, [batchPage, filters.search, filters.assignedTo]);
 
   useEffect(() => {
     if (activeTab === 'BULK_IMPORT') {
@@ -235,15 +242,15 @@ export const ContactsPage: React.FC = () => {
         // Bulk import contacts list: show all bulk contacts including Qualified!
         if (!isBulk) return false;
       } else if (activeTab === 'NEW') {
-        // New contacts list: show all direct non-bulk contacts including Qualified!
-        if (isBulk) return false;
+        // New contacts list: show all unassigned contacts
+        if (c.assignmentStatus === 'Assigned' && !isQualified) return false;
       } else if (activeTab === 'ASSIGNED') {
-        // Qualification section contact list: Qualified status shows ONLY here!
-        // Not Interested contacts from Bulk Import or New MUST NOT show here!
+        // Qualification section contact list: Qualified status or assigned contacts show here!
         if (isNotInterested) return false;
         const isAssignedOrQualified =
           isQualified ||
-          (!isBulk && c.assignmentStatus === 'Assigned') ||
+          c.assignmentStatus === 'Assigned' ||
+          Boolean(c.assignedTo) ||
           (Boolean(c.qualificationStatus) && qualStatus !== 'new');
         if (!isAssignedOrQualified) return false;
       }
@@ -276,19 +283,65 @@ export const ContactsPage: React.FC = () => {
         if (contactSource !== s) return false;
       }
 
+      // Assigned filter matching
+      if (filters.assignedTo && filters.assignedTo !== 'All') {
+        const target = filters.assignedTo.toLowerCase().trim();
+        const assignedName = (c.assignedToName || '').toLowerCase().trim();
+        const assignedId = (c.assignedTo || '').toLowerCase().trim();
+        const creator = (c.createdBy || '').toLowerCase().trim();
+        const matchesAssigned =
+          assignedName === target ||
+          assignedName.includes(target) ||
+          target.includes(assignedName) ||
+          assignedId === target ||
+          creator === target;
+        if (!matchesAssigned) return false;
+      }
+
+      // Assignment status filter matching
+      if (filters.assignmentStatus && filters.assignmentStatus !== 'All') {
+        const s = filters.assignmentStatus.toLowerCase().trim();
+        const currentAssignment = (c.assignmentStatus || (c.assignedTo ? 'Assigned' : 'Unassigned')).toLowerCase().trim();
+        if (s === 'assigned' && currentAssignment !== 'assigned') return false;
+        if (s === 'unassigned' && currentAssignment !== 'unassigned') return false;
+      }
+
+      // Search matching fallback
+      if (filters.search && filters.search.trim()) {
+        const q = filters.search.toLowerCase().trim();
+        const name = (c.name || '').toLowerCase();
+        const company = (c.companyName || '').toLowerCase();
+        const person = (c.contactPerson || '').toLowerCase();
+        const email = (c.email || '').toLowerCase();
+        const phone = (c.phone || '').toLowerCase();
+        const contactId = (c.contactId || c.id || '').toLowerCase();
+        const matchesSearch =
+          name.includes(q) ||
+          company.includes(q) ||
+          person.includes(q) ||
+          email.includes(q) ||
+          phone.includes(q) ||
+          contactId.includes(q);
+        if (!matchesSearch) return false;
+      }
+
       return isDateMatchingFilter(c.updatedAt || c.createdAt, dateFilter);
     });
-  }, [contacts, dateFilter, isAdmin, currentUser, activeTab, filters.status, filters.source]);
+  }, [contacts, dateFilter, isAdmin, currentUser, activeTab, filters.status, filters.source, filters.assignedTo, filters.assignmentStatus, filters.search]);
 
-  // Keep filters in sync on initial mount and tab switch
+  // Keep filters in sync on initial mount and tab switch ONLY when tab actually changes
+  const prevTabRef = useRef<ActiveTabType>(activeTab);
   useEffect(() => {
-    if (activeTab === 'ASSIGNED') {
-      const assignedTarget = !isAdmin && currentUser?.name ? currentUser.name : 'All';
-      setFilters({ assignmentStatus: 'Assigned', status: 'All', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
-    } else if (activeTab === 'BULK_IMPORT') {
-      setFilters({ source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
-    } else {
-      setFilters({ assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+    if (prevTabRef.current !== activeTab) {
+      prevTabRef.current = activeTab;
+      if (activeTab === 'ASSIGNED') {
+        const assignedTarget = !isAdmin && currentUser?.name ? currentUser.name : 'All';
+        setFilters({ assignmentStatus: 'Assigned', status: 'All', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
+      } else if (activeTab === 'BULK_IMPORT') {
+        setFilters({ source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+      } else {
+        setFilters({ assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+      }
     }
   }, [activeTab, isAdmin, currentUser?.name]);
 
@@ -764,10 +817,10 @@ export const ContactsPage: React.FC = () => {
 
           {/* Right: Search, Filter Selects & Add Button (All in Single Row) */}
           <Group gap={6} align="center" wrap="wrap" style={{ flexShrink: 1, minWidth: 0, justifyContent: 'flex-end' }}>
-            {/* Search contacts... */}
+            {/* Search contacts / files... */}
             <form onSubmit={handleSearchSubmit} style={{ width: 140 }}>
               <TextInput
-                placeholder="Search contacts..."
+                placeholder={activeTab === 'BULK_IMPORT' && !selectedBatch ? "Search files..." : "Search contacts..."}
                 leftSection={<IconSearch size={14} color="#94A3B8" />}
                 rightSection={
                   searchInput ? (
@@ -805,31 +858,31 @@ export const ContactsPage: React.FC = () => {
               />
             </form>
 
-
-
-            {/* All Statuses */}
-            <Select
-              data={statusOptions}
-              value={filters.status || 'All'}
-              onChange={(val) => setFilters({ status: val || 'All' })}
-              size="sm"
-              radius="md"
-              style={{ width: 112 }}
-              comboboxProps={{ width: 195, position: 'bottom-start', withinPortal: true, shadow: 'md' }}
-              styles={{
-                input: {
-                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                  borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
-                  fontSize: 12.5,
-                  height: 36,
-                },
-                option: {
-                  fontSize: 12.5,
-                  padding: '7px 12px',
-                  whiteSpace: 'nowrap',
-                },
-              }}
-            />
+            {/* All Statuses (Show for Contact views: NEW, ASSIGNED, or inside Batch Details) */}
+            {(activeTab !== 'BULK_IMPORT' || selectedBatch) && (
+              <Select
+                data={statusOptions}
+                value={filters.status || 'All'}
+                onChange={(val) => setFilters({ status: val || 'All' })}
+                size="sm"
+                radius="md"
+                style={{ width: 112 }}
+                comboboxProps={{ width: 195, position: 'bottom-start', withinPortal: true, shadow: 'md' }}
+                styles={{
+                  input: {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+                    fontSize: 12.5,
+                    height: 36,
+                  },
+                  option: {
+                    fontSize: 12.5,
+                    padding: '7px 12px',
+                    whiteSpace: 'nowrap',
+                  },
+                }}
+              />
+            )}
 
             {/* All Sources (Hidden in Bulk Import page) */}
             {activeTab !== 'BULK_IMPORT' && (

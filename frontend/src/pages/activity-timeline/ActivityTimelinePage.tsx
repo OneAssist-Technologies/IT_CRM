@@ -192,12 +192,26 @@ export const ActivityTimelinePage: React.FC = () => {
   const [page, setPage] = useState<number>(1);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
-  // Ensure leads are fetched
+  // Fetch leads once on mount
   useEffect(() => {
-    if (!leads || leads.length === 0) {
-      fetchLeads().catch(() => {});
+    fetchLeads().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-clear stale selected lead if it no longer exists in database
+  useEffect(() => {
+    if (!leadsLoading && selectedLead) {
+      const exists = leads.some(
+        (l) => l.id === selectedLead.id || (l.leadId && l.leadId === selectedLead.leadId)
+      );
+      if (!exists) {
+        setSelectedLead(null);
+        try {
+          sessionStorage.removeItem('crm_activity_timeline_selected_lead');
+        } catch (_) {}
+      }
     }
-  }, [leads, fetchLeads]);
+  }, [leads, leadsLoading, selectedLead]);
 
   // Persist selected lead in session storage
   const handleSelectLead = (lead: Lead) => {
@@ -408,7 +422,7 @@ export const ActivityTimelinePage: React.FC = () => {
         return dayjs(selectedLead.createdAt).format('YYYY-MM-DD');
       } catch (_) {}
     }
-    return '2026-10-13';
+    return '';
   }, [qualificationActivity, selectedLead]);
 
   const originContactInfo = useMemo(() => {
@@ -1364,7 +1378,7 @@ export const ActivityTimelinePage: React.FC = () => {
                     <Text size="12px" c="dimmed">Qualified Date</Text>
                   </Group>
                   <Text size="12.5px" fw={600}>
-                    {formatDateDisplay(qualificationDate)}
+                    {formatDateDisplay(qualificationDate) || '-'}
                   </Text>
                 </Group>
 

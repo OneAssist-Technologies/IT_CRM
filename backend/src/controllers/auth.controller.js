@@ -1,5 +1,7 @@
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { prisma } from '../config/prisma.js';
-import { setCache } from '../config/redis.js';
+import { setCache, getCache, delCache } from '../config/redis.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { generateSessionToken, generateToken, setAuthCookie } from '../utils/jwt.js';
 import { logAuditEvent } from '../services/auditService.js';
@@ -285,10 +287,416 @@ export async function getCurrentUser(req, res) {
   }
 }
 
+/**
+ * Request Password Reset Link (Forgot Password)
+ * POST /api/auth/forgot-password
+ */
+export async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body;
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide your registered work email address.',
+      });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { email: cleanEmail },
+      select: { id: true, name: true, email: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No user account found with this email address.',
+      });
+    }
+
+    // Generate secure 64-character random token
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Cache token in Redis/memory with 1-hour TTL (3600s)
+    await setCache(`crm:reset-token:${token}`, {
+      userId: user.id,
+      email: cleanEmail,
+      createdAt: Date.now(),
+    }, 3600);
+
+    // Keep user's active token tracked
+    await setCache(`crm:user-token:${cleanEmail}`, token, 3600);
+
+    // Also persist in PostgreSQL for 100% guarantee across process reboots
+    try {
+      await prisma.user.update({
+        where: { email: cleanEmail },
+        data: {
+          refreshToken: `RESET:${token}:${Date.now() + 3600 * 1000}`,
+        },
+      });
+    } catch (dbErr) {
+      console.warn('[DB Token Persistence Warning]', dbErr.message);
+    }
+
+    // Client Reset URL
+    const clientOrigin = req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetUrl = `${clientOrigin}/reset-password?token=${token}&email=${encodeURIComponent(cleanEmail)}`;
+
+    // Audit log
+    await logAuditEvent({
+      userId: user.id,
+      userName: user.name,
+      userRole: 'AUTH',
+      action: 'PASSWORD_RESET_LINK_REQUESTED',
+      entity: 'AUTH',
+      entityId: user.id,
+      ipAddress: req.ip,
+      details: `Password reset request email generated for ${cleanEmail}.`,
+    });
+
+    // Send email via dynamic SMTP
+    const rawPass = (process.env.SMTP_PASS || '').replace(/^["']|["']$/g, '').trim();
+    const smtpUser = (process.env.SMTP_USER || '').trim();
+    const smtpHost = (process.env.SMTP_HOST || 'smtp.gmail.com').trim();
+    const smtpPort = Number(process.env.SMTP_PORT) || 465;
+    const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+
+    let emailSent = false;
+    let mailError = null;
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: {
+          user: smtpUser,
+          pass: rawPass,
+        },
+      });
+
+      await transporter.sendMail({
+        from: `"OneAssist CRM" <${smtpUser}>`,
+        to: cleanEmail,
+        subject: 'OneAssist CRM - Reset Your Password Request',
+        html: `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Reset Your Password - OneAssist CRM</title>
+          </head>
+          <body style="margin: 0; padding: 0; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; color: #1E293B;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #F1F5F9; width: 100%; padding: 40px 16px;">
+              <tr>
+                <td align="center">
+                  <!-- Main Card -->
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 560px; width: 100%; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02); border: 1px solid #E2E8F0;">
+                    
+                    <!-- Top Accent Gradient Line -->
+                    <tr>
+                      <td style="height: 4px; background: linear-gradient(90deg, #1D4ED8 0%, #2563EB 50%, #3B82F6 100%); font-size: 0; line-height: 0;">&nbsp;</td>
+                    </tr>
+
+                    <!-- Header / Brand -->
+                    <tr>
+                      <td align="center" style="padding: 32px 32px 20px; border-bottom: 1px solid #F1F5F9;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                          <tr>
+                            <td align="center">
+                              <span style="font-size: 24px; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">
+                                OneAssist <span style="color: #2563EB;">CRM</span>
+                              </span>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td align="center" style="padding-top: 4px;">
+                              <span style="font-size: 11px; font-weight: 700; color: #64748B; letter-spacing: 0.08em; text-transform: uppercase;">
+                                IT Sales & Operations Hub
+                              </span>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+
+                    <!-- Main Content Body -->
+                    <tr>
+                      <td style="padding: 32px 36px 28px;">
+                        <h1 style="margin: 0 0 16px; font-size: 21px; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">
+                          Password Reset Request
+                        </h1>
+                        <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #334155;">
+                          Hello <strong>${user.name}</strong>,
+                        </p>
+                        <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.65; color: #475569;">
+                          We received a request to reset the password for your OneAssist CRM account associated with <strong style="color: #0F172A;">${cleanEmail}</strong>.
+                        </p>
+                        <p style="margin: 0 0 28px; font-size: 14px; line-height: 1.65; color: #475569;">
+                          To choose a new password, click the button below. This password reset link is valid for <strong>1 hour</strong>.
+                        </p>
+
+                        <!-- CTA Button -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 8px 0 28px;">
+                          <tr>
+                            <td align="center">
+                              <a href="${resetUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%); color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 38px; border-radius: 12px; box-shadow: 0 4px 14px rgba(29, 78, 216, 0.25); letter-spacing: 0.01em;">
+                                Reset Password &rarr;
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <!-- Security Info Box -->
+                        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px 18px; margin: 24px 0 20px;">
+                          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td valign="top" style="width: 24px; padding-right: 10px; font-size: 16px;">&#128274;</td>
+                              <td style="font-size: 13px; line-height: 1.5; color: #64748B;">
+                                <strong style="color: #334155;">Didn't request this?</strong> If you didn't ask to reset your password, you can safely ignore this email. Your account remains completely secure.
+                              </td>
+                            </tr>
+                          </table>
+                        </div>
+
+                        <!-- Fallback Link -->
+                        <p style="margin: 20px 0 0; font-size: 12px; line-height: 1.6; color: #94A3B8; border-top: 1px solid #F1F5F9; padding-top: 18px;">
+                          Button not working? Copy and paste this URL into your browser:<br>
+                          <a href="${resetUrl}" style="color: #2563EB; word-break: break-all; text-decoration: none; font-weight: 500;">${resetUrl}</a>
+                        </p>
+                      </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                      <td align="center" style="background-color: #F8FAFC; padding: 22px 32px; border-top: 1px solid #F1F5F9;">
+                        <p style="margin: 0 0 6px; font-size: 12px; font-weight: 600; color: #64748B;">
+                          OneAssist CRM &bull; IT Sales &amp; Operations Hub
+                        </p>
+                        <p style="margin: 0; font-size: 11px; color: #94A3B8;">
+                          &copy; 2026 OneAssist CRM. All rights reserved. Automated security notification.
+                        </p>
+                      </td>
+                    </tr>
+
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
+        `,
+      });
+      emailSent = true;
+    } catch (mailErr) {
+      console.error('[SMTP Mail Error]', mailErr);
+      mailError = mailErr.message;
+    }
+
+    if (!emailSent) {
+      return res.status(500).json({
+        success: false,
+        message: `Failed to send password reset email: ${mailError || 'SMTP connection error'}`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Password reset request email has been sent to ${cleanEmail}. Please check your inbox and click the reset link.`,
+      email: cleanEmail,
+    });
+  } catch (error) {
+    console.error('[Forgot Password Error]', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error while processing password reset request.',
+    });
+  }
+}
+
+/**
+ * Validate Reset Token
+ * GET /api/auth/validate-reset-token
+ */
+export async function validateResetToken(req, res) {
+  try {
+    const token = String(req.query.token || '').trim();
+    if (!token) {
+      return res.status(400).json({ success: false, valid: false, message: 'Reset token is required.' });
+    }
+
+    // 1. Check Redis cache
+    let cachedData = await getCache(`crm:reset-token:${token}`);
+    let targetEmail = cachedData?.email;
+
+    // 2. Check PostgreSQL database backup if not in Redis
+    if (!targetEmail) {
+      const userWithToken = await prisma.user.findFirst({
+        where: {
+          refreshToken: {
+            startsWith: `RESET:${token}:`,
+          },
+        },
+        select: { id: true, email: true, refreshToken: true },
+      });
+
+      if (userWithToken && userWithToken.refreshToken) {
+        const parts = userWithToken.refreshToken.split(':');
+        const expiry = Number(parts[2]);
+        if (expiry && Date.now() < expiry) {
+          targetEmail = userWithToken.email;
+          // Re-populate in cache
+          await setCache(`crm:reset-token:${token}`, {
+            userId: userWithToken.id,
+            email: targetEmail,
+          }, 3600);
+        }
+      }
+    }
+
+    if (!targetEmail) {
+      return res.status(400).json({ success: false, valid: false, message: 'Invalid or expired reset token.' });
+    }
+
+    return res.json({
+      success: true,
+      valid: true,
+      email: targetEmail,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, valid: false, message: error.message });
+  }
+}
+
+/**
+ * Confirm and Reset Password via Token
+ * POST /api/auth/reset-password
+ */
+export async function resetPassword(req, res) {
+  try {
+    const { token, email, newPassword, confirmPassword } = req.body;
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password is required.',
+      });
+    }
+
+    if (confirmPassword && newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Passwords do not match.',
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long.',
+      });
+    }
+
+    const cleanToken = String(token || '').trim();
+    let resetData = null;
+
+    if (cleanToken) {
+      resetData = await getCache(`crm:reset-token:${cleanToken}`);
+    }
+
+    let targetEmail = resetData?.email;
+
+    // Database backup check
+    if (!targetEmail && cleanToken) {
+      const userWithToken = await prisma.user.findFirst({
+        where: {
+          refreshToken: {
+            startsWith: `RESET:${cleanToken}:`,
+          },
+        },
+        select: { id: true, email: true, refreshToken: true },
+      });
+
+      if (userWithToken && userWithToken.refreshToken) {
+        const parts = userWithToken.refreshToken.split(':');
+        const expiry = Number(parts[2]);
+        if (expiry && Date.now() < expiry) {
+          targetEmail = userWithToken.email;
+        }
+      }
+    }
+
+    if (!targetEmail && email && cleanToken) {
+      const savedToken = await getCache(`crm:user-token:${email.toLowerCase().trim()}`);
+      if (savedToken && String(savedToken) === cleanToken) {
+        targetEmail = email.toLowerCase().trim();
+      }
+    }
+
+    if (!targetEmail) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired password reset link. Please request a new link.',
+      });
+    }
+
+    // Hash the new password
+    const passwordHash = await hashPassword(newPassword);
+
+    // Update in database and clear token
+    const updatedUser = await prisma.user.update({
+      where: { email: targetEmail },
+      data: {
+        passwordHash,
+        refreshToken: null,
+      },
+      select: { id: true, name: true, email: true, role: true },
+    });
+
+    // Invalidate reset tokens and user sessions
+    if (cleanToken) {
+      await delCache(`crm:reset-token:${cleanToken}`);
+    }
+    await delCache(`crm:user-token:${targetEmail}`);
+    await delCache(`crm:session:${updatedUser.id}`);
+
+    // Audit log
+    await logAuditEvent({
+      userId: updatedUser.id,
+      userName: updatedUser.name,
+      userRole: updatedUser.role,
+      action: 'PASSWORD_RESET_COMPLETED',
+      entity: 'USER',
+      entityId: updatedUser.id,
+      ipAddress: req.ip,
+      details: `Password reset successfully completed via email link for ${targetEmail}.`,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Password has been reset successfully! You can now sign in with your new password.',
+      email: targetEmail,
+    });
+  } catch (error) {
+    console.error('[Reset Password Error]', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error while resetting password.',
+    });
+  }
+}
+
 export default {
   signup,
   register,
   login,
   logout,
   getCurrentUser,
+  forgotPassword,
+  validateResetToken,
+  resetPassword,
 };

@@ -76,12 +76,32 @@ export function buildContactFilterQuery(queryParams = {}) {
     andConditions.push({ priority: { equals: priority.trim(), mode: 'insensitive' } });
   }
   if (assignedTo && assignedTo !== 'All') {
-    andConditions.push({
-      OR: [
-        { assignedTo },
-        { assignedToName: { equals: assignedTo, mode: 'insensitive' } },
-      ],
-    });
+    if (assignedTo.toLowerCase() === 'assigned') {
+      andConditions.push({
+        OR: [
+          { assignmentStatus: 'Assigned' },
+          { AND: [{ assignedTo: { not: null } }, { assignedTo: { not: '' } }, { assignedTo: { not: 'none' } }] },
+        ],
+      });
+    } else if (assignedTo.toLowerCase() === 'unassigned') {
+      andConditions.push({
+        OR: [
+          { assignmentStatus: 'Unassigned' },
+          { assignmentStatus: null },
+          { assignedTo: null },
+          { assignedTo: '' },
+          { assignedTo: 'none' },
+        ],
+      });
+    } else {
+      andConditions.push({
+        OR: [
+          { assignedTo: { equals: assignedTo, mode: 'insensitive' } },
+          { assignedToName: { equals: assignedTo, mode: 'insensitive' } },
+          { createdBy: { equals: assignedTo, mode: 'insensitive' } },
+        ],
+      });
+    }
   }
   if (assignmentStatus && assignmentStatus !== 'All') {
     if (assignmentStatus === 'Unassigned') {

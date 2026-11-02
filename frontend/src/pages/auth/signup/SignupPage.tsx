@@ -5,19 +5,11 @@ import {
   PasswordInput,
   Checkbox,
   Button,
-  Group,
   Stack,
   Text,
   Box,
-  Container,
-  Grid,
   Anchor,
-  Tooltip,
-  ActionIcon,
-  useMantineColorScheme,
-  useComputedColorScheme,
-  ThemeIcon,
-  Badge,
+  SimpleGrid,
 } from '@mantine/core';
 import {
   IconUser,
@@ -26,17 +18,14 @@ import {
   IconLock,
   IconShieldCheck,
   IconArrowRight,
-  IconArrowLeft,
-  IconSun,
-  IconMoon,
-  IconTerminal2,
   IconBuilding,
+  IconEye,
+  IconEyeOff,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useCRM } from '../../../context/CRMContext';
 import { crmApi } from '../../../services/api';
-import { CRM_COLORS } from '../../../theme/colors';
-import { AuthShowcasePanel } from '../components/AuthShowcasePanel';
+import { FuturisticAuthLayout } from '../components/FuturisticAuthLayout';
 
 interface SignupPageProps {
   onSuccess?: () => void;
@@ -45,13 +34,10 @@ interface SignupPageProps {
 
 export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLogin }) => {
   const { setActiveNav } = useCRM();
-  const { setColorScheme } = useMantineColorScheme();
-  const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
-  const isDark = computedColorScheme === 'dark';
 
   const [loading, setLoading] = useState(false);
 
-  // Form States (Clean & Empty)
+  // Form States
   const [organisationName, setOrganisationName] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -79,44 +65,36 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
     }
   };
 
-  const toggleColorScheme = () => {
-    setColorScheme(isDark ? 'light' : 'dark');
-  };
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
     if (!organisationName.trim()) {
-      setErrorMsg('Please enter your Organisation / Company Name');
+      setErrorMsg('Please enter your Organisation / Company Name.');
       return;
     }
     if (!name.trim()) {
-      setErrorMsg('Please enter your Full Name');
+      setErrorMsg('Please enter your Full Name.');
       return;
     }
     if (!email.trim() || !email.includes('@')) {
-      setErrorMsg('Please enter a valid Email Address');
+      setErrorMsg('Please enter a valid Work Email Address.');
       return;
     }
     if (!phone.trim()) {
-      setErrorMsg('Please enter your Phone Number');
+      setErrorMsg('Please enter your Phone Number.');
       return;
     }
-    if (!password) {
-      setErrorMsg('Please enter a Password (minimum 6 characters)');
-      return;
-    }
-    if (password.length < 4) {
-      setErrorMsg('Password must be at least 4 characters');
+    if (!password || password.length < 4) {
+      setErrorMsg('Password must be at least 4 characters.');
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMsg('Passwords do not match! Please check again.');
+      setErrorMsg('Passwords do not match. Please verify.');
       return;
     }
     if (!agreedToTerms) {
-      setErrorMsg('Please agree to the Terms & Conditions to proceed.');
+      setErrorMsg('Please accept the Terms of Service & Privacy Policy.');
       return;
     }
 
@@ -124,9 +102,9 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
     try {
       const res = await crmApi.register({
         organisationName: organisationName.trim(),
-        name,
-        email,
-        phone,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
         password,
         confirmPassword,
       });
@@ -134,14 +112,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
       if (res.success && res.user) {
         notifications.show({
           title: 'Account Created Successfully!',
-          message: `Account created for ${res.user.name}. Please sign in to your workspace.`,
+          message: `Workspace created for ${res.user.name}. Please sign in.`,
           color: 'teal',
           icon: <IconShieldCheck size={18} />,
         });
-        // Automatically move to login screen
         handleGoToLogin();
       } else {
-        setErrorMsg(res.message || 'Registration failed');
+        setErrorMsg(res.message || 'Registration failed. Please check inputs.');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to create account. Please try again.');
@@ -150,344 +127,276 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
     }
   };
 
-  // Dynamic Theme Colors
-  const pageBg = isDark
-    ? 'radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.12) 0%, #0B0F19 60%, rgba(168, 85, 247, 0.08) 100%)'
-    : 'radial-gradient(circle at 15% 15%, rgba(201, 228, 254, 0.5) 0%, #EDF3F7 60%, rgba(226, 214, 254, 0.4) 100%)';
-
-  const cardBg = isDark ? '#131B2E' : '#FFFFFF';
-  const cardBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : CRM_COLORS.borderLight;
-  const textColor = isDark ? '#F8FAFC' : CRM_COLORS.textPrimary;
-  const subtextColor = isDark ? '#94A3B8' : CRM_COLORS.textSecondary;
-  const inputBg = isDark ? '#1E293B' : '#FFFFFF';
-  const inputBorder = isDark ? 'rgba(255, 255, 255, 0.12)' : undefined;
-  const inputTextColor = isDark ? '#F8FAFC' : undefined;
-
   return (
-    <Box
-      style={{
-        minHeight: '100vh',
-        background: pageBg,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px 12px',
-        fontFamily: "'Outfit', sans-serif",
-        transition: 'background 0.3s ease',
-      }}
-    >
-      <Container size="lg" p={0} style={{ width: '100%', maxWidth: 1040 }}>
-        <Paper
-          radius="28px"
-          style={{
-            overflow: 'hidden',
-            background: cardBg,
-            border: `1px solid ${cardBorder}`,
-            boxShadow: isDark
-              ? '0 24px 60px -12px rgba(0, 0, 0, 0.6)'
-              : '0 24px 60px -12px rgba(20, 24, 31, 0.12), 0 8px 24px -4px rgba(20, 24, 31, 0.06)',
-            transition: 'all 0.3s ease',
-          }}
-        >
-          <Grid gutter={0} style={{ minHeight: 560, alignItems: 'stretch' }}>
-            {/* Left Showcase Side (Desktop only: visibleFrom="md") */}
-            <AuthShowcasePanel
-              title="Enterprise CRM & Agile IT Platform"
-              subtitle="Manage client proposals, developer bench staffing, sprint milestones & real-time SLAs in one unified suite."
+    <FuturisticAuthLayout onReturnToDashboard={handleReturnToDashboard}>
+      <Paper
+        radius="28px"
+        style={{
+          width: '100%',
+          maxWidth: 480,
+          background: '#FFFFFF',
+          border: 'none',
+          boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.48), 0 0 50px rgba(0, 180, 255, 0.14)',
+          padding: '36px 32px 28px',
+          position: 'relative',
+          transition: 'all 0.3s ease',
+        }}
+      >
+        {/* Brand Header */}
+        <Box mb={24} style={{ textAlign: 'center' }}>
+          <Box
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              background: 'linear-gradient(135deg, #00D2FF 0%, #2563EB 100%)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 18px rgba(0, 210, 255, 0.45)',
+              color: '#FFFFFF',
+              marginBottom: 12,
+            }}
+          >
+            <Text fw={900} size="22px" c="#FFFFFF" style={{ letterSpacing: '-0.04em', fontFamily: 'system-ui' }}>
+              a
+            </Text>
+          </Box>
+          <Text
+            fw={800}
+            size="24px"
+            style={{
+              color: '#111827',
+              letterSpacing: '-0.025em',
+              lineHeight: 1.2,
+            }}
+          >
+            Create Super Admin Account
+          </Text>
+          <Text size="13px" mt={4} style={{ color: '#6B7280' }}>
+            Get started with your enterprise CRM workspace.
+          </Text>
+        </Box>
+
+        {/* Error Alert Banner */}
+        {errorMsg && (
+          <Box
+            p="10px 14px"
+            mb="md"
+            style={{
+              background: '#FEF2F2',
+              border: '1px solid #FCA5A5',
+              borderRadius: '12px',
+            }}
+          >
+            <Text size="xs" fw={600} style={{ color: '#B91C1C' }}>
+              {errorMsg}
+            </Text>
+          </Box>
+        )}
+
+        {/* Signup Form */}
+        <form onSubmit={handleSignup}>
+          <Stack gap="sm">
+            {/* Organisation / Company Name */}
+            <TextInput
+              placeholder="Organisation / Company Name *"
+              value={organisationName}
+              onChange={(e) => setOrganisationName(e.currentTarget.value)}
+              leftSection={<IconBuilding size={16} color="#9CA3AF" />}
+              radius="12px"
+              size="sm"
+              styles={{
+                input: {
+                  background: '#F9FAFB',
+                  borderColor: '#E5E7EB',
+                  color: '#111827',
+                  fontSize: 13,
+                  height: 42,
+                },
+              }}
+              required
             />
 
-            {/* Right Form Side (Full width on mobile) */}
-            <Grid.Col
-              span={{ base: 12, md: 7 }}
-              p={{ base: 'lg', sm: 'xl', md: 36 }}
+            {/* Admin Full Name & Phone Number */}
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <TextInput
+                placeholder="Full Name *"
+                value={name}
+                onChange={(e) => setName(e.currentTarget.value)}
+                leftSection={<IconUser size={16} color="#9CA3AF" />}
+                radius="12px"
+                size="sm"
+                styles={{
+                  input: {
+                    background: '#F9FAFB',
+                    borderColor: '#E5E7EB',
+                    color: '#111827',
+                    fontSize: 13,
+                    height: 42,
+                  },
+                }}
+                required
+              />
+
+              <TextInput
+                placeholder="Phone Number *"
+                value={phone}
+                onChange={(e) => setPhone(e.currentTarget.value)}
+                leftSection={<IconPhone size={16} color="#9CA3AF" />}
+                radius="12px"
+                size="sm"
+                styles={{
+                  input: {
+                    background: '#F9FAFB',
+                    borderColor: '#E5E7EB',
+                    color: '#111827',
+                    fontSize: 13,
+                    height: 42,
+                  },
+                }}
+                required
+              />
+            </SimpleGrid>
+
+            {/* Work Email */}
+            <TextInput
+              placeholder="Work Email Address *"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+              leftSection={<IconMail size={16} color="#9CA3AF" />}
+              radius="12px"
+              size="sm"
+              styles={{
+                input: {
+                  background: '#F9FAFB',
+                  borderColor: '#E5E7EB',
+                  color: '#111827',
+                  fontSize: 13,
+                  height: 42,
+                },
+              }}
+              required
+            />
+
+            {/* Password & Confirm Password */}
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+              <PasswordInput
+                placeholder="Password *"
+                value={password}
+                onChange={(e) => setPassword(e.currentTarget.value)}
+                leftSection={<IconLock size={16} color="#9CA3AF" />}
+                visibilityToggleIcon={({ reveal }) =>
+                  reveal ? (
+                    <IconEyeOff size={15} color="#9CA3AF" />
+                  ) : (
+                    <IconEye size={15} color="#9CA3AF" />
+                  )
+                }
+                radius="12px"
+                size="sm"
+                styles={{
+                  input: {
+                    background: '#F9FAFB',
+                    borderColor: '#E5E7EB',
+                    color: '#111827',
+                    fontSize: 13,
+                    height: 42,
+                  },
+                }}
+                required
+              />
+
+              <PasswordInput
+                placeholder="Confirm Password *"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.currentTarget.value)}
+                leftSection={<IconLock size={16} color="#9CA3AF" />}
+                visibilityToggleIcon={({ reveal }) =>
+                  reveal ? (
+                    <IconEyeOff size={15} color="#9CA3AF" />
+                  ) : (
+                    <IconEye size={15} color="#9CA3AF" />
+                  )
+                }
+                radius="12px"
+                size="sm"
+                styles={{
+                  input: {
+                    background: '#F9FAFB',
+                    borderColor: '#E5E7EB',
+                    color: '#111827',
+                    fontSize: 13,
+                    height: 42,
+                  },
+                }}
+                required
+              />
+            </SimpleGrid>
+
+            {/* Terms Agreement */}
+            <Box mt={4}>
+              <Checkbox
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.currentTarget.checked)}
+                label={
+                  <Text size="11.5px" style={{ color: '#6B7280' }}>
+                    I agree to the{' '}
+                    <Text span fw={700} style={{ color: '#1D4ED8' }}>
+                      Enterprise Service Agreement
+                    </Text>{' '}
+                    and{' '}
+                    <Text span fw={700} style={{ color: '#1D4ED8' }}>
+                      Privacy Policy
+                    </Text>
+                    .
+                  </Text>
+                }
+                radius="sm"
+                size="xs"
+                color="blue"
+              />
+            </Box>
+
+            {/* Main Action Button */}
+            <Button
+              type="submit"
+              loading={loading}
+              size="md"
+              radius="12px"
+              mt={8}
+              rightSection={<IconArrowRight size={16} />}
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                background: cardBg,
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
+                color: '#FFFFFF',
+                fontWeight: 700,
+                fontSize: 15,
+                height: 44,
+                boxShadow: 'var(--crm-btn-shadow, 0 4px 14px rgba(37, 99, 235, 0.22))',
+                transition: 'all 0.2s ease',
               }}
             >
-              <Box>
-                {/* Top Navigation Bar: Return Link, Dark/Light Mode Toggle, Sign In Link */}
-                <Group justify="space-between" align="center" mb="md">
-                  <Tooltip label="Return to CRM Dashboard">
-                    <Button
-                      variant="subtle"
-                      size="xs"
-                      radius="100px"
-                      leftSection={<IconArrowLeft size={14} />}
-                      style={{ color: subtextColor, fontWeight: 600 }}
-                      onClick={handleReturnToDashboard}
-                    >
-                      Return to CRM
-                    </Button>
-                  </Tooltip>
+              Sign Up
+            </Button>
+          </Stack>
+        </form>
 
-                  <Group gap="xs">
-                    <Tooltip label={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-                      <ActionIcon
-                        variant="light"
-                        radius="100px"
-                        size="md"
-                        color={isDark ? 'yellow' : 'gray'}
-                        onClick={toggleColorScheme}
-                      >
-                        {isDark ? <IconSun size={16} /> : <IconMoon size={16} />}
-                      </ActionIcon>
-                    </Tooltip>
-
-                    <Anchor
-                      size="xs"
-                      fw={700}
-                      style={{ color: isDark ? '#38BDF8' : CRM_COLORS.primary, cursor: 'pointer' }}
-                      onClick={handleGoToLogin}
-                    >
-                      Have an account? Sign In →
-                    </Anchor>
-                  </Group>
-                </Group>
-
-                {/* Mobile-Only Compact Brand Header */}
-                <Box hiddenFrom="md" mb="md" pb="xs" style={{ borderBottom: `1px solid ${cardBorder}` }}>
-                  <Group gap="xs">
-                    <ThemeIcon size="sm" radius="8px" style={{ background: 'linear-gradient(135deg, #38BDF8 0%, #6366F1 100%)', color: '#FFFFFF' }}>
-                      <IconTerminal2 size={14} stroke={2.5} />
-                    </ThemeIcon>
-                    <Text fw={800} size="sm" style={{ color: textColor }}>
-                      IT CRM
-                    </Text>
-                  </Group>
-                </Box>
-
-                {/* Header Title */}
-                <Box mb="sm">
-                  <Text fw={800} size="22px" style={{ color: textColor, letterSpacing: '-0.02em' }}>
-                    Create Super Admin Account
-                  </Text>
-                  <Text size="xs" style={{ color: subtextColor }}>
-                    Register your organisation. Employees will be onboarded by the Super Admin in the Employee Directory.
-                  </Text>
-                </Box>
-
-                {/* Employee Notice Banner */}
-                <Box
-                  p="8px 12px"
-                  mb="sm"
-                  style={{
-                    background: isDark ? 'rgba(59, 130, 246, 0.1)' : 'rgba(219, 234, 254, 0.45)',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    borderRadius: '10px',
-                  }}
-                >
-                  <Text size="xs" fw={600} style={{ color: isDark ? '#93C5FD' : '#1E40AF', lineHeight: 1.4 }}>
-                    ℹ️ <strong>Super Admin Registration:</strong> Staff & Employees do not register here. Your Employee account is created by your Super Admin in the Employee Directory.
-                  </Text>
-                </Box>
-
-                {/* Error Banner */}
-                {errorMsg && (
-                  <Box
-                    p="8px 12px"
-                    mb="sm"
-                    style={{
-                      background: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(249, 183, 180, 0.25)',
-                      border: `1px solid ${isDark ? '#EF4444' : CRM_COLORS.pastelCoral}`,
-                      borderRadius: '12px',
-                    }}
-                  >
-                    <Text size="xs" fw={700} style={{ color: isDark ? '#FCA5A5' : '#9B1C1C' }}>
-                      {errorMsg}
-                    </Text>
-                  </Box>
-                )}
-
-                {/* Signup Form */}
-                <form onSubmit={handleSignup}>
-                  <Stack gap="xs">
-                    {/* Organisation Name */}
-                    <TextInput
-                      label={<Text size="xs" fw={700} style={{ color: textColor }}>Organisation / Company Name</Text>}
-                      placeholder="e.g. OneAssist Technologies"
-                      value={organisationName}
-                      onChange={(e) => setOrganisationName(e.currentTarget.value)}
-                      leftSection={<IconBuilding size={15} color={subtextColor} />}
-                      radius="10px"
-                      size="sm"
-                      styles={{
-                        input: {
-                          background: inputBg,
-                          borderColor: inputBorder,
-                          color: inputTextColor,
-                        },
-                      }}
-                      required
-                    />
-
-                    {/* Row 1: Name & Phone (2 Columns on tablet+, 1 Column on small mobile) */}
-                    <Grid gutter="xs">
-                      <Grid.Col span={{ base: 12, sm: 6 }}>
-                        <TextInput
-                          label={<Text size="xs" fw={700} style={{ color: textColor }}>Super Admin Full Name</Text>}
-                          placeholder="Enter your name"
-                          value={name}
-                          onChange={(e) => setName(e.currentTarget.value)}
-                          leftSection={<IconUser size={15} color={subtextColor} />}
-                          radius="10px"
-                          size="sm"
-                          styles={{
-                            input: {
-                              background: inputBg,
-                              borderColor: inputBorder,
-                              color: inputTextColor,
-                            },
-                          }}
-                          required
-                        />
-                      </Grid.Col>
-                      <Grid.Col span={{ base: 12, sm: 6 }}>
-                        <TextInput
-                          label={<Text size="xs" fw={700} style={{ color: textColor }}>Phone Number</Text>}
-                          placeholder="Enter phone number"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.currentTarget.value)}
-                          leftSection={<IconPhone size={15} color={subtextColor} />}
-                          radius="10px"
-                          size="sm"
-                          styles={{
-                            input: {
-                              background: inputBg,
-                              borderColor: inputBorder,
-                              color: inputTextColor,
-                            },
-                          }}
-                          required
-                        />
-                      </Grid.Col>
-                    </Grid>
-
-                    {/* Row 2: Email (Full Width) */}
-                    <TextInput
-                      label={<Text size="xs" fw={700} style={{ color: textColor }}>Email Address</Text>}
-                      placeholder="Enter your email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.currentTarget.value)}
-                      leftSection={<IconMail size={15} color={subtextColor} />}
-                      radius="10px"
-                      size="sm"
-                      styles={{
-                        input: {
-                          background: inputBg,
-                          borderColor: inputBorder,
-                          color: inputTextColor,
-                        },
-                      }}
-                      required
-                    />
-
-                    {/* Row 3: Password & Confirm Password (2 Columns on tablet+, 1 Column on small mobile) */}
-                    <Grid gutter="xs">
-                      <Grid.Col span={{ base: 12, sm: 6 }}>
-                        <PasswordInput
-                          label={<Text size="xs" fw={700} style={{ color: textColor }}>Password</Text>}
-                          placeholder="Create password"
-                          value={password}
-                          onChange={(e) => setPassword(e.currentTarget.value)}
-                          leftSection={<IconLock size={15} color={subtextColor} />}
-                          radius="10px"
-                          size="sm"
-                          styles={{
-                            input: {
-                              background: inputBg,
-                              borderColor: inputBorder,
-                              color: inputTextColor,
-                            },
-                          }}
-                          required
-                        />
-                      </Grid.Col>
-                      <Grid.Col span={{ base: 12, sm: 6 }}>
-                        <PasswordInput
-                          label={<Text size="xs" fw={700} style={{ color: textColor }}>Confirm Password</Text>}
-                          placeholder="Confirm password"
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.currentTarget.value)}
-                          leftSection={<IconLock size={15} color={subtextColor} />}
-                          radius="10px"
-                          size="sm"
-                          styles={{
-                            input: {
-                              background: inputBg,
-                              borderColor: inputBorder,
-                              color: inputTextColor,
-                            },
-                          }}
-                          required
-                        />
-                      </Grid.Col>
-                    </Grid>
-
-                    {/* Checkbox */}
-                    <Checkbox
-                      checked={agreedToTerms}
-                      onChange={(e) => setAgreedToTerms(e.currentTarget.checked)}
-                      label={
-                        <Text size="xs" style={{ color: subtextColor }}>
-                          I agree to the{' '}
-                          <Anchor size="xs" fw={600} style={{ color: isDark ? '#38BDF8' : CRM_COLORS.primary }}>
-                            Terms & Conditions
-                          </Anchor>
-                        </Text>
-                      }
-                      mt={4}
-                      radius="xs"
-                      size="xs"
-                    />
-
-                    {/* Submit Button */}
-                    <Button
-                      type="submit"
-                      loading={loading}
-                      size="sm"
-                      radius="100px"
-                      mt="xs"
-                      rightSection={<IconArrowRight size={15} />}
-                      style={{
-                        background: isDark ? '#38BDF8' : CRM_COLORS.primary,
-                        color: isDark ? '#0F172A' : CRM_COLORS.textOnPrimary,
-                        fontWeight: 700,
-                        height: 40,
-                        boxShadow: isDark
-                          ? '0 8px 20px rgba(56, 189, 248, 0.3)'
-                          : '0 8px 18px rgba(20, 24, 31, 0.18)',
-                      }}
-                    >
-                      Create Account
-                    </Button>
-                  </Stack>
-                </form>
-              </Box>
-
-              {/* Footer Switch */}
-              <Group justify="center" mt="md" pt="xs" style={{ borderTop: `1px solid ${cardBorder}` }}>
-                <Text size="xs" style={{ color: subtextColor }}>
-                  Already registered?
-                </Text>
-                <Anchor
-                  size="xs"
-                  fw={700}
-                  style={{ color: isDark ? '#38BDF8' : CRM_COLORS.primary, cursor: 'pointer' }}
-                  onClick={handleGoToLogin}
-                >
-                  Sign in here
-                </Anchor>
-              </Group>
-            </Grid.Col>
-          </Grid>
-        </Paper>
-      </Container>
-    </Box>
+        {/* Card Footer Switch to Login */}
+        <Box mt={22} pt={14} style={{ borderTop: '1px solid #F3F4F6', textAlign: 'center' }}>
+          <Text size="xs" style={{ color: '#6B7280' }}>
+            Already have an account?{' '}
+            <Anchor
+              size="xs"
+              fw={700}
+              style={{ color: '#1D4ED8', cursor: 'pointer' }}
+              onClick={handleGoToLogin}
+            >
+              Login →
+            </Anchor>
+          </Text>
+        </Box>
+      </Paper>
+    </FuturisticAuthLayout>
   );
 };
 

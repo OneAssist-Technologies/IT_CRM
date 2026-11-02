@@ -389,34 +389,21 @@ export const loadLeadDealData = (lead: Lead): LeadDealData => {
     const saved = localStorage.getItem(`crm_lead_deal_${lead.id}`);
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Clean up legacy mock invoices, payments, proposals, and quotations
-      if (Array.isArray(parsed.invoices)) {
-        parsed.invoices = parsed.invoices.filter((inv: any) => !inv.id?.startsWith('inv-'));
-      }
-      if (Array.isArray(parsed.payments)) {
-        parsed.payments = parsed.payments.filter((pay: any) => !pay.id?.startsWith('pay-'));
-      }
-      if (Array.isArray(parsed.proposals)) {
-        parsed.proposals = parsed.proposals.filter((p: any) => !p.id?.startsWith('prop-'));
-      }
-      if (Array.isArray(parsed.quotations)) {
-        parsed.quotations = parsed.quotations.filter((q: any) => !q.id?.startsWith('quo-'));
-      }
       // Clean up legacy mockup demo items from previous prototypes
       if (parsed.proposals && parsed.proposals.some((p: any) => p.id === `prop-${lead.id}-1`)) {
-        parsed.proposals = [];
+        parsed.proposals = parsed.proposals.filter((p: any) => p.id !== `prop-${lead.id}-1`);
       }
       if (parsed.quotations && parsed.quotations.some((q: any) => q.id === `quo-${lead.id}-1`)) {
-        parsed.quotations = [];
+        parsed.quotations = parsed.quotations.filter((q: any) => q.id !== `quo-${lead.id}-1`);
       }
       if (parsed.contract && parsed.contract.id === `cnt-${lead.id}-1`) {
         parsed.contract = null;
       }
       if (parsed.invoices && parsed.invoices.some((i: any) => i.id === `inv-${lead.id}-1`)) {
-        parsed.invoices = [];
+        parsed.invoices = parsed.invoices.filter((i: any) => i.id !== `inv-${lead.id}-1`);
       }
       if (parsed.payments && parsed.payments.some((p: any) => p.id === `pay-${lead.id}-1`)) {
-        parsed.payments = [];
+        parsed.payments = parsed.payments.filter((p: any) => p.id !== `pay-${lead.id}-1`);
       }
       if (parsed.negotiation && parsed.negotiation.leadId === lead.id && parsed.negotiation.originalQuotedAmount === 150000) {
         parsed.negotiation = null;

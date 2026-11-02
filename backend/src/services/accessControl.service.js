@@ -156,6 +156,28 @@ export async function ensureSystemRolesService() {
     });
   }
 
+  // Auto-link any existing non-admin user without a roleId to the Employee role
+  const defaultEmployeeRole = await prisma.role.findFirst({
+    where: {
+      OR: [
+        { slug: 'employee' },
+        { name: { equals: 'Employee', mode: 'insensitive' } },
+      ],
+    },
+  });
+
+  if (defaultEmployeeRole) {
+    await prisma.user.updateMany({
+      where: {
+        roleId: null,
+        NOT: { role: 'SUPER_ADMIN' },
+      },
+      data: {
+        roleId: defaultEmployeeRole.id,
+      },
+    });
+  }
+
   // Auto-sync missing system module permissions for all existing roles
   const allRoles = await prisma.role.findMany({ select: { id: true, slug: true } });
   for (const r of allRoles) {

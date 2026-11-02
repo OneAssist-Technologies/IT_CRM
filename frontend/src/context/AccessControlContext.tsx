@@ -62,10 +62,11 @@ const DEFAULT_SYSTEM_MODULES: SystemModule[] = [
   { id: 'call_logs', name: 'Activity Logs', category: 'Main Navigation', description: 'Activity logs including Calls, WhatsApp messages, Emails, and Other interactions.' },
   { id: 'customers', name: 'Customers', category: 'Main Navigation', description: 'Client company directories, accounts, and relationship history.' },
   { id: 'projects', name: 'Projects Management', category: 'Main Navigation', description: 'Client project delivery, sprints, milestones, and task SLAs.' },
-  { id: 'negotiations', name: 'Negotiations', category: 'Main Navigation', description: 'Commercial terms, pricing discussions, discounts, and client follow-ups.' },
+  { id: 'activity_timeline', name: 'Activity Timeline', category: 'Main Navigation', description: 'Chronological timeline of all CRM activities across leads, customers, and deals.' },
 
   // 2. Administration & Security
   { id: 'access_control', name: 'Access Control', category: 'Administration & Security', description: 'Role-Based Access Control, permissions matrix, and role hierarchy.' },
+  { id: 'settings', name: 'Settings', category: 'Administration & Security', description: 'Company settings, master catalog, and system configurations.' },
 ];
 
 export const DEFAULT_ACCESS_CONTROL_VALUE: AccessControlContextType = {
@@ -154,10 +155,13 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
     ]);
 
     // Populate system modules
+    const filterLegacy = (mods: SystemModule[]) =>
+      mods.filter((m) => m.id !== 'negotiations' && m.id !== 'invoices');
+
     if (modulesRes.success && modulesRes.modules && modulesRes.modules.length > 0) {
-      setSystemModules(modulesRes.modules);
+      setSystemModules(filterLegacy(modulesRes.modules));
     } else if (rolesRes.success && rolesRes.systemModules && rolesRes.systemModules.length > 0) {
-      setSystemModules(rolesRes.systemModules);
+      setSystemModules(filterLegacy(rolesRes.systemModules));
     }
 
     if (rolesRes.success && rolesRes.roles) {
@@ -197,24 +201,6 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
-  useEffect(() => {
-    fetchMyPermissions();
-    fetchRoles();
-    fetchUsers();
-    fetchAuditLogs();
-  }, [fetchMyPermissions, fetchRoles, fetchUsers, fetchAuditLogs, currentUser?.id]);
-
-  useEffect(() => {
-    const handlePermsUpdated = () => {
-      fetchMyPermissions();
-      fetchRoles();
-    };
-    window.addEventListener('crm_permissions_updated', handlePermsUpdated);
-    return () => {
-      window.removeEventListener('crm_permissions_updated', handlePermsUpdated);
-    };
-  }, [fetchMyPermissions, fetchRoles]);
-
   // Permission Checkers
   const roleSlugStr = (myPermissions?.role?.slug || myPermissions?.role?.name || currentUser?.role || '').toLowerCase().trim();
 
@@ -225,6 +211,37 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
       currentUser?.role === 'SUPER_ADMIN' ||
       (currentUser?.email && currentUser.email.toLowerCase() === 'sandy@gmail.com')
   );
+
+  const hasAccessControlAccess = Boolean(
+    isSuperAdmin ||
+      myPermissions?.permissions?.['access_control']?.view ||
+      (myPermissions?.permissions?.['access_control'] as any)?.canView
+  );
+
+  useEffect(() => {
+    fetchMyPermissions();
+  }, [fetchMyPermissions, currentUser?.id]);
+
+  useEffect(() => {
+    if (hasAccessControlAccess) {
+      fetchRoles();
+      fetchUsers();
+      fetchAuditLogs();
+    }
+  }, [hasAccessControlAccess, fetchRoles, fetchUsers, fetchAuditLogs]);
+
+  useEffect(() => {
+    const handlePermsUpdated = () => {
+      fetchMyPermissions();
+      if (hasAccessControlAccess) {
+        fetchRoles();
+      }
+    };
+    window.addEventListener('crm_permissions_updated', handlePermsUpdated);
+    return () => {
+      window.removeEventListener('crm_permissions_updated', handlePermsUpdated);
+    };
+  }, [hasAccessControlAccess, fetchMyPermissions, fetchRoles]);
 
   const can = useCallback(
     (moduleId: string, action: PermissionAction = 'view'): boolean => {
@@ -246,8 +263,11 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
         companies: ['companies', 'customers'],
         projects: ['projects', 'projects_management'],
         projects_management: ['projects_management', 'projects'],
+        activity_timeline: ['activity_timeline', 'activities'],
+        activities: ['activity_timeline', 'activities'],
         access_control: ['access_control', 'rbac'],
         rbac: ['rbac', 'access_control'],
+        settings: ['settings'],
       };
 
       const candidates = normalizeMap[moduleId] || [moduleId];

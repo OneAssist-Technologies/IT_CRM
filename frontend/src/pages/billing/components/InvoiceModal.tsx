@@ -112,6 +112,10 @@ const getProductModules = (
     }
   }
 
+  if (product && product.name) {
+    return [{ name: product.name, description: product.description || '' }];
+  }
+
   return [];
 };
 
@@ -287,19 +291,20 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [billingSettings, setBillingSettings] = useState<BillingSettings | null>(null);
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
   const [customRowIndices, setCustomRowIndices] = useState<number[]>([]);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState<boolean>(false);
 
   // 1. Scenario: Project Billing vs Standard Product
   const [scenario, setScenario] = useState<'project' | 'standard'>('project');
 
   // Company Information (Seller) - Pre-loaded from settings in background
-  const [companyName, setCompanyName] = useState<string>('OmniTech Solutions Pvt Ltd');
-  const [companyGstin, setCompanyGstin] = useState<string>('33AAAAA0000A1Z5');
-  const [companyPincode, setCompanyPincode] = useState<string>('600001');
-  const [companyCity, setCompanyCity] = useState<string>('Chennai');
-  const [companyState, setCompanyState] = useState<string>('Tamil Nadu');
-  const [companyAddress, setCompanyAddress] = useState<string>('Tech Boulevard, Guindy Industrial Estate');
-  const [companyPhone, setCompanyPhone] = useState<string>('+91 98458 64510');
-  const [companyEmail, setCompanyEmail] = useState<string>('billing@omnitech.com');
+  const [companyName, setCompanyName] = useState<string>('OneAssist Technologies');
+  const [companyGstin, setCompanyGstin] = useState<string>('');
+  const [companyPincode, setCompanyPincode] = useState<string>('');
+  const [companyCity, setCompanyCity] = useState<string>('');
+  const [companyState, setCompanyState] = useState<string>('');
+  const [companyAddress, setCompanyAddress] = useState<string>('');
+  const [companyPhone, setCompanyPhone] = useState<string>('');
+  const [companyEmail, setCompanyEmail] = useState<string>('');
 
   // Invoice Details
   const [invoiceNumber, setInvoiceNumber] = useState<string>('');
@@ -322,12 +327,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [clientGst, setClientGst] = useState<string>('');
 
   // Bank Details - Pre-loaded from settings in background
-  const [bankAccountHolder, setBankAccountHolder] = useState<string>('OmniTech Solutions Pvt Ltd');
-  const [bankAccountNumber, setBankAccountNumber] = useState<string>('50200012345678');
-  const [bankIfsc, setBankIfsc] = useState<string>('HDFC0001234');
-  const [bankName, setBankName] = useState<string>('HDFC Bank');
-  const [bankBranch, setBankBranch] = useState<string>('Guindy Branch, Chennai');
-  const [bankUpi, setBankUpi] = useState<string>('omnitech@okhdfcbank');
+  const [bankAccountHolder, setBankAccountHolder] = useState<string>('');
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>('');
+  const [bankIfsc, setBankIfsc] = useState<string>('');
+  const [bankName, setBankName] = useState<string>('');
+  const [bankBranch, setBankBranch] = useState<string>('');
+  const [bankUpi, setBankUpi] = useState<string>('');
 
   // Additional IDs & Relations
   const [salesOrderId, setSalesOrderId] = useState<string>('');
@@ -582,17 +587,17 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       billingService.getSettings().then((s) => {
         if (s) {
           setBillingSettings(s);
-          if (s.companyName) setCompanyName(s.companyName);
-          if (s.companyGst) setCompanyGstin(s.companyGst);
-          if (s.companyAddress) setCompanyAddress(s.companyAddress);
-          if (s.companyPhone) setCompanyPhone(s.companyPhone);
-          if (s.companyEmail) setCompanyEmail(s.companyEmail);
-          if (s.accountHolderName) setBankAccountHolder(s.accountHolderName);
-          if (s.accountNumber) setBankAccountNumber(s.accountNumber);
-          if (s.ifscCode) setBankIfsc(s.ifscCode);
-          if (s.bankName) setBankName(s.bankName);
-          if (s.branchName) setBankBranch(s.branchName);
-          if (s.upiId) setBankUpi(s.upiId);
+          setCompanyName(s.companyName || 'OneAssist Technologies');
+          setCompanyGstin(s.companyGst || '');
+          setCompanyAddress(s.companyAddress || '');
+          setCompanyPhone(s.companyPhone || '');
+          setCompanyEmail(s.companyEmail || '');
+          setBankAccountHolder(s.accountHolderName || '');
+          setBankAccountNumber(s.accountNumber || '');
+          setBankIfsc(s.ifscCode || '');
+          setBankName(s.bankName || '');
+          setBankBranch(s.branchName || '');
+          setBankUpi(s.upiId || '');
         }
       }).catch(() => {});
     }
@@ -890,7 +895,15 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       }
     }
 
-    // 3. Modules from other available projects (Master Projects + Delivery Projects)
+    // 3. Products & Services directly from Catalogue (Highest Utility)
+    for (const p of products) {
+      if (p.name && !seen.has(p.name)) {
+        seen.add(p.name);
+        options.push({ value: p.name, label: `${p.name} (${p.type || 'Product'})` });
+      }
+    }
+
+    // 4. Modules from other available projects (Master Projects + Delivery Projects)
     for (const prj of availableProjects) {
       if (selectedProject && prj.id === selectedProject.id) continue;
       let mods: any = prj.modules;
@@ -912,7 +925,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       }
     }
 
-    // 4. Modules from Catalogue
+    // 5. Modules from Catalogue
     for (const p of products) {
       if (selectedCatalogueProduct && p.id === selectedCatalogueProduct.id) continue;
       const mods = getProductModules(p, availableProjects);
@@ -1008,6 +1021,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (mod) foundDesc = mod.description;
     } else {
       for (const p of products) {
+        if (p.name === val) {
+          foundProdId = p.id;
+          foundProdType = p.type;
+          foundTaxRate = Number(p.taxRate) || 18;
+          foundDesc = p.description || '';
+          if (p.unitPrice && Number(p.unitPrice) > 0) {
+            foundPrice = Number(p.unitPrice);
+          }
+          break;
+        }
         const mods = getProductModules(p, availableProjects);
         const mod = mods.find((m) => m.name === val);
         if (mod) {
@@ -1236,15 +1259,97 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasAttemptedSubmit(true);
+
     if (!clientName.trim()) {
-      notifications.show({ color: 'red', message: 'Client or Receiver Name is required' });
+      notifications.show({
+        color: 'red',
+        title: 'Customer Name Required',
+        message: 'Customer / Client Name is mandatory (*). Please enter or select a customer name.',
+      });
       return;
     }
-    const validItems = items.filter((it) => it.itemName && it.itemName.trim().length > 0);
-    if (validItems.length === 0) {
-      notifications.show({ color: 'red', message: 'Please add at least one line item with a name' });
+
+    if (!projectTitle.trim() && !selectedProjectId) {
+      notifications.show({
+        color: 'red',
+        title: 'Project Title Required',
+        message: 'Project Title is mandatory (*). Please select a project or enter a title.',
+      });
       return;
     }
+
+    if (!invoiceDate || !invoiceDate.trim()) {
+      notifications.show({
+        color: 'red',
+        title: 'Invoice Date Required',
+        message: 'Date of Invoice is mandatory (*). Please choose an invoice date.',
+      });
+      return;
+    }
+
+    if (!dueDate || !dueDate.trim()) {
+      notifications.show({
+        color: 'red',
+        title: 'Due Date Required',
+        message: 'Payment Due Date is mandatory (*). Please choose a payment due date.',
+      });
+      return;
+    }
+
+    if (!items || items.length === 0) {
+      notifications.show({
+        color: 'red',
+        title: 'Line Item Required',
+        message: 'Please add at least one line item to the invoice.',
+      });
+      return;
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const rowNum = i + 1;
+      const name = it.itemName ? it.itemName.trim() : '';
+      const price = Number(it.unitPrice || 0);
+
+      if (!name) {
+        notifications.show({
+          color: 'red',
+          title: 'Item Name Required',
+          message: `Line Item #${rowNum}: Item Name / Service is mandatory (*). Please select from dropdown or click ✎ to type a custom name.`,
+        });
+        return;
+      }
+
+      if (price <= 0) {
+        notifications.show({
+          color: 'red',
+          title: 'Amount Required',
+          message: `Line Item #${rowNum} ("${name}"): Amount (₹) is mandatory (*) and must be greater than 0.`,
+        });
+        return;
+      }
+
+      if (scenario === 'standard' && (Number(it.quantity) || 0) <= 0) {
+        notifications.show({
+          color: 'red',
+          title: 'Quantity Required',
+          message: `Line Item #${rowNum} ("${name}"): Quantity must be at least 1.`,
+        });
+        return;
+      }
+    }
+
+    if (grandTotal <= 0) {
+      notifications.show({
+        color: 'red',
+        title: 'Invalid Grand Total',
+        message: 'Invoice Grand Total must be greater than ₹0.',
+      });
+      return;
+    }
+
+    const validItems = items;
 
     try {
       setSubmitting(true);
@@ -1527,6 +1632,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={clientName}
                       onChange={(e) => setClientName(e.currentTarget.value)}
                       required
+                      error={hasAttemptedSubmit && !clientName.trim() ? 'Customer name is required' : undefined}
                       size="xs"
                       radius="md"
                       leftSection={<IconUser size={14} color="#94A3B8" />}
@@ -1678,6 +1784,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         placeholder="e.g. Venus Implementation"
                         value={projectTitle}
                         onChange={(e) => setProjectTitle(e.currentTarget.value)}
+                        error={hasAttemptedSubmit && !projectTitle.trim() ? 'Project Title is required' : undefined}
                         size="xs"
                         radius="md"
                         leftSection={<IconBriefcase size={14} color="#94A3B8" />}
@@ -1706,6 +1813,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         }))}
                         value={selectedProjectId || null}
                         onChange={handleSelectProject}
+                        error={hasAttemptedSubmit && !selectedProjectId && !projectTitle.trim() ? 'Project Title is required' : undefined}
                         searchable
                         clearable
                         size="xs"
@@ -1721,6 +1829,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={parseDateString(invoiceDate)}
                       onChange={(d) => setInvoiceDate(formatDateToString(d))}
                       required
+                      error={hasAttemptedSubmit && !invoiceDate ? 'Date of Invoice is required' : undefined}
                       size="xs"
                       radius="md"
                       valueFormat="DD-MM-YYYY"
@@ -1736,6 +1845,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={parseDateString(dueDate)}
                       onChange={(d) => handleDueDateChange(formatDateToString(d))}
                       required
+                      error={hasAttemptedSubmit && !dueDate ? 'Payment Due Date is required' : undefined}
                       size="xs"
                       radius="md"
                       valueFormat="DD-MM-YYYY"
@@ -1954,11 +2064,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               radius="sm"
                               style={{ flex: 1 }}
                               required
+                              error={hasAttemptedSubmit && (!item.itemName || !item.itemName.trim())}
                               autoFocus
                             />
                           ) : (
                             <Select
-                              placeholder="Select Module..."
+                              placeholder="Select Item or Module..."
                               data={getRowModuleOptions(item.itemName)}
                               value={item.itemName || null}
                               onChange={(val) => handleModuleSelect(idx, val)}
@@ -1967,7 +2078,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               size="xs"
                               radius="sm"
                               style={{ flex: 1 }}
-                              nothingFoundMessage="No matching module"
+                              error={
+                                (!item.itemName || !item.itemName.trim()) &&
+                                (Number(item.unitPrice || item.totalAmount || 0) > 0 || hasAttemptedSubmit)
+                              }
+                              nothingFoundMessage="No matching item (click ✎ pencil to type manually)"
                             />
                           )}
                           <ActionIcon
@@ -1991,6 +2106,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               min={1}
                               size="xs"
                               radius="sm"
+                              error={hasAttemptedSubmit && Number(item.quantity || 0) <= 0}
                             />
                           </Table.Td>
                           <Table.Td>
@@ -2012,6 +2128,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           min={0}
                           size="xs"
                           radius="sm"
+                          error={Number(item.unitPrice || 0) <= 0 && (hasAttemptedSubmit || !!item.itemName?.trim())}
                         />
                       </Table.Td>
                       <Table.Td>

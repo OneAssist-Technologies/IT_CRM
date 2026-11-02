@@ -432,14 +432,18 @@ export const AccessControlPage: React.FC = () => {
       'call_logs',
       'customers',
       'projects',
+      'activity_timeline',
       'access_control',
+      'settings',
     ];
 
-    systemModules.forEach((mod) => {
-      const cat = mod.category || 'Main Navigation';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(mod);
-    });
+    systemModules
+      .filter((mod) => mod.id !== 'negotiations' && mod.id !== 'invoices')
+      .forEach((mod) => {
+        const cat = mod.category || 'Main Navigation';
+        if (!map.has(cat)) map.set(cat, []);
+        map.get(cat)!.push(mod);
+      });
 
     const categoryOrder = ['Main Navigation', 'Administration & Security', 'Custom Modules'];
 
@@ -956,6 +960,8 @@ export const AccessControlPage: React.FC = () => {
       case 'projects':
       case 'projects_management':
         return <IconFolders size={18} color="#4F46E5" />;
+      case 'activity_timeline':
+        return <IconClock size={18} color="#4F46E5" />;
       case 'employees':
       case 'employee_management':
         return <IconUsers size={18} color="#4F46E5" />;
@@ -1068,10 +1074,10 @@ export const AccessControlPage: React.FC = () => {
             leftSection={<IconPlus size={16} />}
             onClick={() => setAddRoleModalOpen(true)}
             style={{
-              background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+              background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
               color: '#FFFFFF',
               fontWeight: 600,
-              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
               padding: '0 22px',
               height: 40,
             }}
@@ -2044,7 +2050,7 @@ export const AccessControlPage: React.FC = () => {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2096,7 +2102,7 @@ export const AccessControlPage: React.FC = () => {
               onClick={handleCreateRoleSubmit}
               disabled={!newRoleName.trim()}
               style={{
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 color: '#FFFFFF',
               }}
             >
@@ -2169,7 +2175,7 @@ export const AccessControlPage: React.FC = () => {
               onClick={handleCreateModuleSubmit}
               disabled={!newModuleName.trim()}
               style={{
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 color: '#FFFFFF',
               }}
             >
@@ -2228,7 +2234,7 @@ export const AccessControlPage: React.FC = () => {
                 loading={updatingHierarchy}
                 onClick={() => handleUpdateRoleParent(hierarchyModalRole.id, targetParentId || null)}
                 style={{
-                  background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                  background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                   color: '#FFFFFF',
                 }}
               >
@@ -2357,7 +2363,7 @@ export const AccessControlPage: React.FC = () => {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2472,7 +2478,7 @@ export const AccessControlPage: React.FC = () => {
                 radius="100px"
                 size="xs"
                 style={{
-                  background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                  background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                   color: '#FFFFFF',
                 }}
                 leftSection={<IconShieldLock size={14} />}

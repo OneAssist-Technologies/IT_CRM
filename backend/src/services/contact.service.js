@@ -73,6 +73,53 @@ async function resolveEmployeeScopedFilter(currentUser) {
 }
 
 /**
+ * Helper: scope import batches and bulk upload contacts by user (Super Admin sees all, Employees only see theirs)
+ */
+async function resolveBatchScopedFilter(currentUser) {
+  if (!currentUser) return null;
+  const roleUpper = String(currentUser.role || '').toUpperCase();
+  if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
+    return null; // Full super admin access
+  }
+
+  if (currentUser.id) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      include: { roleRelation: true },
+    });
+    if (dbUser?.roleRelation) {
+      const slug = dbUser.roleRelation.slug?.toLowerCase();
+      if (slug === 'super_admin') {
+        return null;
+      }
+    }
+  }
+
+  // Look up employee record matching current user
+  const emp = await prisma.employee.findFirst({
+    where: {
+      OR: [
+        ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+        ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+      ],
+    },
+  });
+
+  const orConditions = [];
+  if (currentUser.id) orConditions.push({ createdBy: currentUser.id });
+  if (emp?.id) orConditions.push({ createdBy: emp.id });
+
+  const names = [currentUser.name, currentUser.email, emp?.name].filter(Boolean);
+  for (const name of names) {
+    orConditions.push(
+      { createdBy: { equals: name, mode: 'insensitive' } }
+    );
+  }
+
+  return orConditions.length > 0 ? { OR: orConditions } : { createdBy: currentUser.id };
+}
+
+/**
  * 1. List contacts with search, filters, pagination, sorting, and role-based data scoping
  */
 export async function getContactsService(queryParams = {}, currentUser = null) {
@@ -244,6 +291,7 @@ export async function getContactByIdService(id) {
  */
 export async function getContactStatsService(currentUser = null) {
   const empScope = await resolveEmployeeScopedFilter(currentUser);
+  const batchScope = await resolveBatchScopedFilter(currentUser);
 
   const assignedWhere = empScope
     ? {
@@ -355,8 +403,8 @@ export async function getContactStatsService(currentUser = null) {
       },
     }),
     prisma.contact.count({ where: { priority: 'High', ...(empScope ? { AND: [empScope.combinedFilter] } : {}) } }),
-    prisma.importBatch.count(),
-    prisma.bulkUploadContact.count(),
+    prisma.importBatch.count({ where: batchScope ? batchScope : {} }),
+    prisma.bulkUploadContact.count({ where: batchScope ? batchScope : {} }),
   ]);
 
   return {
@@ -891,6 +939,7 @@ export async function updateContactService(id, body, user) {
     },
   });
 
+  let existingBulk = null;
   if (!existing) {
     const existingBulk = await prisma.bulkUploadContact.findFirst({
       where: {
@@ -1291,6 +1340,50 @@ export async function updateContactService(id, body, user) {
     },
   });
 
+  // Keep linked bulk contact in sync if it originated from bulk import
+  try {
+    const linkedBulk = existingBulk || await prisma.bulkUploadContact.findFirst({
+      where: {
+        OR: [
+          { importedContactId: existing.id },
+          ...(existing.internalReference ? [{ bulkId: existing.internalReference }] : []),
+        ],
+      },
+    });
+    if (linkedBulk) {
+      await prisma.bulkUploadContact.update({
+        where: { id: linkedBulk.id },
+        data: {
+          ...(body.name && { name: body.name.trim() }),
+          ...(body.companyName !== undefined && { companyName: body.companyName }),
+          ...(body.contactPerson !== undefined && { contactPerson: body.contactPerson }),
+          ...(body.email !== undefined && { email: body.email ? body.email.toLowerCase().trim() : null }),
+          ...(body.phone !== undefined && {
+            phone: (() => {
+              const digits = String(body.phone || '').replace(/\D/g, '');
+              return digits.slice(0, 10);
+            })(),
+          }),
+          ...(body.status !== undefined && { status: body.status }),
+          ...(body.stage !== undefined && { stage: body.stage }),
+          ...(body.contactMode !== undefined && { contactMode: body.contactMode ? String(body.contactMode).trim() : null }),
+          ...(body.description !== undefined && { description: body.description, notes: body.description }),
+          ...(body.notes !== undefined && { notes: body.notes }),
+          ...(body.remarks !== undefined && { remarks: body.remarks }),
+          ...(body.assignedTo !== undefined && {
+            assignedTo: body.assignedTo && body.assignedTo !== 'none' && body.assignedTo !== 'Unassigned' ? body.assignedTo : null,
+            assignmentStatus: body.assignedTo && body.assignedTo !== 'none' && body.assignedTo !== 'Unassigned' ? 'Assigned' : 'Unassigned',
+          }),
+          ...(body.assignedToName !== undefined && { assignedToName: body.assignedToName }),
+          ...(body.city !== undefined && { city: body.city }),
+          ...(body.street !== undefined && { street: body.street }),
+        },
+      });
+    }
+  } catch (syncErr) {
+    console.warn('Could not sync linked bulk contact:', syncErr?.message);
+  }
+
   await delCache('crm:contacts:*');
 
   if (io) {
@@ -1555,6 +1648,7 @@ export async function getNextBatchId() {
 
 /**
  * Safely generate the next Bulk Upload Contact ID (e.g. BLK-1001)
+ * Helper to generate next Bulk ID e.g. BLK-1001
  */
 export async function getNextBulkId() {
   const allBulks = await prisma.bulkUploadContact.findMany({
@@ -1585,6 +1679,7 @@ export async function bulkImportContactsService(body, user) {
     defaultCategory = 'Product',
     defaultSource = 'Bulk Import',
     fileName = 'bulk_contacts.csv',
+    fileSize = 0,
   } = body;
 
   if (!Array.isArray(contacts) || contacts.length === 0) {
@@ -1593,11 +1688,21 @@ export async function bulkImportContactsService(body, user) {
     throw error;
   }
 
-  let assignedToId = null;
+  // Resolve assignedTo employee details
   let assignedToName = null;
+  let assignedToId = null;
   let assignmentStatus = 'Unassigned';
 
-  if (defaultAssignedTo && defaultAssignedTo !== 'Unassigned' && defaultAssignedTo !== 'none' && defaultAssignedTo !== 'null') {
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+
+  if (
+    isSuperAdmin &&
+    defaultAssignedTo &&
+    defaultAssignedTo !== 'none' &&
+    defaultAssignedTo !== 'Unassigned' &&
+    defaultAssignedTo !== 'null' &&
+    String(defaultAssignedTo).trim() !== ''
+  ) {
     const emp = await prisma.employee.findFirst({
       where: {
         OR: [
@@ -1614,6 +1719,27 @@ export async function bulkImportContactsService(body, user) {
     } else {
       assignedToId = defaultAssignedTo;
       assignedToName = defaultAssignedTo;
+      assignmentStatus = 'Assigned';
+    }
+  } else {
+    // Default to whoever imported the batch!
+    const importerName = user?.name || user?.email || 'System';
+    const emp = await prisma.employee.findFirst({
+      where: {
+        OR: [
+          { id: user?.id || '' },
+          { email: { equals: user?.email || '', mode: 'insensitive' } },
+          { name: { equals: user?.name || '', mode: 'insensitive' } },
+        ],
+      },
+    });
+    if (emp) {
+      assignedToId = emp.id;
+      assignedToName = emp.name;
+      assignmentStatus = 'Assigned';
+    } else {
+      assignedToId = user?.id || null;
+      assignedToName = importerName;
       assignmentStatus = 'Assigned';
     }
   }
@@ -1765,6 +1891,11 @@ export async function getBulkUploadContactsService(queryParams = {}, currentUser
   const limitNum = Math.max(1, parseInt(limit, 10) || 10);
 
   const andConditions = [];
+
+  const batchScope = await resolveBatchScopedFilter(currentUser);
+  if (batchScope) {
+    andConditions.push(batchScope);
+  }
 
   if (batchId) {
     andConditions.push({ batchId });
@@ -1947,12 +2078,29 @@ export async function getImportBatchesService(queryParams = {}, currentUser = nu
     sortBy = 'createdAt',
     sortOrder = 'desc',
     search = '',
+    assignedTo,
   } = queryParams;
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(1, parseInt(limit, 10) || 10);
 
   const andConditions = [];
+
+  // Data scoping: Employees should ONLY see batches they uploaded or are assigned to; Super Admin sees all
+  const batchScope = await resolveBatchScopedFilter(currentUser);
+  if (batchScope) {
+    andConditions.push(batchScope);
+  }
+
+  if (assignedTo && assignedTo !== 'All') {
+    andConditions.push({
+      OR: [
+        { assignedTo },
+        { assignedToName: { equals: assignedTo, mode: 'insensitive' } },
+        { createdBy: { equals: assignedTo, mode: 'insensitive' } },
+      ],
+    });
+  }
 
   if (search && search.trim()) {
     const q = search.trim();
@@ -2005,6 +2153,21 @@ export async function getImportBatchDetailsService(batchId, currentUser = null) 
     throw error;
   }
 
+  const batchScope = await resolveBatchScopedFilter(currentUser);
+  if (batchScope) {
+    const isAllowed = await prisma.importBatch.findFirst({
+      where: {
+        id: batch.id,
+        AND: [batchScope],
+      },
+    });
+    if (!isAllowed) {
+      const error = new Error('Access denied. You do not have permission to view this import batch.');
+      error.status = 403;
+      throw error;
+    }
+  }
+
   return {
     success: true,
     batch,
@@ -2023,6 +2186,21 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
     const error = new Error('Import batch not found');
     error.status = 404;
     throw error;
+  }
+
+  const batchScope = await resolveBatchScopedFilter(currentUser);
+  if (batchScope) {
+    const isAllowed = await prisma.importBatch.findFirst({
+      where: {
+        id: batch.id,
+        AND: [batchScope],
+      },
+    });
+    if (!isAllowed) {
+      const error = new Error('Access denied. You do not have permission to view this import batch.');
+      error.status = 403;
+      throw error;
+    }
   }
 
   const {
@@ -2142,6 +2320,13 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
  * 16. Delete Import Batch
  */
 export async function deleteImportBatchService(batchId, currentUser = null) {
+  const batchScope = await resolveBatchScopedFilter(currentUser);
+  if (batchScope) {
+    const error = new Error('Access denied. Only Super Admin can delete import batches.');
+    error.status = 403;
+    throw error;
+  }
+
   const batch = await prisma.importBatch.findFirst({
     where: { OR: [{ id: batchId }, { batchId }] },
   });
@@ -2177,6 +2362,13 @@ export async function deleteImportBatchService(batchId, currentUser = null) {
  * 17. Assign Import Batch and its contacts
  */
 export async function assignImportBatchService(batchId, body, currentUser = null) {
+  const batchScope = await resolveBatchScopedFilter(currentUser);
+  if (batchScope) {
+    const error = new Error('Access denied. Only Super Admin can assign import batches.');
+    error.status = 403;
+    throw error;
+  }
+
   const { employeeId, assignedTo } = body || {};
   const targetId = employeeId !== undefined ? employeeId : assignedTo;
 

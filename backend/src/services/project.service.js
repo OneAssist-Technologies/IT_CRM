@@ -6,9 +6,49 @@ import { generateProjectId, buildProjectFilterQuery, formatProjectResponse } fro
 import { recordActivity } from './activity.service.js';
 
 /**
+ * Scope projects by user (Super Admin sees all, Employees only see projects created by them)
+ */
+async function resolveProjectScopeFilter(currentUser) {
+  if (!currentUser) return null;
+  const roleUpper = String(currentUser.role || '').toUpperCase();
+  if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
+    return null; // Super Admin sees all projects
+  }
+
+  if (currentUser.id) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      include: { roleRelation: true },
+    });
+    if (dbUser?.roleRelation?.slug?.toLowerCase() === 'super_admin') {
+      return null;
+    }
+  }
+
+  const emp = await prisma.employee.findFirst({
+    where: {
+      OR: [
+        ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+        ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+      ],
+    },
+  });
+
+  const orConditions = [];
+  const identifiers = [currentUser.name, currentUser.email, emp?.name].filter(Boolean);
+  for (const ident of identifiers) {
+    orConditions.push({ createdBy: { equals: ident, mode: 'insensitive' } });
+  }
+  if (currentUser.id) orConditions.push({ createdBy: currentUser.id });
+  if (emp?.id) orConditions.push({ createdBy: emp.id });
+
+  return orConditions.length > 0 ? { OR: orConditions } : { createdBy: currentUser.id };
+}
+
+/**
  * 1. List Projects with pagination, search, sorting, filters, and Redis caching
  */
-export async function getProjectsService(queryParams = {}) {
+export async function getProjectsService(queryParams = {}, currentUser = null) {
   const {
     sortBy = 'createdAt',
     sortOrder = 'desc',
@@ -20,8 +60,9 @@ export async function getProjectsService(queryParams = {}) {
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 10));
   const skip = (pageNum - 1) * limitNum;
 
-  // Cache key based on query params
-  const cacheKey = `crm:projects:list:${JSON.stringify(queryParams)}`;
+  // Cache key based on user and query params
+  const userScopeKey = currentUser?.id || 'all';
+  const cacheKey = `crm:projects:list:${userScopeKey}:${JSON.stringify(queryParams)}`;
   try {
     const cached = await getCache(cacheKey);
     if (cached) {
@@ -30,6 +71,12 @@ export async function getProjectsService(queryParams = {}) {
   } catch (_) {}
 
   const where = buildProjectFilterQuery(queryParams);
+
+  const scopeFilter = await resolveProjectScopeFilter(currentUser);
+  if (scopeFilter) {
+    where.AND = where.AND || [];
+    where.AND.push(scopeFilter);
+  }
 
   const validSortFields = ['createdAt', 'updatedAt', 'name', 'progress', 'status', 'priority', 'startDate', 'targetEndDate', 'estimatedBudget'];
   const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
@@ -193,8 +240,10 @@ export async function getProjectByIdService(id) {
 /**
  * 3. Get Project KPI Stats with Redis Caching and single groupBy aggregation
  */
-export async function getProjectStatsService() {
-  const cacheKey = 'crm:projects:stats';
+export async function getProjectStatsService(currentUser = null) {
+  const scopeFilter = await resolveProjectScopeFilter(currentUser);
+  const userScopeKey = currentUser?.id || 'all';
+  const cacheKey = `crm:projects:stats:${userScopeKey}`;
   try {
     const cached = await getCache(cacheKey);
     if (cached) {
@@ -202,12 +251,16 @@ export async function getProjectStatsService() {
     }
   } catch (_) {}
 
+  const whereClause = scopeFilter ? scopeFilter : {};
+
   const [statusGroups, budgetAggregate] = await Promise.all([
     prisma.project.groupBy({
       by: ['status'],
+      where: whereClause,
       _count: { _all: true },
     }),
     prisma.project.aggregate({
+      where: whereClause,
       _sum: {
         estimatedBudget: true,
         actualCost: true,

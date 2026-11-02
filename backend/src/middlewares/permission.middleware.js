@@ -116,6 +116,27 @@ export async function getUserPermissions(user) {
 
       await setCache(cacheKey, result, 3600);
       return result;
+    } else {
+      // Find matching role or fallback to default 'employee' role for non-admin user
+      const candidateRole = await prisma.role.findFirst({
+        where: {
+          OR: [
+            { name: { equals: dbUser?.role || user.role || 'Employee', mode: 'insensitive' } },
+            { slug: { equals: (dbUser?.role || user.role || 'employee').toLowerCase().replace(/[\s-]+/g, '_'), mode: 'insensitive' } },
+            { slug: 'employee' },
+            { name: { equals: 'Employee', mode: 'insensitive' } },
+          ],
+        },
+        include: { permissions: true },
+      });
+
+      if (candidateRole) {
+        dbUser.roleRelation = candidateRole;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { roleId: candidateRole.id },
+        }).catch(() => {});
+      }
     }
   }
 

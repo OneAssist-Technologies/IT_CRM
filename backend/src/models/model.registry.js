@@ -61,18 +61,6 @@ export const SYSTEM_MODULES = [
     description: 'Client project delivery, sprints, milestones, and task SLAs.',
   },
   {
-    id: 'negotiations',
-    name: 'Negotiations',
-    category: 'Main Navigation',
-    description: 'Commercial deal negotiations, expected values, discounts, and client discussions.',
-  },
-  {
-    id: 'invoices',
-    name: 'Invoices',
-    category: 'Main Navigation',
-    description: 'Invoice management, GST tax calculations, payment tracking, and settlements.',
-  },
-  {
     id: 'activity_timeline',
     name: 'Activity Timeline',
     category: 'Main Navigation',
@@ -101,7 +89,7 @@ export const MODULE_CATEGORIES = [
 ];
 
 // Obsolete / legacy template module IDs to exclude from display
-const EXCLUDED_LEGACY_MODULES = new Set([
+export const EXCLUDED_LEGACY_MODULES = new Set([
   'calendar',
   'daily_working_plan',
   'distributor_dashboard',
@@ -121,6 +109,8 @@ const EXCLUDED_LEGACY_MODULES = new Set([
   'meetings', // aliased to scheduled_meetings
   'rbac', // aliased to access_control
   'billing', // standalone billing module excluded from sidebar/rbac
+  'negotiations',
+  'invoices',
 ]);
 
 /**

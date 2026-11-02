@@ -278,6 +278,8 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
         proposal?.proposalNumber ||
         generateProposalNumber();
 
+      let createdDbProposal: any = null;
+
       // Sync with backend proposals table
       try {
         const payload: any = {
@@ -314,24 +316,32 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
         };
 
         if (proposal?.id && !proposal.id.startsWith('prop-')) {
-          await leadService.updateProposal(proposal.id, payload);
+          const res = await leadService.updateProposal(proposal.id, payload);
+          createdDbProposal = res?.data;
         } else {
-          await leadService.createProposal(payload);
+          const res = await leadService.createProposal(payload);
+          createdDbProposal = res?.data;
         }
       } catch (backendErr) {
         console.warn('Backend proposal sync skipped:', backendErr);
       }
 
+      const finalId =
+        createdDbProposal?.id ||
+        proposal?.id ||
+        (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `proposal-${Date.now()}`);
+      const finalNum = createdDbProposal?.proposalNumber || proposalNum;
+
       const savedProposal: LeadProposal = {
-        id: proposalId,
+        id: finalId,
         leadId: lead.id,
-        proposalNumber: proposalNum,
-        title: proposalTitle.trim() || `${companyName || contactName} Solution Proposal`,
+        proposalNumber: finalNum,
+        title: createdDbProposal?.title || proposalTitle.trim() || `${companyName || contactName} Solution Proposal`,
         issueDate: proposalDate,
         validUntil: validUntil,
         status: status,
         currency: 'INR (₹)',
-        items: [],
+        items: createdDbProposal?.items || [],
         discountPercent: 0,
         taxPercent: 0,
         subtotal: proposalAmount || 0,
@@ -341,7 +351,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
         documentSize: documentFileSize.trim() || undefined,
         notes: notes,
         terms: termsConditions,
-        createdAt: proposal?.createdAt || new Date().toISOString(),
+        createdAt: createdDbProposal?.createdAt || proposal?.createdAt || new Date().toISOString(),
       };
 
       onSave(savedProposal);

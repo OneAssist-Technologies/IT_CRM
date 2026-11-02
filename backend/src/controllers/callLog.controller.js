@@ -7,7 +7,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
  */
 export async function getCallLogs(req, res) {
   try {
-    const data = await callLogService.getCallLogsService(req.query);
+    const data = await callLogService.getCallLogsService(req.query, req.user);
     return sendSuccess(res, data, 'Call logs fetched successfully.');
   } catch (error) {
     console.error('getCallLogs error:', error);
@@ -21,7 +21,7 @@ export async function getCallLogs(req, res) {
  */
 export async function getCallLogStats(req, res) {
   try {
-    const stats = await callLogService.getCallLogStatsService();
+    const stats = await callLogService.getCallLogStatsService(req.user);
     return sendSuccess(res, stats, 'Call log statistics retrieved.');
   } catch (error) {
     console.error('getCallLogStats error:', error);
@@ -48,7 +48,7 @@ export async function getCallLogById(req, res) {
  */
 export async function createCallLog(req, res) {
   try {
-    const call = await callLogService.createCallLogService(req.body);
+    const call = await callLogService.createCallLogService(req.body, req.user);
     return sendSuccess(res, call, 'Call logged successfully.', 201);
   } catch (error) {
     console.error('createCallLog error:', error);
@@ -90,7 +90,7 @@ export async function deleteCallLog(req, res) {
  */
 export async function getSectionActivities(req, res) {
   try {
-    const data = await callLogService.getSectionActivitiesService(req.params.section, req.query);
+    const data = await callLogService.getSectionActivitiesService(req.params.section, req.query, req.user);
     return sendSuccess(res, data, `${req.params.section} activities fetched successfully.`);
   } catch (error) {
     console.error('getSectionActivities error:', error);
@@ -104,7 +104,7 @@ export async function getSectionActivities(req, res) {
  */
 export async function getSectionStats(req, res) {
   try {
-    const stats = await callLogService.getSectionStatsService(req.params.section);
+    const stats = await callLogService.getSectionStatsService(req.params.section, req.user);
     return sendSuccess(res, stats, `${req.params.section} statistics retrieved.`);
   } catch (error) {
     console.error('getSectionStats error:', error);

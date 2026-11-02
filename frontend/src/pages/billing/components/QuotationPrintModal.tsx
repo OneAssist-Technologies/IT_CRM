@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   Modal,
   Button,
@@ -13,7 +13,8 @@ import {
   Grid,
 } from '@mantine/core';
 import { IconPrinter } from '@tabler/icons-react';
-import { Quotation } from '../../../types/billing';
+import { Quotation, BillingSettings } from '../../../types/billing';
+import { billingService } from '../../../services/billingService';
 import { printQuotationDirect } from '../utils/quotationPrint';
 
 interface QuotationPrintModalProps {
@@ -90,12 +91,26 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({
   quotation,
 }) => {
   const printRef = useRef<HTMLDivElement>(null);
+  const [settings, setSettings] = useState<BillingSettings | null>(null);
+
+  useEffect(() => {
+    if (opened) {
+      billingService.getSettings().then((s) => {
+        if (s) setSettings(s);
+      }).catch(() => {});
+    }
+  }, [opened]);
 
   if (!quotation) return null;
 
   const handlePrint = () => {
-    printQuotationDirect(quotation);
+    printQuotationDirect(quotation, settings);
   };
+
+  const companyName = settings?.companyName || 'OneAssist Technologies';
+  const companyAddress = settings?.companyAddress || '';
+  const companyGst = settings?.companyGst || '';
+  const companyPan = settings?.companyPan || (companyGst && companyGst.length >= 12 ? companyGst.substring(2, 12) : '');
 
   const quotationDateFormatted = quotation.quotationDate
     ? new Date(quotation.quotationDate)
@@ -389,33 +404,37 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({
                   Quotation by
                 </Text>
                 <Text size="11px" fw={700} c="#0F172A">
-                  OneAssist Technologies Pvt Ltd
+                  {companyName}
                 </Text>
               </Group>
-              <Group align="flex-start" wrap="nowrap" mb={6}>
-                <Text size="11px" c="#64748B" style={{ width: 80, flexShrink: 0 }}>
-                  Address
-                </Text>
-                <Text size="11px" c="#334155" style={{ lineHeight: 1.4 }}>
-                  104, Tech Park, Guindy, Chennai, Tamil Nadu, India - 600032
-                </Text>
-              </Group>
+              {companyAddress ? (
+                <Group align="flex-start" wrap="nowrap" mb={6}>
+                  <Text size="11px" c="#64748B" style={{ width: 80, flexShrink: 0 }}>
+                    Address
+                  </Text>
+                  <Text size="11px" c="#334155" style={{ lineHeight: 1.4 }}>
+                    {companyAddress}
+                  </Text>
+                </Group>
+              ) : null}
               <Group align="flex-start" wrap="nowrap" mb={4}>
                 <Text size="11px" c="#64748B" style={{ width: 80, flexShrink: 0 }}>
                   GSTIN
                 </Text>
                 <Text size="11px" fw={600} c="#0F172A">
-                  33AAAAA0000A1Z5
+                  {companyGst || 'Unregistered'}
                 </Text>
               </Group>
-              <Group align="flex-start" wrap="nowrap">
-                <Text size="11px" c="#64748B" style={{ width: 80, flexShrink: 0 }}>
-                  PAN
-                </Text>
-                <Text size="11px" fw={600} c="#0F172A">
-                  AAAAA0000A
-                </Text>
-              </Group>
+              {companyPan ? (
+                <Group align="flex-start" wrap="nowrap">
+                  <Text size="11px" c="#64748B" style={{ width: 80, flexShrink: 0 }}>
+                    PAN
+                  </Text>
+                  <Text size="11px" fw={600} c="#0F172A">
+                    {companyPan}
+                  </Text>
+                </Group>
+              ) : null}
             </Box>
 
             {/* Right Card: Quotation to */}

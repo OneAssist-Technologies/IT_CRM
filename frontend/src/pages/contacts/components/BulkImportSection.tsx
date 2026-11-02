@@ -34,6 +34,7 @@ import { notifications } from '@mantine/notifications';
 import * as XLSX from 'xlsx';
 import { useContact } from '../../../context/ContactContext';
 import { useCRM } from '../../../context/CRMContext';
+import { usePermissions } from '../../../context/AccessControlContext';
 
 export interface ParsedContactRow {
   rowNum: number;
@@ -89,6 +90,7 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
   const isDark = computedColorScheme === 'dark';
   const { metadata, bulkImportContacts } = useContact();
   const { currentUser } = useCRM();
+  const { isSuperAdmin } = usePermissions();
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -297,6 +299,10 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
 
     setImporting(true);
     try {
+      const finalAssignedTo = isSuperAdmin
+        ? (defaultAssignedTo !== 'Unassigned' ? defaultAssignedTo : (currentUser?.name || undefined))
+        : (currentUser?.name || currentUser?.id || undefined);
+
       const contactsToImport = validRows.map((r) => ({
         customId: r.customId || undefined,
         leadId: r.customId || undefined,
@@ -322,12 +328,12 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
             : r.callStatus === 'Not interested' || r.callStatus === 'Not Interested'
             ? 'Not Interested'
             : r.callStatus || 'Not Connected',
-        assignedTo: defaultAssignedTo !== 'Unassigned' ? defaultAssignedTo : null,
+        assignedTo: finalAssignedTo || null,
       }));
 
       const res = await bulkImportContacts({
         contacts: contactsToImport,
-        defaultAssignedTo: defaultAssignedTo !== 'Unassigned' ? defaultAssignedTo : undefined,
+        defaultAssignedTo: finalAssignedTo,
         defaultSource: 'Bulk Import',
         fileName: fileName || 'bulk_contacts.csv',
       });
@@ -558,20 +564,47 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
 
                 {/* Batch Options */}
                 <Group gap="sm" align="flex-end" wrap="wrap">
-                  <Select
-                    label="Assign Imported Contacts To"
-                    size="xs"
-                    data={employeeOptions}
-                    value={defaultAssignedTo}
-                    onChange={(val) => setDefaultAssignedTo(val || 'Unassigned')}
-                    style={{ width: 200 }}
-                    styles={{
-                      input: {
-                        backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
-                        fontSize: 12,
-                      },
-                    }}
-                  />
+                  {isSuperAdmin ? (
+                    <Select
+                      label="Assign Imported Contacts To"
+                      size="xs"
+                      data={employeeOptions}
+                      value={defaultAssignedTo}
+                      onChange={(val) => setDefaultAssignedTo(val || 'Unassigned')}
+                      style={{ width: 220 }}
+                      styles={{
+                        input: {
+                          backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
+                          fontSize: 12,
+                        },
+                      }}
+                    />
+                  ) : (
+                    <Box style={{ minWidth: 160 }}>
+                      <Text size="11px" fw={600} c={isDark ? '#94A3B8' : '#64748B'} mb={4}>
+                        Assigned Owner
+                      </Text>
+                      <Badge
+                        radius="md"
+                        styles={{
+                          root: {
+                            backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                            color: isDark ? '#93C5FD' : '#1D4ED8',
+                            border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #BFDBFE',
+                            fontWeight: 600,
+                            fontSize: 12,
+                            textTransform: 'none',
+                            padding: '6px 12px',
+                            height: 32,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          },
+                        }}
+                      >
+                        {currentUser?.name || 'Assigned to Me'}
+                      </Badge>
+                    </Box>
+                  )}
 
                   <Button
                     variant="default"
