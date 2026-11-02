@@ -34,18 +34,24 @@ interface ParsedModule {
 }
 
 const getProductModules = (product?: BillingProduct | null): ParsedModule[] => {
-  if (!product || !product.modules || !Array.isArray(product.modules)) return [];
-  return product.modules
-    .map((m: any) => {
-      if (typeof m === 'string') {
-        return { name: m, description: '' };
-      }
-      return {
-        name: m?.name || '',
-        description: m?.description || '',
-      };
-    })
-    .filter((m) => m.name && m.name.trim() !== '');
+  if (!product) return [];
+  if (product.modules && Array.isArray(product.modules) && product.modules.length > 0) {
+    return product.modules
+      .map((m: any) => {
+        if (typeof m === 'string') {
+          return { name: m, description: '' };
+        }
+        return {
+          name: m?.name || '',
+          description: m?.description || '',
+        };
+      })
+      .filter((m) => m.name && m.name.trim() !== '');
+  }
+  if (product.name) {
+    return [{ name: product.name, description: product.description || '' }];
+  }
+  return [];
 };
 
 interface SalesOrderModalProps {
@@ -241,6 +247,13 @@ export const SalesOrderModal: React.FC<SalesOrderModalProps> = ({
         }
       }
     } else {
+      // All products directly
+      for (const p of products) {
+        if (p.name && !seen.has(p.name)) {
+          seen.add(p.name);
+          options.push({ value: p.name, label: `${p.name} (${p.type || 'Product'})` });
+        }
+      }
       // All modules across all active products
       for (const p of products) {
         const mods = getProductModules(p);
@@ -366,12 +379,27 @@ export const SalesOrderModal: React.FC<SalesOrderModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName.trim()) {
-      notifications.show({ color: 'red', message: 'Client or Contact Name is required' });
+      notifications.show({ color: 'red', message: 'Client or Contact Name is required (*)' });
       return;
     }
     if (contractValue <= 0) {
       notifications.show({ color: 'red', message: 'Total Contract Value must be greater than 0' });
       return;
+    }
+    if (!items || items.length === 0) {
+      notifications.show({ color: 'red', message: 'Please add at least one line item to the sales order' });
+      return;
+    }
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (!it.itemName?.trim()) {
+        notifications.show({ color: 'red', message: `Line Item #${i + 1}: Item Name / Service is required (*)` });
+        return;
+      }
+      if (Number(it.unitPrice || 0) <= 0) {
+        notifications.show({ color: 'red', message: `Line Item #${i + 1} (${it.itemName}): Amount is required and must be greater than 0` });
+        return;
+      }
     }
 
     try {
@@ -769,7 +797,7 @@ export const SalesOrderModal: React.FC<SalesOrderModalProps> = ({
                             />
                           ) : (
                             <Select
-                              placeholder="Select Module..."
+                              placeholder="Select Item or Module..."
                               data={getRowModuleOptions(item.itemName)}
                               value={item.itemName || null}
                               onChange={(val) => handleModuleSelect(idx, val)}
@@ -778,7 +806,8 @@ export const SalesOrderModal: React.FC<SalesOrderModalProps> = ({
                               size="xs"
                               radius="sm"
                               style={{ flex: 1 }}
-                              nothingFoundMessage="No matching module"
+                              error={!item.itemName && Number(item.unitPrice || item.totalAmount || 0) > 0}
+                              nothingFoundMessage="No matching item (click ✎ pencil to type manually)"
                             />
                           )}
                           <ActionIcon

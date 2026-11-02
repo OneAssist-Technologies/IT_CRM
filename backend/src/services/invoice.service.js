@@ -16,19 +16,19 @@ export async function getBillingSettingsService() {
     settings = await prisma.billingSettings.create({
       data: {
         id: 'default_billing_settings',
-        companyName: 'OmniTech Solutions Pvt Ltd',
-        companyAddress: 'Tidel Park, Rajiv Gandhi Salai, Taramani, Chennai, Tamil Nadu 600113',
-        companyGst: '33AAAAA0000A1Z5',
-        companyPan: 'AAAAA0000A',
-        companyPhone: '+91 98765 43210',
-        companyEmail: 'billing@omnitech.io',
-        companyWebsite: 'https://omnitech.io',
-        bankName: 'HDFC Bank',
-        accountNumber: '50200012345678',
-        accountHolderName: 'OmniTech Solutions Pvt Ltd',
-        ifscCode: 'HDFC0001234',
-        branchName: 'Tidel Park Branch',
-        upiId: 'omnitech@hdfcbank',
+        companyName: 'OneAssist Technologies',
+        companyAddress: '',
+        companyGst: '',
+        companyPan: '',
+        companyPhone: '',
+        companyEmail: '',
+        companyWebsite: '',
+        bankName: '',
+        accountNumber: '',
+        accountHolderName: '',
+        ifscCode: '',
+        branchName: '',
+        upiId: '',
         invoicePrefix: 'INV-2026-',
         invoiceNextNumber: 1,
         quotationPrefix: 'QUO-2026-',
@@ -58,6 +58,20 @@ export async function getBillingSettingsService() {
 
   return {
     ...settings,
+    companyName: settings.companyName || profileVal.companyName || profileVal.legalName || 'OneAssist Technologies',
+    companyAddress: settings.companyAddress || profileVal.companyAddress || profileVal.address || '',
+    companyGst: settings.companyGst || profileVal.companyGst || profileVal.gstNumber || '',
+    companyPan: settings.companyPan || profileVal.companyPan || profileVal.panNumber || '',
+    companyPhone: settings.companyPhone || profileVal.companyPhone || profileVal.phone || '',
+    companyEmail: settings.companyEmail || profileVal.companyEmail || profileVal.email || '',
+    companyWebsite: settings.companyWebsite || profileVal.companyWebsite || profileVal.website || '',
+    companyLogoUrl: settings.companyLogoUrl || profileVal.companyLogoUrl || profileVal.logoUrl || '',
+    bankName: settings.bankName || profileVal.bankName || '',
+    accountNumber: settings.accountNumber || profileVal.accountNumber || '',
+    accountHolderName: settings.accountHolderName || profileVal.accountHolderName || '',
+    ifscCode: settings.ifscCode || profileVal.ifscCode || '',
+    branchName: settings.branchName || profileVal.branchName || '',
+    upiId: settings.upiId || profileVal.upiId || '',
     authorizedSignatory: profileVal.authorizedSignatory || 'Santhosh C',
     signatoryDesignation: profileVal.signatoryDesignation || 'Managing Director',
     signatureUrl: profileVal.signatureUrl || null,
@@ -1615,6 +1629,45 @@ export async function createInvoiceService(data, user) {
     throw err;
   }
 
+  if (!data.projectName?.trim() && !data.projectTitle?.trim()) {
+    const err = new Error('Project Title is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!data.invoiceDate) {
+    const err = new Error('Date of Invoice is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!data.dueDate) {
+    const err = new Error('Payment Due Date is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  const rawItems = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
+  if (rawItems.length === 0) {
+    const err = new Error('At least one line item is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  for (let i = 0; i < rawItems.length; i++) {
+    const it = rawItems[i];
+    if (!it.itemName?.trim()) {
+      const err = new Error(`Line Item #${i + 1}: Item Name / Service is required.`);
+      err.status = 400;
+      throw err;
+    }
+    if (Number(it.unitPrice || 0) <= 0) {
+      const err = new Error(`Line Item #${i + 1} (${it.itemName}): Amount is required and must be greater than 0.`);
+      err.status = 400;
+      throw err;
+    }
+  }
+
   const settings = await getBillingSettingsService();
   let invoiceNumber = data.invoiceNumber?.trim();
 
@@ -1644,7 +1697,6 @@ export async function createInvoiceService(data, user) {
   );
 
   // Line Items Calculation
-  const rawItems = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
   let subtotal = 0;
   let totalLineDiscounts = 0;
   let totalTax = 0;
@@ -1712,12 +1764,12 @@ export async function createInvoiceService(data, user) {
     : (initialPaymentAmount > 0 ? 'Partially Paid' : 'Unpaid');
 
   const bankDetails = {
-    bankName: data.bankDetails?.bankName || settings.bankName || 'HDFC Bank',
-    accountNumber: data.bankDetails?.accountNumber || settings.accountNumber || '50200012345678',
-    accountHolderName: data.bankDetails?.accountHolderName || settings.accountHolderName || 'OmniTech Solutions Pvt Ltd',
-    ifscCode: data.bankDetails?.ifscCode || settings.ifscCode || 'HDFC0001234',
-    branchName: data.bankDetails?.branchName || settings.branchName || 'Tidel Park Branch',
-    upiId: data.bankDetails?.upiId || settings.upiId || 'omnitech@hdfcbank',
+    bankName: data.bankDetails?.bankName || settings.bankName || '',
+    accountNumber: data.bankDetails?.accountNumber || settings.accountNumber || '',
+    accountHolderName: data.bankDetails?.accountHolderName || settings.accountHolderName || '',
+    ifscCode: data.bankDetails?.ifscCode || settings.ifscCode || '',
+    branchName: data.bankDetails?.branchName || settings.branchName || '',
+    upiId: data.bankDetails?.upiId || settings.upiId || '',
     invoiceType: data.invoiceType || 'One-Time',
     currency: data.currency || 'INR',
     paymentStatus,
@@ -1866,7 +1918,26 @@ export async function updateInvoiceService(id, data, user) {
   if (data.contactPerson !== undefined) meta.contactPerson = data.contactPerson;
 
   // Allow full re-calculation and saving of line items whenever items are provided
-  if (Array.isArray(data.items) && data.items.length > 0) {
+  if (Array.isArray(data.items)) {
+    if (data.items.length === 0) {
+      const err = new Error('At least one line item is required.');
+      err.status = 400;
+      throw err;
+    }
+    for (let i = 0; i < data.items.length; i++) {
+      const it = data.items[i];
+      if (!it.itemName?.trim()) {
+        const err = new Error(`Line Item #${i + 1}: Item Name / Service is required.`);
+        err.status = 400;
+        throw err;
+      }
+      if (Number(it.unitPrice || 0) <= 0) {
+        const err = new Error(`Line Item #${i + 1} (${it.itemName}): Amount is required and must be greater than 0.`);
+        err.status = 400;
+        throw err;
+      }
+    }
+
     const taxType = data.taxType || meta.taxType || 'INTRA_STATE';
     let subtotal = 0;
     let totalLineDiscounts = 0;

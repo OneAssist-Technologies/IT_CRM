@@ -694,9 +694,9 @@ export const NotificationBell: React.FC = () => {
               style={{
                 borderRadius: 10,
                 background: isDark
-                  ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.16) 0%, rgba(59, 130, 246, 0.16) 100%)'
-                  : 'linear-gradient(135deg, #EEF2FF 0%, #EFF6FF 100%)',
-                border: isDark ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid #C7D2FE',
+                  ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(59, 130, 246, 0.16) 100%)'
+                  : 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                border: isDark ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid #BFDBFE',
               }}
             >
               <Group justify="space-between" align="center" wrap="nowrap">
@@ -706,7 +706,7 @@ export const NotificationBell: React.FC = () => {
                       width: 26,
                       height: 26,
                       borderRadius: 8,
-                      background: '#4F46E5',
+                      background: 'var(--crm-primary, #2563EB)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',

@@ -5,6 +5,9 @@ import {
   login,
   logout,
   getCurrentUser,
+  forgotPassword,
+  validateResetToken,
+  resetPassword,
 } from '../controllers/auth.controller.js';
 
 const router = Router();
@@ -22,5 +25,10 @@ router.post('/logout', logout);
 // 4. Current Session Verification (/me or /session)
 router.get('/session', requireAuth, getCurrentUser);
 router.get('/me', requireAuth, getCurrentUser);
+
+// 5. Dynamic Password Reset Flow
+router.post('/forgot-password', forgotPassword);
+router.get('/validate-reset-token', validateResetToken);
+router.post('/reset-password', resetPassword);
 
 export default router;

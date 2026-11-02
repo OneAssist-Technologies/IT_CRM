@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { Box, Container, Drawer, Paper, Text, Button } from '@mantine/core';
+import React from 'react';
+import { Box, Container, Drawer, Paper, Text, Button, useComputedColorScheme } from '@mantine/core';
 import { IconShieldLock } from '@tabler/icons-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { AnimatedCanvasBackdrop } from '../common/AnimatedCanvasBackdrop';
 import { useCRM } from '../../context/CRMContext';
 import { usePermissions } from '../../context/AccessControlContext';
 import { DashboardPage } from '../../pages/DashboardPage';
@@ -20,7 +21,7 @@ import { BillingPage } from '../../pages/billing';
 import { InvoicesPage, CreateInvoicePage, InvoiceDetailsPage } from '../../pages/invoices';
 import { Invoice } from '../../types/billing';
 import { LeadNegotiationSection, LeadContractSection } from '../../pages/leads/components/LeadDealSections';
-import { AuthPage, SignupPage, LoginPage } from '../../pages/auth';
+import { AuthPage, SignupPage, LoginPage, ResetPasswordPage } from '../../pages/auth';
 import { ActivityTimelinePage } from '../../pages/activity-timeline';
 import { useContact } from '../../context/ContactContext';
 import { useLead } from '../../context/LeadContext';
@@ -58,7 +59,9 @@ const AccessRestrictedView: React.FC<{ moduleName: string; onGoAllowed: () => vo
 );
 
 export const AppLayout: React.FC = () => {
-  const { activeNav, setActiveNav, sidebarMobileOpened, setSidebarMobileOpened } = useCRM();
+  const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
+  const isDark = computedColorScheme === 'dark';
+  const { activeNav, setActiveNav, sidebarMobileOpened, setSidebarMobileOpened, sidebarCollapsed } = useCRM();
   const { selectedContact, deleteContact } = useContact();
   const { isSuperAdmin, can } = usePermissions();
   const { selectedLead } = useLead();
@@ -81,6 +84,15 @@ export const AppLayout: React.FC = () => {
       <LoginPage
         onSuccess={() => setActiveNav('dashboard')}
         onSwitchToSignup={() => setActiveNav('signup')}
+      />
+    );
+  }
+
+  if (activeNav === 'reset-password') {
+    return (
+      <ResetPasswordPage
+        onSuccess={() => setActiveNav('login')}
+        onBackToLogin={() => setActiveNav('login')}
       />
     );
   }
@@ -709,17 +721,19 @@ export const AppLayout: React.FC = () => {
         background: 'transparent',
       }}
     >
-      {/* 1. Desktop Left Fixed Sidebar (Fixed 260px, Hidden on Mobile) */}
+      {/* 1. Desktop Left Fixed Sidebar (Collapsible: 275px or 72px, Hidden on Mobile) */}
       <Box
         visibleFrom="md"
         style={{
-          width: 260,
-          minWidth: 260,
-          maxWidth: 260,
+          width: sidebarCollapsed ? 72 : 275,
+          minWidth: sidebarCollapsed ? 72 : 275,
+          maxWidth: sidebarCollapsed ? 72 : 275,
           height: '100vh',
           flexShrink: 0,
           zIndex: 110,
           overflow: 'hidden',
+          transition:
+            'width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <Sidebar onSelectNav={(nav) => setActiveNav(nav)} />
@@ -750,6 +764,9 @@ export const AppLayout: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden',
           position: 'relative',
+          background: isDark
+            ? '#070D1E'
+            : 'linear-gradient(135deg, #F0F5FE 0%, #E8F0FC 40%, #F4F1FD 100%)',
         }}
       >
         {/* Top Header Bar (64px Fixed, never scrolls) */}
@@ -782,6 +799,9 @@ export const AppLayout: React.FC = () => {
             position: 'relative',
           }}
         >
+          {/* High-Tech Animated Canvas Background (Strictly behind cards: zIndex 0, pointer-events none) */}
+          <AnimatedCanvasBackdrop />
+
           <Container
             fluid
             px={{ base: 'xs', sm: 'md', md: 'lg', xl: 'xl' }}
@@ -793,6 +813,8 @@ export const AppLayout: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               paddingBottom: 48,
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             {renderActiveScreen()}

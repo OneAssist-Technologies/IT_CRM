@@ -28,6 +28,10 @@ interface CRMContextType {
   sidebarMobileOpened: boolean;
   setSidebarMobileOpened: (opened: boolean) => void;
 
+  // Desktop Sidebar collapse toggle
+  sidebarCollapsed: boolean;
+  setSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+
   // Clear Database & Storage
   clearDatabase: () => Promise<void>;
 }
@@ -55,6 +59,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     if (path === 'signup') return 'signup';
     if (path === 'login' || path === 'signin' || path === 'auth') return 'login';
+    if (path === 'reset-password' || path === 'reset') return 'reset-password';
 
     if (
       path === 'employees/add' ||
@@ -235,6 +240,20 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [sidebarMobileOpened, setSidebarMobileOpened] = useState<boolean>(false);
 
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('crm_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('crm_sidebar_collapsed', String(sidebarCollapsed));
+    } catch {}
+  }, [sidebarCollapsed]);
+
   // User Logout: Clears HttpOnly Cookie & Session
   const logoutUser = async () => {
     try {
@@ -275,6 +294,8 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setGlobalSearch,
         sidebarMobileOpened,
         setSidebarMobileOpened,
+        sidebarCollapsed,
+        setSidebarCollapsed,
         clearDatabase,
       }}
     >

@@ -312,7 +312,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
             <Button variant="subtle" onClick={onClose} disabled={loading} color="gray">
               Cancel
             </Button>
-            <Button type="submit" loading={loading} style={{ background: '#0EA5E9' }}>
+            <Button type="submit" loading={loading}>
               {customer ? 'Update Customer' : 'Save Customer'}
             </Button>
           </Group>

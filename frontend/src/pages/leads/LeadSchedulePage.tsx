@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Stack,
@@ -244,11 +244,14 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     return null;
   });
 
+  const prevLeadIdRef = useRef<string | null>(activeLead?.id || null);
+
   useEffect(() => {
-    if (activeLead) {
+    if (activeLead && activeLead.id !== prevLeadIdRef.current) {
+      prevLeadIdRef.current = activeLead.id;
       setDealData(loadLeadDealData(activeLead));
     }
-  }, [activeLead]);
+  }, [activeLead?.id]);
 
   const handleUpdateProposals = async (newProposals: any) => {
     if (!dealData || !activeLead) return;

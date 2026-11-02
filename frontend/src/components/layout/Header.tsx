@@ -71,7 +71,7 @@ export const Header: React.FC<HeaderProps> = () => {
           aria-label="Toggle navigation"
         />
         <TextInput
-          placeholder="Search..."
+          placeholder="Search anything..."
           leftSection={<IconSearch size={16} stroke={2} color={iconColor} />}
           rightSection={
             globalSearch ? (

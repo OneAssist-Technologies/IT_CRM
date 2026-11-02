@@ -592,8 +592,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         try {
           await createCallLogApi({
             callType: (callType as any) || 'Outgoing',
-            employeeId: assignedEmployeeId,
-            employeeName: assignedEmployeeName,
+            employeeId: currentUser?.id || assignedEmployeeId,
+            employeeName: currentUser?.name || assignedEmployeeName,
             contactId: contactIdentifier,
             contactName: contactDisplayName,
             companyName: contactCompany || undefined,
@@ -627,8 +627,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             activityTime: whatsappTime || getCurrentTimeStr(),
             nextFollowDate: whatsappStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
             description: formData.description?.trim() || undefined,
-            performedBy: assignedEmployeeName,
-            performedById: assignedEmployeeId ? String(assignedEmployeeId) : undefined,
+            performedBy: currentUser?.name || assignedEmployeeName,
+            performedById: currentUser?.id ? String(currentUser.id) : (assignedEmployeeId ? String(assignedEmployeeId) : undefined),
           });
           window.dispatchEvent(new CustomEvent('crm_activities_updated'));
         } catch (waErr) {
@@ -651,8 +651,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             activityTime: emailTime || getCurrentTimeStr(),
             nextFollowDate: emailStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
             description: formData.description?.trim() || undefined,
-            performedBy: assignedEmployeeName,
-            performedById: assignedEmployeeId ? String(assignedEmployeeId) : undefined,
+            performedBy: currentUser?.name || assignedEmployeeName,
+            performedById: currentUser?.id ? String(currentUser.id) : (assignedEmployeeId ? String(assignedEmployeeId) : undefined),
           });
           window.dispatchEvent(new CustomEvent('crm_activities_updated'));
         } catch (emailErr) {
@@ -674,8 +674,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             activityTime: otherActivityTime || getCurrentTimeStr(),
             nextFollowDate: otherStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
             description: formData.description?.trim() || undefined,
-            performedBy: assignedEmployeeName,
-            performedById: assignedEmployeeId ? String(assignedEmployeeId) : undefined,
+            performedBy: currentUser?.name || assignedEmployeeName,
+            performedById: currentUser?.id ? String(currentUser.id) : (assignedEmployeeId ? String(assignedEmployeeId) : undefined),
           });
           window.dispatchEvent(new CustomEvent('crm_activities_updated'));
         } catch (otherErr) {

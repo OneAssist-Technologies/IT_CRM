@@ -59,28 +59,28 @@ export interface CRMThemeTokens {
 }
 
 export const CRM_COLORS: CRMThemeTokens = {
-  // ⚡ ONEASSIST BRAND PALETTE (Coimbatore HQ)
-  primary: '#4F46E5',
-  primaryHover: '#4338CA',
-  primaryLight: '#EEF2FF',
-  primaryDark: '#312E81',
-  primaryGradient: 'linear-gradient(135deg, #4F46E5 0%, #2563EB 50%, #06B6D4 100%)',
+  // ⚡ ONEASSIST BRAND PALETTE (Refined Royal Sapphire & Midnight Navy)
+  primary: '#2563EB',
+  primaryHover: '#1D4ED8',
+  primaryLight: '#EFF6FF',
+  primaryDark: '#1E40AF',
+  primaryGradient: 'linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%)',
 
-  brandCyan: '#06B6D4',
-  brandSky: '#0EA5E9',
+  brandCyan: '#0EA5E9',
+  brandSky: '#38BDF8',
   brandBlue: '#2563EB',
 
   // ❄️ CLEAN ENTERPRISE SAAS CANVAS
-  background: '#F8FAFC',
+  background: '#F0F5FE',
   backgroundLight: '#FFFFFF',
-  backgroundDark: '#F1F5F9',
+  backgroundDark: '#E8F0FC',
 
   // 🪟 CRISP WHITE FLOATING CARDS & EXECUTIVE SURFACES
   cardBg: '#FFFFFF',
   cardBgHover: '#F8FAFC',
-  cardBgDark: '#0F172A',
+  cardBgDark: '#071126',
   border: '#E2E8F0',
-  borderLight: 'rgba(99, 102, 241, 0.08)',
+  borderLight: 'rgba(37, 99, 235, 0.08)',
 
   // ✍️ SLEEK HIGH-CONTRAST TYPOGRAPHY
   textPrimary: '#0F172A',
@@ -105,7 +105,7 @@ export const CRM_COLORS: CRMThemeTokens = {
   warning: '#F59E0B',
   danger: '#EF4444',
   error: '#EF4444',
-  info: '#0EA5E9',
+  info: '#06B6D4',
 };
 
 export default CRM_COLORS;

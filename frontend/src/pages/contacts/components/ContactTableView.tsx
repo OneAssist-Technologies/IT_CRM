@@ -55,6 +55,7 @@ import { Contact } from '../../../types/contact';
 import { useContact } from '../../../context/ContactContext';
 import { useCRM } from '../../../context/CRMContext';
 import { useEmployee } from '../../../context/EmployeeContext';
+import { usePermissions } from '../../../context/AccessControlContext';
 
 export type ContactTableActiveTab = 'BULK_IMPORT' | 'NEW' | 'ASSIGNED';
 
@@ -1060,18 +1061,46 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                       </Text>
                     </Table.Td>
 
-                    {/* 6. ASSIGNED OWNER: Quick Assign dropdown matching bulk import batches */}
+                    {/* 6. ASSIGNED OWNER: Quick Assign dropdown matching bulk import batches (Super Admin Only) */}
                     <Table.Td
                       style={{ width: 115, whiteSpace: 'nowrap', padding: '8px 8px', verticalAlign: 'middle' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Menu
-                        shadow="lg"
-                        width={230}
-                        position="bottom-start"
-                        radius="md"
-                        withinPortal
-                      >
+                      {!isSuperAdmin ? (
+                        <Tooltip
+                          label={`Assigned to ${contact.assignedToName || (contact as any).createdBy || 'Assigned'}`}
+                          withArrow
+                          position="top"
+                        >
+                          <Badge
+                            radius="xl"
+                            styles={{
+                              root: {
+                                backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                                color: isDark ? '#93C5FD' : '#1D4ED8',
+                                border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #BFDBFE',
+                                fontWeight: 600,
+                                fontSize: 11.5,
+                                textTransform: 'none',
+                                padding: '4px 10px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 5,
+                              },
+                            }}
+                          >
+                            <IconUserCheck size={12} stroke={2.2} />
+                            <span>{contact.assignedToName || (contact as any).createdBy || 'Assigned'}</span>
+                          </Badge>
+                        </Tooltip>
+                      ) : (
+                        <Menu
+                          shadow="lg"
+                          width={230}
+                          position="bottom-start"
+                          radius="md"
+                          withinPortal
+                        >
                         <Menu.Target>
                           <Tooltip
                             label={
@@ -1259,6 +1288,7 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                           )}
                         </Menu.Dropdown>
                       </Menu>
+                      )}
                     </Table.Td>
 
 

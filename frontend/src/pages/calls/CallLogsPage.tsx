@@ -678,9 +678,6 @@ export const CallLogsPage: React.FC = () => {
                 Omni-Channel
               </Badge>
             </Group>
-            <Text size="xs" c="dimmed" mt={2}>
-              Track, record and analyze multi-channel client activities across Calls, WhatsApp, Email, and Other interactions.
-            </Text>
           </div>
 
           {/* Section Navigation Tabs (Segmented Control Pill Bar) */}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Box,
   Text,
@@ -116,20 +116,19 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
   };
 
   // Load proposals from database if available
+  const fetchProposalsFromDb = useCallback(async () => {
+    if (!lead?.id) return;
+    try {
+      const dbProposals = await leadService.getProposals({ leadId: lead.id });
+      if (dbProposals && Array.isArray(dbProposals)) {
+        onUpdateProposals(dbProposals);
+      }
+    } catch (_) {}
+  }, [lead?.id, onUpdateProposals]);
+
   useEffect(() => {
-    if (lead?.id) {
-      leadService
-        .getProposals({ leadId: lead.id })
-        .then((dbProposals) => {
-          if (dbProposals && dbProposals.length > 0) {
-            const existingIds = new Set(dbProposals.map((p) => p.id));
-            const merged = [...dbProposals, ...proposals.filter((p) => !p.id?.startsWith('prop-') && !existingIds.has(p.id))];
-            onUpdateProposals(merged);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [lead?.id]);
+    fetchProposalsFromDb();
+  }, [fetchProposalsFromDb]);
 
   const handleOpenCreate = () => {
     setSelectedEditProposal(null);
@@ -162,6 +161,11 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
     }
     setModalOpened(false);
     setSelectedEditProposal(null);
+
+    // Promptly sync state with backend database
+    setTimeout(() => {
+      fetchProposalsFromDb();
+    }, 150);
   };
 
   const handleStatusChange = (propId: string, status: LeadProposal['status']) => {

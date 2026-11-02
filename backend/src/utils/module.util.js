@@ -15,6 +15,8 @@ export function generateModuleId(name) {
     .replace(/^_+|_+$/g, '');
 }
 
+import { EXCLUDED_LEGACY_MODULES } from '../models/model.registry.js';
+
 /**
  * Merge static system modules and dynamic DB role permissions
  */
@@ -22,6 +24,7 @@ export function mergeSystemAndDbModules(systemModules = [], dbPermissions = []) 
   const moduleMap = new Map();
 
   for (const sysMod of systemModules) {
+    if (EXCLUDED_LEGACY_MODULES && EXCLUDED_LEGACY_MODULES.has(sysMod.id)) continue;
     moduleMap.set(sysMod.id, {
       id: sysMod.id,
       name: sysMod.name,
@@ -32,6 +35,7 @@ export function mergeSystemAndDbModules(systemModules = [], dbPermissions = []) 
   }
 
   for (const p of dbPermissions) {
+    if (EXCLUDED_LEGACY_MODULES && EXCLUDED_LEGACY_MODULES.has(p.moduleId)) continue;
     if (!moduleMap.has(p.moduleId)) {
       moduleMap.set(p.moduleId, {
         id: p.moduleId,

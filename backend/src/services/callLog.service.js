@@ -3,9 +3,91 @@ import { generateCallId, formatCallLogResponse } from '../utils/callLog.util.js'
 import { io } from '../utils/socket.js';
 
 /**
+ * Scope call logs by user (Super Admin sees all, Employees only see their own calls)
+ */
+async function resolveCallLogScopeFilter(currentUser) {
+  if (!currentUser) return null;
+  const roleUpper = String(currentUser.role || '').toUpperCase();
+  if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
+    return null;
+  }
+
+  if (currentUser.id) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      include: { roleRelation: true },
+    });
+    if (dbUser?.roleRelation?.slug?.toLowerCase() === 'super_admin') {
+      return null;
+    }
+  }
+
+  const emp = await prisma.employee.findFirst({
+    where: {
+      OR: [
+        ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+        ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+      ],
+    },
+  });
+
+  const orConditions = [];
+  if (currentUser.id) orConditions.push({ employeeId: currentUser.id });
+  if (emp?.id) orConditions.push({ employeeId: emp.id });
+  if (emp?.empCode) orConditions.push({ employeeId: emp.empCode });
+
+  const names = [currentUser.name, currentUser.email, emp?.name].filter(Boolean);
+  for (const name of names) {
+    orConditions.push({ employeeName: { equals: name, mode: 'insensitive' } });
+  }
+
+  return orConditions.length > 0 ? { OR: orConditions } : { employeeId: currentUser.id };
+}
+
+/**
+ * Scope section activities by user (Super Admin sees all, Employees only see activities performed by them)
+ */
+async function resolveActivityScopeFilter(currentUser) {
+  if (!currentUser) return null;
+  const roleUpper = String(currentUser.role || '').toUpperCase();
+  if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
+    return null;
+  }
+
+  if (currentUser.id) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: currentUser.id },
+      include: { roleRelation: true },
+    });
+    if (dbUser?.roleRelation?.slug?.toLowerCase() === 'super_admin') {
+      return null;
+    }
+  }
+
+  const emp = await prisma.employee.findFirst({
+    where: {
+      OR: [
+        ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+        ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+      ],
+    },
+  });
+
+  const orConditions = [];
+  if (currentUser.id) orConditions.push({ performedById: currentUser.id });
+  if (emp?.id) orConditions.push({ performedById: emp.id });
+  const names = [currentUser.name, currentUser.email, emp?.name].filter(Boolean);
+  for (const name of names) {
+    orConditions.push({ performedBy: { equals: name, mode: 'insensitive' } });
+  }
+
+  return orConditions.length > 0 ? { OR: orConditions } : { performedById: currentUser.id };
+}
+
+/**
  * 1. Get Call Logs with filters and search
  */
-export async function getCallLogsService(queryParams = {}) {
+export async function getCallLogsService(queryParams = {}, currentUser = null) {
   const {
     callType,
     status,
@@ -23,6 +105,12 @@ export async function getCallLogsService(queryParams = {}) {
   } = queryParams;
 
   const where = {};
+
+  const scopeFilter = await resolveCallLogScopeFilter(currentUser);
+  if (scopeFilter) {
+    where.AND = where.AND || [];
+    where.AND.push(scopeFilter);
+  }
 
   if (callType && callType !== 'ALL' && callType !== 'All') {
     where.callType = { equals: callType, mode: 'insensitive' };
@@ -174,17 +262,21 @@ export async function getCallLogsService(queryParams = {}) {
 /**
  * 2. Get Overview KPI Statistics for Call Logs
  */
-export async function getCallLogStatsService() {
+export async function getCallLogStatsService(currentUser = null) {
+  const scopeFilter = await resolveCallLogScopeFilter(currentUser);
+  const baseWhere = scopeFilter ? scopeFilter : {};
+
   const [total, incoming, outgoing, completed, missed, busy, noAnswer, notInterested, followUp, interested] = await Promise.all([
-    prisma.callLog.count(),
-    prisma.callLog.count({ where: { callType: { equals: 'Incoming', mode: 'insensitive' } } }),
-    prisma.callLog.count({ where: { callType: { equals: 'Outgoing', mode: 'insensitive' } } }),
-    prisma.callLog.count({ where: { status: { equals: 'Completed', mode: 'insensitive' } } }),
-    prisma.callLog.count({ where: { status: { equals: 'Missed', mode: 'insensitive' } } }),
-    prisma.callLog.count({ where: { status: { equals: 'Busy', mode: 'insensitive' } } }),
-    prisma.callLog.count({ where: { status: { equals: 'No Answer', mode: 'insensitive' } } }),
+    prisma.callLog.count({ where: baseWhere }),
+    prisma.callLog.count({ where: { ...baseWhere, callType: { equals: 'Incoming', mode: 'insensitive' } } }),
+    prisma.callLog.count({ where: { ...baseWhere, callType: { equals: 'Outgoing', mode: 'insensitive' } } }),
+    prisma.callLog.count({ where: { ...baseWhere, status: { equals: 'Completed', mode: 'insensitive' } } }),
+    prisma.callLog.count({ where: { ...baseWhere, status: { equals: 'Missed', mode: 'insensitive' } } }),
+    prisma.callLog.count({ where: { ...baseWhere, status: { equals: 'Busy', mode: 'insensitive' } } }),
+    prisma.callLog.count({ where: { ...baseWhere, status: { equals: 'No Answer', mode: 'insensitive' } } }),
     prisma.callLog.count({
       where: {
+        ...baseWhere,
         OR: [
           { status: { equals: 'Not Interested', mode: 'insensitive' } },
           { status: { contains: 'not interest', mode: 'insensitive' } },
@@ -194,6 +286,7 @@ export async function getCallLogStatsService() {
     }),
     prisma.callLog.count({
       where: {
+        ...baseWhere,
         OR: [
           { status: { equals: 'Follow-up', mode: 'insensitive' } },
           { status: { equals: 'Follow Up', mode: 'insensitive' } },
@@ -203,6 +296,7 @@ export async function getCallLogStatsService() {
     }),
     prisma.callLog.count({
       where: {
+        ...baseWhere,
         OR: [
           { status: { equals: 'Interested', mode: 'insensitive' } },
           { status: { contains: 'interested', mode: 'insensitive' } },
@@ -611,10 +705,10 @@ export function formatSectionActivity(act) {
 /**
  * 7. Get Section Activities (whatsapp, email, others, calls)
  */
-export async function getSectionActivitiesService(section = 'calls', queryParams = {}) {
+export async function getSectionActivitiesService(section = 'calls', queryParams = {}, currentUser = null) {
   const sec = String(section).toLowerCase().trim();
   if (sec === 'calls' || sec === 'call') {
-    return getCallLogsService(queryParams);
+    return getCallLogsService(queryParams, currentUser);
   }
 
   const {
@@ -632,6 +726,12 @@ export async function getSectionActivitiesService(section = 'calls', queryParams
   } = queryParams;
 
   const where = {};
+
+  const actScope = await resolveActivityScopeFilter(currentUser);
+  if (actScope) {
+    where.AND = where.AND || [];
+    where.AND.push(actScope);
+  }
 
   if (sec === 'whatsapp') {
     where.type = 'whatsapp';
@@ -783,14 +883,17 @@ export async function getSectionActivitiesService(section = 'calls', queryParams
 /**
  * 8. Get Section Statistics (calls, whatsapp, email, others)
  */
-export async function getSectionStatsService(section = 'calls') {
+export async function getSectionStatsService(section = 'calls', currentUser = null) {
   const sec = String(section).toLowerCase().trim();
   if (sec === 'calls' || sec === 'call') {
-    return getCallLogStatsService();
+    return getCallLogStatsService(currentUser);
   }
 
+  const actScope = await resolveActivityScopeFilter(currentUser);
+  const baseScope = actScope ? actScope : {};
+
   if (sec === 'whatsapp') {
-    const baseWhere = { type: 'whatsapp' };
+    const baseWhere = { type: 'whatsapp', ...baseScope };
     const [total, sent, replied, interested, followUp, failed, notInterested] = await Promise.all([
       prisma.activity.count({ where: baseWhere }),
       prisma.activity.count({ where: { ...baseWhere, status: { contains: 'Sent', mode: 'insensitive' } } }),
@@ -804,7 +907,7 @@ export async function getSectionStatsService(section = 'calls') {
   }
 
   if (sec === 'email') {
-    const baseWhere = { type: 'email' };
+    const baseWhere = { type: 'email', ...baseScope };
     const [total, sent, replied, draft, interested, followUp, failed, notInterested] = await Promise.all([
       prisma.activity.count({ where: baseWhere }),
       prisma.activity.count({ where: { ...baseWhere, status: { contains: 'Sent', mode: 'insensitive' } } }),
@@ -819,7 +922,7 @@ export async function getSectionStatsService(section = 'calls') {
   }
 
   // others
-  const baseWhere = { type: { in: ['other', 'others', 'task'] } };
+  const baseWhere = { type: { in: ['other', 'others', 'task'] }, ...baseScope };
   const [total, interested, followUp, notInterested, directVisit, sms] = await Promise.all([
     prisma.activity.count({ where: baseWhere }),
     prisma.activity.count({ where: { ...baseWhere, status: { contains: 'Interested', mode: 'insensitive' } } }),

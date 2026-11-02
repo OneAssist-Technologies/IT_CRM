@@ -37,11 +37,11 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
   };
 
   // Company Details from Settings / Project
-  const companyName = settings?.companyName || (invoice as any)?.companyDetails?.companyName || 'OneAssist Technologies Pvt Ltd';
-  const companyAddress = settings?.companyAddress || (invoice as any)?.companyDetails?.address || 'Tidel Park, Rajiv Gandhi Salai, Taramani, Chennai, Tamil Nadu 600113';
-  const companyGst = settings?.companyGst || (invoice as any)?.companyDetails?.gstin || '33AAAAA0000A1Z5';
-  const companyPhone = settings?.companyPhone || (invoice as any)?.companyDetails?.phone || '+91 98765 43210';
-  const companyEmail = settings?.companyEmail || (invoice as any)?.companyDetails?.email || 'billing@oneassist.in';
+  const companyName = settings?.companyName || (invoice as any)?.companyDetails?.companyName || 'OneAssist Technologies';
+  const companyAddress = settings?.companyAddress || (invoice as any)?.companyDetails?.address || '';
+  const companyGst = settings?.companyGst || (invoice as any)?.companyDetails?.gstin || '';
+  const companyPhone = settings?.companyPhone || (invoice as any)?.companyDetails?.phone || '';
+  const companyEmail = settings?.companyEmail || (invoice as any)?.companyDetails?.email || '';
   const companyLogo = settings?.companyLogoUrl || (settings as any)?.logoUrl || '/oneassist-logo.png';
 
   const cleanedBrandWords = companyName
@@ -54,7 +54,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
     : companyName.trim().split(/\s+/).slice(1).join(' ');
 
   // Client Details
-  const clientDisplayName = invoice.companyName || invoice.contactName || 'Max Studio';
+  const clientDisplayName = invoice.companyName || invoice.contactName || 'Client';
   const clientContactPerson = invoice.contactName && invoice.contactName !== invoice.companyName ? invoice.contactName : null;
 
   let fullClientAddress = invoice.clientAddress || '';
@@ -62,13 +62,10 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
     const parts = [invoice.clientCity, invoice.clientState, invoice.clientPincode].filter(Boolean);
     fullClientAddress = parts.join(', ');
   }
-  if (!fullClientAddress) {
-    fullClientAddress = '305, 3rd Floor Orion mall, Bengaluru, Karnataka, India - 560055';
-  }
 
-  const clientGst = invoice.clientGst || '29VGCED1234K2Z6';
-  const clientPan = (invoice as any).clientPan || (clientGst && clientGst.length >= 12 ? clientGst.substring(2, 12) : 'VGCED1234K');
-  const companyPan = (settings as any)?.companyPan || (companyGst && companyGst.length >= 12 ? companyGst.substring(2, 12) : 'AAAAA0000A');
+  const clientGst = invoice.clientGst?.trim() || '';
+  const clientPan = (invoice as any).clientPan?.trim() || (clientGst && clientGst.length >= 12 ? clientGst.substring(2, 12) : '');
+  const companyPan = (settings as any)?.companyPan?.trim() || (companyGst && companyGst.length >= 12 ? companyGst.substring(2, 12) : '');
 
   // Calculations
   const subtotal = Number(invoice.subtotal) || 0;
@@ -84,23 +81,23 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
 
   // Bank Info
   const bank = invoice.bankDetails || {};
-  const beneficiary = settings?.accountHolderName || bank.accountHolderName || companyName;
-  const bankName = settings?.bankName || bank.bankName || 'HDFC Bank';
-  const accountNo = settings?.accountNumber || bank.accountNumber || '50200012345678';
-  const ifsc = settings?.ifscCode || bank.ifscCode || 'HDFC0018159';
-  const accountType = (settings as any)?.accountType || (bank as any).accountType || 'Current Account';
-  const upi = settings?.upiId || bank.upiId || 'oneassist@hdfcbank';
+  const beneficiary = settings?.accountHolderName || bank.accountHolderName || (settings?.bankName || bank.bankName ? companyName : '');
+  const bankName = settings?.bankName || bank.bankName || '';
+  const accountNo = settings?.accountNumber || bank.accountNumber || '';
+  const ifsc = settings?.ifscCode || bank.ifscCode || '';
+  const accountType = (settings as any)?.accountType || (bank as any).accountType || '';
+  const upi = settings?.upiId || bank.upiId || '';
 
   // Authorized Signatory Details
   const signatoryName =
     (invoice as any)?.approvedBy ||
     (settings as any)?.authorizedSignatory ||
     (invoice as any)?.companyDetails?.authorizedSignatory ||
-    'Santhosh C';
+    '';
   const signatoryDesignation =
     (settings as any)?.signatoryDesignation ||
     (invoice as any)?.companyDetails?.signatoryDesignation ||
-    'Managing Director';
+    '';
   const signatureUrl =
     (settings as any)?.signatureUrl ||
     (invoice as any)?.companyDetails?.signatureUrl ||
@@ -262,21 +259,27 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
             <Text size="13.5px" fw={700} c="#0F172A" mb={4}>
               {companyName}
             </Text>
-            <Text size="11px" c="#475569" style={{ lineHeight: 1.5, marginBottom: 8 }}>
-              {companyAddress}
-            </Text>
+            {companyAddress ? (
+              <Text size="11px" c="#475569" style={{ lineHeight: 1.5, marginBottom: 8 }}>
+                {companyAddress}
+              </Text>
+            ) : null}
           </Box>
           <Box style={{ marginTop: 'auto', paddingTop: 6 }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%' }}>
               <tbody>
                 <tr>
                   <td style={{ fontWeight: 700, color: '#0F172A', width: 55, paddingBottom: 3 }}>GSTIN</td>
-                  <td style={{ color: '#475569', fontWeight: 500, paddingBottom: 3 }}>{companyGst}</td>
+                  <td style={{ color: '#475569', fontWeight: 500, paddingBottom: 3 }}>
+                    {companyGst || 'Unregistered'}
+                  </td>
                 </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, color: '#0F172A', width: 55 }}>PAN</td>
-                  <td style={{ color: '#475569', fontWeight: 500 }}>{companyPan}</td>
-                </tr>
+                {companyPan ? (
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#0F172A', width: 55 }}>PAN</td>
+                    <td style={{ color: '#475569', fontWeight: 500 }}>{companyPan}</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </Box>
@@ -309,21 +312,27 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
                 Attn: {clientContactPerson}
               </Text>
             )}
-            <Text size="11px" c="#475569" style={{ lineHeight: 1.5, marginBottom: 8 }}>
-              {fullClientAddress}
-            </Text>
+            {fullClientAddress ? (
+              <Text size="11px" c="#475569" style={{ lineHeight: 1.5, marginBottom: 8 }}>
+                {fullClientAddress}
+              </Text>
+            ) : null}
           </Box>
           <Box style={{ marginTop: 'auto', paddingTop: 6 }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%' }}>
               <tbody>
                 <tr>
                   <td style={{ fontWeight: 700, color: '#0F172A', width: 55, paddingBottom: 3 }}>GSTIN</td>
-                  <td style={{ color: '#475569', fontWeight: 500, paddingBottom: 3 }}>{clientGst}</td>
+                  <td style={{ color: '#475569', fontWeight: 500, paddingBottom: 3 }}>
+                    {clientGst || 'Unregistered'}
+                  </td>
                 </tr>
-                <tr>
-                  <td style={{ fontWeight: 700, color: '#0F172A', width: 55 }}>PAN</td>
-                  <td style={{ color: '#475569', fontWeight: 500 }}>{clientPan}</td>
-                </tr>
+                {clientPan ? (
+                  <tr>
+                    <td style={{ fontWeight: 700, color: '#0F172A', width: 55 }}>PAN</td>
+                    <td style={{ color: '#475569', fontWeight: 500 }}>{clientPan}</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </Box>
@@ -444,30 +453,49 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
             {/* Bank text info */}
             <table style={{ borderCollapse: 'collapse', fontSize: 11.5, flex: 1 }}>
               <tbody>
-                <tr>
-                  <td style={{ color: '#64748B', paddingBottom: 5, width: 130 }}>Account Holder Name :</td>
-                  <td style={{ fontWeight: 600, color: '#0F172A', paddingBottom: 5 }}>{beneficiary}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#64748B', paddingBottom: 5 }}>Account Number :</td>
-                  <td style={{ fontWeight: 700, color: '#0F172A', paddingBottom: 5 }}>{accountNo}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#64748B', paddingBottom: 5 }}>IFSC :</td>
-                  <td style={{ fontWeight: 600, color: '#0F172A', paddingBottom: 5 }}>{ifsc}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#64748B', paddingBottom: 5 }}>Account Type :</td>
-                  <td style={{ color: '#0F172A', paddingBottom: 5 }}>{accountType}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#64748B', paddingBottom: 5 }}>Bank :</td>
-                  <td style={{ color: '#0F172A', paddingBottom: 5 }}>{bankName}</td>
-                </tr>
-                <tr>
-                  <td style={{ color: '#64748B' }}>UPI :</td>
-                  <td style={{ fontWeight: 600, color: '#6D28D9' }}>{upi}</td>
-                </tr>
+                {beneficiary ? (
+                  <tr>
+                    <td style={{ color: '#64748B', paddingBottom: 5, width: 130 }}>Account Holder Name :</td>
+                    <td style={{ fontWeight: 600, color: '#0F172A', paddingBottom: 5 }}>{beneficiary}</td>
+                  </tr>
+                ) : null}
+                {accountNo ? (
+                  <tr>
+                    <td style={{ color: '#64748B', paddingBottom: 5 }}>Account Number :</td>
+                    <td style={{ fontWeight: 700, color: '#0F172A', paddingBottom: 5 }}>{accountNo}</td>
+                  </tr>
+                ) : null}
+                {ifsc ? (
+                  <tr>
+                    <td style={{ color: '#64748B', paddingBottom: 5 }}>IFSC :</td>
+                    <td style={{ fontWeight: 600, color: '#0F172A', paddingBottom: 5 }}>{ifsc}</td>
+                  </tr>
+                ) : null}
+                {accountType ? (
+                  <tr>
+                    <td style={{ color: '#64748B', paddingBottom: 5 }}>Account Type :</td>
+                    <td style={{ color: '#0F172A', paddingBottom: 5 }}>{accountType}</td>
+                  </tr>
+                ) : null}
+                {bankName ? (
+                  <tr>
+                    <td style={{ color: '#64748B', paddingBottom: 5 }}>Bank :</td>
+                    <td style={{ color: '#0F172A', paddingBottom: 5 }}>{bankName}</td>
+                  </tr>
+                ) : null}
+                {upi ? (
+                  <tr>
+                    <td style={{ color: '#64748B' }}>UPI :</td>
+                    <td style={{ fontWeight: 600, color: '#6D28D9' }}>{upi}</td>
+                  </tr>
+                ) : null}
+                {!accountNo && !bankName && !ifsc && !upi ? (
+                  <tr>
+                    <td colSpan={2} style={{ color: '#94A3B8', fontStyle: 'italic', paddingBottom: 5 }}>
+                      Bank details not provided
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </Box>
@@ -657,12 +685,16 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
             )}
           </Box>
 
-          <Text style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-            {signatoryName}
-          </Text>
-          <Text style={{ fontSize: 11, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>
-            {signatoryDesignation}
-          </Text>
+          {signatoryName && (
+            <Text style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
+              {signatoryName}
+            </Text>
+          )}
+          {signatoryDesignation && (
+            <Text style={{ fontSize: 11, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: 2 }}>
+              {signatoryDesignation}
+            </Text>
+          )}
           <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }}>
             (Authorized Signatory)
           </Text>
@@ -670,18 +702,22 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
       </Box>
 
       {/* 6. FOOTER */}
-      <Box
-        style={{
-          borderTop: '1px solid #E2E8F0',
-          paddingTop: 12,
-          marginTop: 14,
-          fontSize: 11,
-          color: '#64748B',
-          textAlign: 'center',
-        }}
-      >
-        For any billing enquiries, email us on <b>{companyEmail}</b> or call us on <b>{companyPhone}</b>
-      </Box>
+      {(companyEmail || companyPhone) && (
+        <Box
+          style={{
+            borderTop: '1px solid #E2E8F0',
+            paddingTop: 12,
+            marginTop: 14,
+            fontSize: 11,
+            color: '#64748B',
+            textAlign: 'center',
+          }}
+        >
+          For any billing enquiries
+          {companyEmail ? <>, email us on <b>{companyEmail}</b></> : null}
+          {companyPhone ? <>{companyEmail ? ' or ' : ', '}call us on <b>{companyPhone}</b></> : null}
+        </Box>
+      )}
     </Paper>
   );
 };
