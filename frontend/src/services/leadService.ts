@@ -134,6 +134,7 @@ export const leadService = {
       issueDate: p.proposalDate,
       validUntil: p.validUntil,
       status: p.status,
+      rejectionReason: p.rejectionReason || null,
       currency: p.currency || 'INR (₹)',
       items: (p.items || []).map((it: any) => ({
         id: it.id,
@@ -166,6 +167,7 @@ export const leadService = {
       issueDate: p.proposalDate,
       validUntil: p.validUntil,
       status: p.status,
+      rejectionReason: p.rejectionReason || null,
       currency: p.currency || 'INR (₹)',
       items: (p.items || []).map((it: any) => ({
         id: it.id,

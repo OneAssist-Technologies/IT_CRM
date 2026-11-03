@@ -641,6 +641,25 @@ async function getNextLeadId() {
 /**
  * Automatically sync/create a Lead when a Contact is qualified
  */
+
+export function mapContactStatusToLead(contactStatus, currentLeadStatus = 'New') {
+  if (!contactStatus || contactStatus === 'Not Connected') {
+    return currentLeadStatus || 'New';
+  }
+  const s = String(contactStatus).toLowerCase();
+  if (s.includes('not interested') || s.includes('not-interested') || s.includes('disqual') || s.includes('lost') || s.includes('cancel')) {
+    return 'Lost';
+  }
+  if (s.includes('qualif')) return 'Qualified';
+  if (s.includes('interest')) return 'Interested';
+  if (s.includes('follow')) return 'Follow-up';
+  if (s.includes('proposal')) return 'Proposal Sent';
+  if (s.includes('won') || s.includes('complete')) return 'Complete';
+  if (s.includes('progress') || s.includes('contact') || s.includes('busy') || s.includes('sent')) return 'In Progress';
+  if (s.includes('new') || s.includes('init')) return 'New';
+  return currentLeadStatus || 'New';
+}
+
 export async function syncContactToLead(contact, user = null) {
   if (!contact) return null;
 
@@ -708,13 +727,13 @@ export async function syncContactToLead(contact, user = null) {
           category,
           productList: productList.length > 0 ? productList : existingLead.productList,
           serviceList: serviceList.length > 0 ? serviceList : existingLead.serviceList,
-          status: 'New',
-          stage: 'Initialization',
+          status: mapContactStatusToLead(contact.status, existingLead.status),
+          stage: contact.stage || existingLead.stage || 'Initialization',
+          priority: contact.priority || existingLead.priority || 'Medium',
           assignedTo: contact.assignedTo || existingLead.assignedTo || assignedTo,
           assignedToName: contact.assignedToName || existingLead.assignedToName || assignedToName,
           createdBy: existingLead.createdBy || createdBy,
           createdByName: existingLead.createdByName || createdByName,
-          createdAt: new Date(),
         },
       });
 
@@ -821,8 +840,9 @@ export async function syncContactToLead(contact, user = null) {
           category,
           productList,
           serviceList,
-          status: 'New',
-          stage: 'Initialization',
+          priority: contact.priority || 'Medium',
+          status: mapContactStatusToLead(contact.status, 'New'),
+          stage: contact.stage || 'Initialization',
           assignedTo,
           assignedToName,
           createdBy,
@@ -1082,6 +1102,8 @@ export async function updateContactService(id, body, user) {
             ...(body.name && { name: body.name.trim() }),
             ...(body.companyName !== undefined && { companyName: body.companyName }),
             ...(body.contactPerson !== undefined && { contactPerson: body.contactPerson }),
+            ...(body.designation !== undefined && { designation: body.designation }),
+            ...(body.profession !== undefined && { profession: body.profession }),
             ...(body.email !== undefined && { email: body.email ? body.email.toLowerCase().trim() : null }),
             ...(body.phone !== undefined && {
               phone: (() => {
@@ -1395,10 +1417,14 @@ export async function updateContactService(id, body, user) {
   await syncContactToLead(updated, user);
 
   try {
+    const mappedLeadStatus = mapContactStatusToLead(updated.status, existing?.status || 'New');
     const leadUpdateData = {
-      ...(updated.status && { status: updated.status }),
+      ...(mappedLeadStatus && { status: mappedLeadStatus }),
       ...(updated.stage && { stage: updated.stage }),
       ...(updated.notes && { notes: updated.notes }),
+      ...(updated.priority && { priority: updated.priority }),
+      ...(updated.designation !== undefined && { designation: updated.designation }),
+      ...(updated.profession !== undefined && { profession: updated.profession }),
       ...(updated.assignedTo !== undefined && { assignedTo: updated.assignedTo, assignedToName: updated.assignedToName }),
     };
     if (Object.keys(leadUpdateData).length > 0) {
@@ -1407,6 +1433,9 @@ export async function updateContactService(id, body, user) {
           OR: [
             { id: cleanId },
             { leadId: cleanId },
+            ...(body.leadId ? [{ id: body.leadId }, { leadId: body.leadId }] : []),
+            ...(body.leadCode ? [{ id: body.leadCode }, { leadId: body.leadCode }] : []),
+            ...(existing.internalReference ? [{ leadId: existing.internalReference }] : []),
             ...(updated.email ? [{ email: { equals: updated.email, mode: 'insensitive' } }] : []),
             ...(updated.phone ? [{ phone: updated.phone }] : []),
           ],

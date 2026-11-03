@@ -35,10 +35,12 @@ import {
   IconCalendarEvent,
   IconLink,
   IconTag,
+  IconBriefcase,
 } from '@tabler/icons-react';
 import { Contact, ContactFormData } from '../../../types/contact';
 import { useContact } from '../../../context/ContactContext';
 import { useCRM } from '../../../context/CRMContext';
+import { leadService } from '../../../services/leadService';
 import { createMeetingApi } from '../../../services/meetingService';
 import { createCallLogApi, createSectionActivityApi } from '../../../services/callLogService';
 import { MeetingTimePicker } from '../../meetings/components/MeetingTimePicker';
@@ -52,6 +54,22 @@ interface ContactModalProps {
   title?: string;
   showContactMode?: boolean;
 }
+
+
+const mapStatusToLeadStatus = (statusStr: string): string => {
+  const s = (statusStr || '').toLowerCase();
+  if (s.includes('not interested') || s.includes('not-interested') || s.includes('disqual') || s.includes('lost') || s.includes('cancel')) {
+    return 'Lost';
+  }
+  if (s.includes('qualif')) return 'Qualified';
+  if (s.includes('interest')) return 'Interested';
+  if (s.includes('follow')) return 'Follow-up';
+  if (s.includes('proposal')) return 'Proposal Sent';
+  if (s.includes('won') || s.includes('complete')) return 'Complete';
+  if (s.includes('progress') || s.includes('contact') || s.includes('busy') || s.includes('sent') || s.includes('connected')) return 'In Progress';
+  if (s.includes('new') || s.includes('init')) return 'New';
+  return statusStr || 'In Progress';
+};
 
 const parseTimeToMinutes = (timeStr: string): { minutes: number; isAM: boolean; isPM: boolean; rawHours: number } | null => {
   if (!timeStr) return null;
@@ -159,6 +177,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
     name: '',
     companyName: '',
     contactPerson: '',
+    designation: '',
     email: '',
     phone: '',
     website: '',
@@ -263,6 +282,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         name: contact.name || '',
         companyName: contact.companyName || '',
         contactPerson: contact.contactPerson || contact.name || '',
+        designation: (contact as any).designation || (contact as any).profession || '',
         email: contact.email || '',
         phone: contact.phone || '',
         website: (contact as any).website || (contact as any).companyWebsite || '',
@@ -498,6 +518,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         name: resolvedName,
         companyName: formData.companyName?.trim() || undefined,
         contactPerson: formData.contactPerson?.trim() || undefined,
+        designation: formData.designation?.trim() || undefined,
+        profession: formData.designation?.trim() || undefined,
         email: formData.email?.trim() || undefined,
         phone: formData.phone ? formData.phone.replace(/\D/g, '') : '',
         website: formData.website?.trim() || undefined,
@@ -560,13 +582,36 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         rescheduleDate: (formData.contactMode === 'Meeting' && meetingStatus === 'Rescheduled') ? rescheduleDate : undefined,
         rescheduleTime: (formData.contactMode === 'Meeting' && meetingStatus === 'Rescheduled') ? rescheduleTime : undefined,
         nextFollowDate: finalFollowDate,
+        leadId: (contact as any)?.leadId || undefined,
+        leadCode: (contact as any)?.leadCode || undefined,
       };
 
       let res;
       if (isEditing && contact?.id) {
         res = await updateContact(contact.id, payload);
+        if (!res?.success) {
+          res = await createContact(payload);
+        }
       } else {
         res = await createContact(payload);
+      }
+
+      let leadUpdatedDirectly = false;
+      const explicitLeadId = (contact as any)?.leadId || (contact as any)?.lead_id || (contact as any)?.internalReference || (contact?.id && String(contact.id).startsWith('lead-') ? contact.id : undefined);
+      if (explicitLeadId) {
+        try {
+          const leadMapped = mapStatusToLeadStatus(finalStatus);
+          await leadService.updateLead(explicitLeadId, {
+            status: leadMapped,
+            stage: payload.stage || (leadMapped === 'Qualified' ? 'Qualification' : (leadMapped === 'Lost' ? 'Lost' : undefined)),
+            notes: formData.description?.trim() || undefined,
+            priority: tagPriority?.trim() || 'Medium',
+            assignedTo: formData.assignedTo && formData.assignedTo !== 'none' ? formData.assignedTo : undefined,
+          });
+          leadUpdatedDirectly = true;
+        } catch (leadErr) {
+          console.warn('Failed to update lead directly in ContactModal:', leadErr);
+        }
       }
 
       const contactIdentifier = res?.data?.id || res?.data?.contactId || contact?.id || contact?.contactId;
@@ -586,6 +631,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         currentUser?.name ||
         'Sandy';
       const assignedEmployeeId = foundEmp?.id || (contact as any)?.assignedTo || currentUser?.id || undefined;
+      const targetLeadId = (contact as any)?.leadId || (contact as any)?.lead_id || (contact as any)?.internalReference || contactIdentifier;
+      const targetLeadCode = (contact as any)?.leadCode || (contact as any)?.leadId || (contact as any)?.internalReference;
 
       // 1. If contact mode is Call, auto-log call activity to Activity Logs module
       if (formData.contactMode === 'Call') {
@@ -598,13 +645,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             contactName: contactDisplayName,
             companyName: contactCompany || undefined,
             phoneNumber: contactPhone || '0000000000',
-            leadId: contactIdentifier,
+            leadId: targetLeadId,
+            leadCode: targetLeadCode,
             duration: callDuration?.trim() || '01:00',
             status: (callStatus as any) || 'Completed',
             callDate: callDate || getTodayDateStr(),
             callTime: callFromTime || '10:00 AM',
             description: formData.description?.trim() || undefined,
-          });
+            nextFollowDate: callStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
+          } as any);
           window.dispatchEvent(new CustomEvent('crm_call_logs_updated'));
         } catch (callErr) {
           console.error('Error auto-logging call activity:', callErr);
@@ -617,6 +666,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           await createSectionActivityApi('whatsapp', {
             contactId: contactIdentifier,
             contactName: contactDisplayName,
+            leadId: targetLeadId,
+            leadCode: targetLeadCode,
+            leadName: contactDisplayName,
             customerName: contactCompany || undefined,
             companyName: contactCompany || undefined,
             phoneNumber: contactPhone,
@@ -642,6 +694,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           await createSectionActivityApi('email', {
             contactId: contactIdentifier,
             contactName: contactDisplayName,
+            leadId: targetLeadId,
+            leadCode: targetLeadCode,
+            leadName: contactDisplayName,
             customerName: contactCompany || undefined,
             companyName: contactCompany || undefined,
             email: formData.email?.trim() || contact?.email || undefined,
@@ -666,6 +721,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           await createSectionActivityApi('others', {
             contactId: contactIdentifier,
             contactName: contactDisplayName,
+            leadId: targetLeadId,
+            leadCode: targetLeadCode,
+            leadName: contactDisplayName,
             customerName: contactCompany || undefined,
             companyName: contactCompany || undefined,
             activityType: otherActivityType || 'Direct Visit',
@@ -712,7 +770,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               : (formData.description?.trim() || undefined),
             status: meetingStatus,
             meetingStatus: meetingStatus,
-          });
+            nextFollowDate: meetingStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
+          } as any);
 
           window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
         } catch (meetingErr) {
@@ -728,7 +787,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
       } catch (_) {}
 
-      if (res?.success) {
+      if (res?.success || leadUpdatedDirectly || explicitLeadId) {
         const isNotInterested = finalStatus === 'Not Interested' || finalStatus === 'Not-Interested';
         if (!isNotInterested && (finalStatus === 'Qualified' || finalStatus === 'Follow-up Required' || finalStatus === 'Pending' || formData.contactMode === 'Meeting')) {
           if (typeof window !== 'undefined') {
@@ -736,6 +795,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
           }
         }
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
         onSuccess?.();
         onClose();
       }
@@ -854,7 +914,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       {/* Main Form */}
       <form onSubmit={handleSubmit}>
         <Stack gap="lg">
-          {/* Row 1: Contact person | Company */}
+          {/* Row 1: Contact person | Designation */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
             <TextInput
               className="contact-form-field"
@@ -868,6 +928,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
             <TextInput
               className="contact-form-field"
+              label="Designation"
+              placeholder="e.g. Project Manager, Director"
+              leftSection={<IconBriefcase size={18} stroke={1.6} />}
+              value={formData.designation || ''}
+              onChange={(e) => handleFieldChange('designation', e.target.value)}
+              styles={inputStyles}
+            />
+          </SimpleGrid>
+
+          {/* Row 2: Company | Website */}
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
+            <TextInput
+              className="contact-form-field"
               label="Company"
               placeholder="e.g. TechCorp Solutions"
               leftSection={<IconBuilding size={18} stroke={1.6} />}
@@ -876,9 +949,19 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               error={errors.companyName}
               styles={inputStyles}
             />
+
+            <TextInput
+              className="contact-form-field"
+              label="Website"
+              placeholder="e.g. https://www.techcorp.com"
+              leftSection={<IconWorld size={18} stroke={1.6} />}
+              value={formData.website || ''}
+              onChange={(e) => handleFieldChange('website', e.target.value)}
+              styles={inputStyles}
+            />
           </SimpleGrid>
 
-          {/* Row 2: Email | Phone number */}
+          {/* Row 3: Email | Phone number */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
             <TextInput
               className="contact-form-field"
@@ -908,7 +991,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             />
           </SimpleGrid>
 
-          {/* Row 3: Source | Website */}
+          {/* Row 4: Source | Location */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
             <Select
               className="contact-form-field"
@@ -925,19 +1008,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
             <TextInput
               className="contact-form-field"
-              label="Website"
-              placeholder="e.g. https://www.techcorp.com"
-              leftSection={<IconWorld size={18} stroke={1.6} />}
-              value={formData.website || ''}
-              onChange={(e) => handleFieldChange('website', e.target.value)}
-              styles={inputStyles}
-            />
-          </SimpleGrid>
-
-          {/* Row 4: Location | Tag Priority */}
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
-            <TextInput
-              className="contact-form-field"
               label="Location"
               placeholder="e.g. Chennai, Tamil Nadu, India"
               leftSection={<IconMapPin size={18} stroke={1.6} />}
@@ -945,11 +1015,14 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               onChange={(e) => handleFieldChange('location', e.target.value)}
               styles={inputStyles}
             />
+          </SimpleGrid>
 
+          {/* Row 5: Tag | Contact mode */}
+          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
             <Autocomplete
               className="contact-form-field"
-              label="Tag Priority"
-              placeholder="Select (Low, Medium, High) or type custom..."
+              label="Tag"
+              placeholder="Select tag (Low, Medium, High) or type custom..."
               leftSection={<IconTag size={18} stroke={1.6} />}
               data={priorityOptions}
               value={tagPriority}
@@ -957,10 +1030,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               clearable
               styles={inputStyles}
             />
-          </SimpleGrid>
 
-          {/* Row 5: Contact mode & Status */}
-          <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
             <Select
               className="contact-form-field"
               label="Contact mode"
@@ -978,8 +1048,10 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               clearable
               styles={inputStyles}
             />
+          </SimpleGrid>
 
-            {!formData.contactMode && (
+          {!formData.contactMode && (
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg">
               <Select
                 className="contact-form-field"
                 label="Status"
@@ -999,8 +1071,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                 onChange={(val) => setGeneralStatus(val || 'Not Connected')}
                 styles={inputStyles}
               />
-            )}
-          </SimpleGrid>
+            </SimpleGrid>
+          )}
 
           {/* Dynamic Call Fields (when Contact mode is Call) */}
           {formData.contactMode === 'Call' && (

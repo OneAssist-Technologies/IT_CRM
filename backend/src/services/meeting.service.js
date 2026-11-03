@@ -566,6 +566,9 @@ export async function createMeetingService(body) {
       performedById: created.employeeId,
       activityDate: created.meetingDate || created.date,
       activityTime: created.startTime || created.time || '10:30 AM',
+      metadata: {
+        nextFollowDate: body.nextFollowDate || body.followUpDate || undefined,
+      },
     });
   } catch (err) {
     console.warn('Activity recording note:', err.message);
@@ -728,6 +731,13 @@ export async function updateMeetingService(id, body) {
         activityTime: updated.startTime || updated.time,
         customerName: updated.clientName,
         performedBy: updated.employeeName || 'Staff',
+        ...(body.nextFollowDate || body.followUpDate
+          ? {
+              metadata: {
+                nextFollowDate: body.nextFollowDate || body.followUpDate,
+              },
+            }
+          : {}),
       },
     });
   } catch (actErr) {

@@ -17,11 +17,13 @@ import {
   TextInput,
   Textarea,
   Select,
+  Menu,
 } from '@mantine/core';
 import {
   IconCalculator,
   IconPlus,
   IconCheck,
+  IconRefresh,
   IconDownload,
   IconArrowRight,
   IconTrash,
@@ -40,8 +42,6 @@ import {
   IconFileText,
   IconClock,
   IconTag,
-  IconChevronDown,
-  IconChevronRight,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Lead } from '../../../types/lead';
@@ -50,6 +50,20 @@ import { billingService } from '../../../services/billingService';
 import { QuotationModal } from '../../billing/components/QuotationModal';
 import { QuotationPrintModal } from '../../billing/components/QuotationPrintModal';
 import { printQuotationDirect } from '../../billing/utils/quotationPrint';
+
+const QUOTATION_STATUS_OPTIONS: Array<{
+  value: string;
+  label: string;
+  color: string;
+}> = [
+  { value: 'Draft', label: 'Draft', color: 'gray' },
+  { value: 'Sent', label: 'Sent to Client', color: 'blue' },
+  { value: 'Under Review', label: 'Under Review', color: 'yellow' },
+  { value: 'Changes Required', label: 'Changes Required', color: 'orange' },
+  { value: 'Accepted', label: 'Accepted', color: 'teal' },
+  { value: 'Rejected', label: 'Rejected', color: 'red' },
+  { value: 'Converted', label: 'Converted', color: 'green' },
+];
 
 interface LeadQuotationSectionProps {
   lead: Lead;
@@ -70,18 +84,10 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   const [createModalOpened, setCreateModalOpened] = useState(false);
   const [isRevisionModal, setIsRevisionModal] = useState(false);
   const [revisionBaseQuote, setRevisionBaseQuote] = useState<Quotation | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
   const [printingQuotation, setPrintingQuotation] = useState<Quotation | null>(null);
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const toggleExpand = (id: string) => {
-    setExpandedRows((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
 
   const handleOpenCreate = () => {
     setIsRevisionModal(false);
@@ -109,7 +115,20 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
       if (!quoteId.startsWith('quo-')) {
         await billingService.updateQuotationStatus(quoteId, status);
       }
-      const updated = quotations.map((q) => (q.id === quoteId ? { ...q, status: status as any } : q));
+      const updated = quotations.map((q) => {
+        if (q.id === quoteId) {
+          return { ...q, status: status as any };
+        }
+        if (q.allRevisions && q.allRevisions.length > 0) {
+          return {
+            ...q,
+            allRevisions: q.allRevisions.map((rev) =>
+              rev.id === quoteId ? { ...rev, status: status as any } : rev
+            ),
+          };
+        }
+        return q;
+      });
       onUpdateQuotations(updated);
       if (selectedQuotation?.id === quoteId) {
         setSelectedQuotation({ ...selectedQuotation, status: status as any });
@@ -128,7 +147,17 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   };
 
   const handleDelete = async (quoteId: string) => {
-    const updated = quotations.filter((q) => q.id !== quoteId);
+    const updated = quotations
+      .filter((q) => q.id !== quoteId)
+      .map((q) => {
+        if (q.allRevisions && q.allRevisions.length > 0) {
+          return {
+            ...q,
+            allRevisions: q.allRevisions.filter((r) => r.id !== quoteId),
+          };
+        }
+        return q;
+      });
     onUpdateQuotations(updated);
     if (selectedQuotation?.id === quoteId) {
       setSelectedQuotation(null);
@@ -152,9 +181,9 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   };
 
   const handleQuotationSaved = (saved?: Quotation) => {
-    // 1. Fetch fresh list from CRM database
+    // 1. Fetch fresh list from CRM database with flat: true
     billingService
-      .getQuotations({ leadId: lead.id })
+      .getQuotations({ leadId: lead.id, flat: true })
       .then((data) => {
         if (data && data.length > 0) {
           onUpdateQuotations(data);
@@ -233,7 +262,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   useEffect(() => {
     if (!lead?.id) return;
     billingService
-      .getQuotations({ leadId: lead.id })
+      .getQuotations({ leadId: lead.id, flat: true })
       .then((dbQuotes) => {
         if (dbQuotes && dbQuotes.length > 0) {
           onUpdateQuotations(dbQuotes);
@@ -242,8 +271,51 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
       .catch(() => {});
   }, [lead?.id]);
 
-  const activeQuotation = selectedQuotation || quotations[0];
+  // Flatten quotations so each revision (V1, V2, etc.) is rendered as a separate, distinct row
+  const displayQuotations = React.useMemo(() => {
+    const list: Quotation[] = [];
+    const seenIds = new Set<string>();
+
+    for (const quote of quotations) {
+      if (quote.allRevisions && quote.allRevisions.length > 0) {
+        for (const rev of quote.allRevisions) {
+          if (!seenIds.has(rev.id)) {
+            seenIds.add(rev.id);
+            list.push({
+              ...rev,
+              companyName: rev.companyName || quote.companyName,
+              contactName: rev.contactName || quote.contactName,
+            });
+          }
+        }
+      } else {
+        if (!seenIds.has(quote.id)) {
+          seenIds.add(quote.id);
+          list.push(quote);
+        }
+      }
+    }
+
+    // Sort: newest first, and within same quote group, higher version first
+    return list.sort((a, b) => {
+      const getBaseNum = (q: Quotation) =>
+        q.originalQuotationNumber || (q.quotationNumber ? q.quotationNumber.replace(/-V\d+$/i, '') : '');
+      const baseA = getBaseNum(a);
+      const baseB = getBaseNum(b);
+
+      if (baseA && baseB && baseA === baseB) {
+        return (b.version || 1) - (a.version || 1);
+      }
+      const timeA = new Date(a.createdAt || a.quotationDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.quotationDate || 0).getTime();
+      return timeB - timeA;
+    });
+  }, [quotations]);
+
+  const activeQuotation = selectedQuotation || displayQuotations[0];
   const activeStatus = activeQuotation?.status;
+  const hasAccepted = displayQuotations.some((q) => (q.status || '').toLowerCase() === 'accepted');
+  const hasChangesRequired = displayQuotations.some((q) => (q.status || '').toLowerCase() === 'changes required');
 
   return (
     <Box>
@@ -293,7 +365,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
           </Button>
 
           {/* Conditional Navigation Buttons based on current quotation status */}
-          {activeStatus === 'Accepted' && (
+          {(activeStatus === 'Accepted' || hasAccepted) && (
             <Button
               size="sm"
               variant="light"
@@ -306,7 +378,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
             </Button>
           )}
 
-          {activeStatus === 'Changes Required' && (
+          {(activeStatus === 'Changes Required' || hasChangesRequired) && (
             <Button
               size="sm"
               variant="light"
@@ -322,7 +394,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
       </Group>
 
       {/* 2. Quotation List Content */}
-      {quotations.length === 0 ? (
+      {displayQuotations.length === 0 ? (
         <Paper
           radius="lg"
           p="3rem"
@@ -402,284 +474,223 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {quotations.map((quote) => {
+                  {displayQuotations.map((quote) => {
                     const itemCount = quote.items?.length || 0;
                     const firstItem = quote.items?.[0]?.itemName || '';
-                    const allRevs = quote.allRevisions || [quote];
-                    const isExpanded = Boolean(expandedRows[quote.id]);
-                    const hasRevs = allRevs.length > 1;
-                    const latestRev = allRevs[allRevs.length - 1] || quote;
+                    const versionLabel = quote.revisionName || (quote.version ? `V${quote.version}` : 'V1');
 
                     return (
-                      <React.Fragment key={quote.id}>
-                        <Table.Tr
-                          style={{
-                            borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid #F1F5F9',
-                            background: isExpanded ? (isDark ? 'rgba(79, 70, 229, 0.08)' : '#F8FAFC') : undefined,
-                          }}
-                        >
-                          {/* 1. QUOTATION / REF */}
-                          <Table.Td>
-                            <Group gap="sm" wrap="nowrap">
-                              {hasRevs && (
-                                <ActionIcon
-                                  size="sm"
-                                  variant={isExpanded ? 'filled' : 'subtle'}
-                                  color="indigo"
-                                  radius="md"
-                                  onClick={() => toggleExpand(quote.id)}
-                                >
-                                  {isExpanded ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                                </ActionIcon>
-                              )}
-                              <Box
+                      <Table.Tr
+                        key={quote.id}
+                        style={{
+                          borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid #F1F5F9',
+                        }}
+                      >
+                        {/* 1. QUOTATION / REF */}
+                        <Table.Td>
+                          <Group gap="sm" wrap="nowrap">
+                            <Box
+                              style={{
+                                width: 38,
+                                height: 38,
+                                borderRadius: 10,
+                                background: isDark ? 'rgba(79, 70, 229, 0.18)' : '#EEF2FF',
+                                color: isDark ? '#A5B4FC' : '#4F46E5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontWeight: 800,
+                                fontSize: 14,
+                                flexShrink: 0,
+                                border: isDark ? '1px solid rgba(99, 102, 241, 0.25)' : '1px solid #E0E7FF',
+                              }}
+                            >
+                              <IconCalculator size={19} stroke={1.8} />
+                            </Box>
+                            <div>
+                              <Text
+                                size="sm"
+                                fw={700}
                                 style={{
-                                  width: 38,
-                                  height: 38,
-                                  borderRadius: 10,
-                                  background: isDark ? 'rgba(79, 70, 229, 0.18)' : '#EEF2FF',
-                                  color: isDark ? '#A5B4FC' : '#4F46E5',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontWeight: 800,
-                                  fontSize: 14,
-                                  flexShrink: 0,
-                                  border: isDark ? '1px solid rgba(99, 102, 241, 0.25)' : '1px solid #E0E7FF',
+                                  color: isDark ? '#F8FAFC' : '#0F172A',
+                                  cursor: 'pointer',
                                 }}
+                                onClick={() => setPrintingQuotation(quote)}
                               >
-                                <IconCalculator size={19} stroke={1.8} />
-                              </Box>
-                              <div>
-                                <Text
-                                  size="sm"
-                                  fw={700}
-                                  style={{
-                                    color: isDark ? '#F8FAFC' : '#0F172A',
-                                    cursor: 'pointer',
-                                  }}
-                                  onClick={() => setPrintingQuotation(latestRev)}
-                                >
-                                  {quote.originalQuotationNumber || quote.quotationNumber}
-                                </Text>
-                                <Group gap={6} mt={2}>
-                                  <Text size="11px" c="dimmed">
-                                    {quote.companyName || quote.contactName}
-                                  </Text>
-                                  {itemCount > 0 && (
-                                    <>
-                                      <Text size="11px" c="dimmed">•</Text>
-                                      <Text size="11px" c="dimmed">
-                                        {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                                        {firstItem ? ` (${firstItem})` : ''}
-                                      </Text>
-                                    </>
-                                  )}
-                                </Group>
-                              </div>
-                            </Group>
-                          </Table.Td>
-
-                          {/* 2. VERSION */}
-                          <Table.Td>
-                            <Group gap={6}>
-                              <Badge size="sm" variant="filled" color="indigo" radius="sm">
-                                {quote.latestRevisionName || (quote.version ? `V${quote.version}` : 'V1')}
-                              </Badge>
-                              {hasRevs && (
-                                <Badge
-                                  size="xs"
-                                  variant="light"
-                                  color="indigo"
-                                  radius="sm"
-                                  style={{ cursor: 'pointer' }}
-                                  onClick={() => toggleExpand(quote.id)}
-                                >
-                                  {allRevs.length} Revs
-                                </Badge>
-                              )}
-                            </Group>
-                          </Table.Td>
-
-                          {/* 3. DATE & VALIDITY */}
-                          <Table.Td>
-                            <Group gap={6}>
-                              <IconCalendar size={14} color="#94A3B8" />
-                              <Text size="xs" fw={600} style={{ color: isDark ? '#E2E8F0' : '#1E293B' }}>
-                                {quote.quotationDate ? new Date(quote.quotationDate).toISOString().split('T')[0] : 'N/A'}
+                                {quote.quotationNumber}
                               </Text>
-                            </Group>
-                            <Text size="11px" c="dimmed" mt={2}>
-                              Valid till: {quote.validUntil ? new Date(quote.validUntil).toISOString().split('T')[0] : 'N/A'}
+                              <Group gap={6} mt={2}>
+                                <Text size="11px" c="dimmed">
+                                  {quote.companyName || quote.contactName || lead.name}
+                                </Text>
+                                {itemCount > 0 && (
+                                  <>
+                                    <Text size="11px" c="dimmed">•</Text>
+                                    <Text size="11px" c="dimmed">
+                                      {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                                      {firstItem ? ` (${firstItem})` : ''}
+                                    </Text>
+                                  </>
+                                )}
+                              </Group>
+                            </div>
+                          </Group>
+                        </Table.Td>
+
+                        {/* 2. VERSION */}
+                        <Table.Td>
+                          <Badge size="sm" variant="filled" color="indigo" radius="sm">
+                            {versionLabel}
+                          </Badge>
+                        </Table.Td>
+
+                        {/* 3. DATE & VALIDITY */}
+                        <Table.Td>
+                          <Group gap={6}>
+                            <IconCalendar size={14} color="#94A3B8" />
+                            <Text size="xs" fw={600} style={{ color: isDark ? '#E2E8F0' : '#1E293B' }}>
+                              {quote.quotationDate ? new Date(quote.quotationDate).toISOString().split('T')[0] : 'N/A'}
                             </Text>
-                          </Table.Td>
+                          </Group>
+                          <Text size="11px" c="dimmed" mt={2}>
+                            Valid till: {quote.validUntil ? new Date(quote.validUntil).toISOString().split('T')[0] : 'N/A'}
+                          </Text>
+                        </Table.Td>
 
-                          {/* 4. VALUE / PRICING */}
-                          <Table.Td>
-                            <Text size="sm" fw={800} style={{ color: '#2563EB', letterSpacing: '-0.02em' }}>
-                              ₹{Number(quote.latestGrandTotal || latestRev.grandTotal || quote.grandTotal || 0).toLocaleString('en-IN')}
-                            </Text>
-                          </Table.Td>
+                        {/* 4. VALUE / PRICING */}
+                        <Table.Td>
+                          <Text size="sm" fw={800} style={{ color: '#2563EB', letterSpacing: '-0.02em' }}>
+                            ₹{Number(quote.grandTotal || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </Table.Td>
 
-                          {/* 5. STATUS */}
-                          <Table.Td>
-                            {renderStatusBadge(quote.latestStatus || latestRev.status || quote.status)}
-                          </Table.Td>
+                        {/* 5. STATUS */}
+                        <Table.Td>
+                          {renderStatusBadge(quote.status)}
+                        </Table.Td>
 
-                          {/* 6. ACTIONS */}
-                          <Table.Td style={{ textAlign: 'right' }}>
-                            <Group justify="flex-end" gap={6} wrap="nowrap">
-                              <Tooltip label="Create Revised Quotation" withArrow>
-                                <ActionIcon
-                                  variant="light"
-                                  color="indigo"
-                                  size="md"
-                                  radius="md"
-                                  onClick={() => handleCreateRevision(latestRev)}
-                                >
-                                  <IconPlus size={16} />
-                                </ActionIcon>
-                              </Tooltip>
+                        {/* 6. ACTIONS */}
+                        <Table.Td style={{ textAlign: 'right' }}>
+                          <Group justify="flex-end" gap={6} wrap="nowrap">
+                            <Tooltip label="Create Revised Quotation" withArrow>
+                              <ActionIcon
+                                variant="light"
+                                color="indigo"
+                                size="md"
+                                radius="md"
+                                onClick={() => handleCreateRevision(quote)}
+                              >
+                                <IconPlus size={16} />
+                              </ActionIcon>
+                            </Tooltip>
 
-                              <Tooltip label="View Quotation PDF" withArrow>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="blue"
-                                  size="md"
-                                  radius="md"
-                                  onClick={() => setPrintingQuotation(latestRev)}
-                                >
-                                  <IconEye size={16} />
-                                </ActionIcon>
-                              </Tooltip>
+                            <Tooltip label="View Quotation PDF" withArrow>
+                              <ActionIcon
+                                variant="subtle"
+                                color="blue"
+                                size="md"
+                                radius="md"
+                                onClick={() => setPrintingQuotation(quote)}
+                              >
+                                <IconEye size={16} />
+                              </ActionIcon>
+                            </Tooltip>
 
-                              <Tooltip label="Print / Download Quotation" withArrow>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="indigo"
-                                  size="md"
-                                  radius="md"
-                                  onClick={() => printQuotationDirect(latestRev)}
-                                >
-                                  <IconPrinter size={16} />
-                                </ActionIcon>
-                              </Tooltip>
+                            <Tooltip label="Print / Download Quotation" withArrow>
+                              <ActionIcon
+                                variant="subtle"
+                                color="indigo"
+                                size="md"
+                                radius="md"
+                                onClick={() => printQuotationDirect(quote)}
+                              >
+                                <IconPrinter size={16} />
+                              </ActionIcon>
+                            </Tooltip>
 
-                              {latestRev.status !== 'Accepted' && latestRev.status !== 'Superseded' && (
-                                <Tooltip label="Mark Accepted" withArrow>
+                            <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                              <Menu.Target>
+                                <Tooltip label="Update Status" withArrow>
                                   <ActionIcon
                                     variant="subtle"
                                     color="teal"
                                     size="md"
                                     radius="md"
-                                    onClick={() => handleStatusChange(latestRev.id, 'Accepted')}
                                   >
-                                    <IconCheck size={16} />
+                                    <IconRefresh size={16} />
                                   </ActionIcon>
                                 </Tooltip>
-                              )}
+                              </Menu.Target>
+                              <Menu.Dropdown>
+                                <Menu.Label>Update Status</Menu.Label>
+                                {QUOTATION_STATUS_OPTIONS.map((opt) => {
+                                  const isSelected = (quote.status || '').toLowerCase() === opt.value.toLowerCase();
+                                  return (
+                                    <Menu.Item
+                                      key={opt.value}
+                                      onClick={() => handleStatusChange(quote.id, opt.value)}
+                                      leftSection={
+                                        <Box
+                                          style={{
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: '50%',
+                                            backgroundColor:
+                                              opt.color === 'teal'
+                                                ? '#10B981'
+                                                : opt.color === 'blue'
+                                                ? '#3B82F6'
+                                                : opt.color === 'yellow'
+                                                ? '#F59E0B'
+                                                : opt.color === 'orange'
+                                                ? '#F97316'
+                                                : opt.color === 'red'
+                                                ? '#EF4444'
+                                                : opt.color === 'green'
+                                                ? '#059669'
+                                                : '#94A3B8',
+                                          }}
+                                        />
+                                      }
+                                      rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                      style={{
+                                        fontWeight: isSelected ? 600 : 400,
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      {opt.label}
+                                    </Menu.Item>
+                                  );
+                                })}
+                              </Menu.Dropdown>
+                            </Menu>
 
-                              <Tooltip label="Edit Quotation" withArrow>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="gray"
-                                  size="md"
-                                  radius="md"
-                                  onClick={() => handleOpenEdit(latestRev)}
-                                >
-                                  <IconEdit size={16} />
-                                </ActionIcon>
-                              </Tooltip>
+                            <Tooltip label="Edit Quotation" withArrow>
+                              <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                size="md"
+                                radius="md"
+                                onClick={() => handleOpenEdit(quote)}
+                              >
+                                <IconEdit size={16} />
+                              </ActionIcon>
+                            </Tooltip>
 
-                              <Tooltip label="Delete Quotation" withArrow>
-                                <ActionIcon
-                                  variant="subtle"
-                                  color="red"
-                                  size="md"
-                                  radius="md"
-                                  onClick={() => handleDelete(quote.id)}
-                                >
-                                  <IconTrash size={16} />
-                                </ActionIcon>
-                              </Tooltip>
-                            </Group>
-                          </Table.Td>
-                        </Table.Tr>
-
-                        {/* Expanded Revisions Sub-Table */}
-                        {isExpanded && (
-                          <Table.Tr style={{ background: isDark ? 'rgba(15, 23, 42, 0.7)' : '#F8FAFC' }}>
-                            <Table.Td colSpan={6} style={{ padding: '12px 20px 16px 48px' }}>
-                              <Paper p="sm" radius="md" style={{ background: isDark ? '#1E293B' : '#FFFFFF', border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #E2E8F0' }}>
-                                <Group justify="space-between" align="center" mb="xs">
-                                  <Text fw={700} size="xs" c="indigo" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
-                                    Revision History ({allRevs.length} Versions)
-                                  </Text>
-                                  <Button
-                                    size="xs"
-                                    variant="light"
-                                    color="indigo"
-                                    leftSection={<IconPlus size={12} />}
-                                    onClick={() => handleCreateRevision(latestRev)}
-                                    style={{ height: 24, fontSize: 11 }}
-                                  >
-                                    Create Revision
-                                  </Button>
-                                </Group>
-                                <Table verticalSpacing="xs">
-                                  <Table.Thead>
-                                    <Table.Tr>
-                                      <Table.Th style={{ fontSize: 10, color: '#94A3B8' }}>VERSION</Table.Th>
-                                      <Table.Th style={{ fontSize: 10, color: '#94A3B8' }}>CODE</Table.Th>
-                                      <Table.Th style={{ fontSize: 10, color: '#94A3B8' }}>AMOUNT</Table.Th>
-                                      <Table.Th style={{ fontSize: 10, color: '#94A3B8' }}>STATUS</Table.Th>
-                                      <Table.Th style={{ fontSize: 10, color: '#94A3B8' }}>DATE</Table.Th>
-                                      <Table.Th style={{ fontSize: 10, color: '#94A3B8', textAlign: 'right' }}>ACTIONS</Table.Th>
-                                    </Table.Tr>
-                                  </Table.Thead>
-                                  <Table.Tbody>
-                                    {allRevs.map((rev) => (
-                                      <Table.Tr key={rev.id}>
-                                        <Table.Td>
-                                          <Badge size="xs" variant="filled" color="indigo">
-                                            {rev.revisionName || `V${rev.version || 1}`}
-                                          </Badge>
-                                        </Table.Td>
-                                        <Table.Td>
-                                          <Text size="xs" fw={600} style={{ color: isDark ? '#A5B4FC' : '#4F46E5', cursor: 'pointer' }} onClick={() => setPrintingQuotation(rev)}>
-                                            {rev.quotationNumber}
-                                          </Text>
-                                        </Table.Td>
-                                        <Table.Td>
-                                          <Text size="xs" fw={700} c="green">
-                                            ₹{Number(rev.grandTotal || 0).toLocaleString('en-IN')}
-                                          </Text>
-                                        </Table.Td>
-                                        <Table.Td>{renderStatusBadge(rev.status)}</Table.Td>
-                                        <Table.Td>
-                                          <Text size="11px" c="dimmed">
-                                            {rev.quotationDate}
-                                          </Text>
-                                        </Table.Td>
-                                        <Table.Td style={{ textAlign: 'right' }}>
-                                          <Group justify="flex-end" gap={4}>
-                                            <ActionIcon size="xs" variant="subtle" color="blue" onClick={() => setPrintingQuotation(rev)} title="View / Print">
-                                              <IconPrinter size={13} />
-                                            </ActionIcon>
-                                            <ActionIcon size="xs" variant="subtle" color="teal" onClick={() => handleCreateRevision(rev)} title="Revise">
-                                              <IconPlus size={13} />
-                                            </ActionIcon>
-                                          </Group>
-                                        </Table.Td>
-                                      </Table.Tr>
-                                    ))}
-                                  </Table.Tbody>
-                                </Table>
-                              </Paper>
-                            </Table.Td>
-                          </Table.Tr>
-                        )}
-                      </React.Fragment>
+                            <Tooltip label="Delete Quotation" withArrow>
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                size="md"
+                                radius="md"
+                                onClick={() => handleDelete(quote.id)}
+                              >
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Group>
+                        </Table.Td>
+                      </Table.Tr>
                     );
                   })}
                 </Table.Tbody>
@@ -689,89 +700,163 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
 
           {/* MOBILE CARDS VIEW */}
           <Stack hiddenFrom="sm" gap="md" mt="md">
-            {quotations.map((quote) => (
-              <Paper
-                key={quote.id}
-                p="md"
-                radius="md"
-                style={{
-                  background: isDark ? '#111827' : '#FFFFFF',
-                  border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
-                }}
-              >
-                <Group justify="space-between" align="flex-start" mb="xs">
-                  <div>
-                    <Text fw={700} size="sm" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
-                      {quote.quotationNumber}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {quote.companyName || quote.contactName}
-                    </Text>
-                  </div>
-                  {renderStatusBadge(quote.status)}
-                </Group>
+            {displayQuotations.map((quote) => {
+              const versionLabel = quote.revisionName || (quote.version ? `V${quote.version}` : 'V1');
+              return (
+                <Paper
+                  key={quote.id}
+                  p="md"
+                  radius="md"
+                  style={{
+                    background: isDark ? '#111827' : '#FFFFFF',
+                    border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+                  }}
+                >
+                  <Group justify="space-between" align="flex-start" mb="xs">
+                    <div>
+                      <Group gap="xs" align="center">
+                        <Text fw={700} size="sm" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+                          {quote.quotationNumber}
+                        </Text>
+                        <Badge size="xs" variant="filled" color="indigo" radius="sm">
+                          {versionLabel}
+                        </Badge>
+                      </Group>
+                      <Text size="xs" c="dimmed" mt={2}>
+                        {quote.companyName || quote.contactName || lead.name}
+                      </Text>
+                    </div>
+                    {renderStatusBadge(quote.status)}
+                  </Group>
 
-                <Group justify="space-between" align="center" my="xs">
-                  <div>
-                    <Text size="11px" c="dimmed">
-                      Total Quotation Value
-                    </Text>
-                    <Text size="md" fw={800} style={{ color: '#2563EB' }}>
-                      ₹{quote.grandTotal?.toLocaleString('en-IN') || '0'}
-                    </Text>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <Text size="11px" c="dimmed">
-                      Valid Till
-                    </Text>
-                    <Text size="xs" fw={600} style={{ color: isDark ? '#E2E8F0' : '#1E293B' }}>
-                      {quote.validUntil ? new Date(quote.validUntil).toISOString().split('T')[0] : 'N/A'}
-                    </Text>
-                  </div>
-                </Group>
+                  <Group justify="space-between" align="center" my="xs">
+                    <div>
+                      <Text size="11px" c="dimmed">
+                        Total Quotation Value
+                      </Text>
+                      <Text size="md" fw={800} style={{ color: '#2563EB' }}>
+                        ₹{Number(quote.grandTotal || 0).toLocaleString('en-IN')}
+                      </Text>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <Text size="11px" c="dimmed">
+                        Valid Till
+                      </Text>
+                      <Text size="xs" fw={600} style={{ color: isDark ? '#E2E8F0' : '#1E293B' }}>
+                        {quote.validUntil ? new Date(quote.validUntil).toISOString().split('T')[0] : 'N/A'}
+                      </Text>
+                    </div>
+                  </Group>
 
-                <Divider my="xs" color={isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'} />
+                  <Divider my="xs" color={isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'} />
 
-                <Group justify="flex-end" gap={8}>
-                  <Button
-                    size="xs"
-                    variant="light"
-                    color="blue"
-                    leftSection={<IconEye size={13} />}
-                    onClick={() => setPrintingQuotation(quote)}
-                  >
-                    View PDF
-                  </Button>
-                  <Button
-                    size="xs"
-                    variant="light"
-                    color="indigo"
-                    leftSection={<IconPrinter size={13} />}
-                    onClick={() => printQuotationDirect(quote)}
-                  >
-                    Print
-                  </Button>
-                  <ActionIcon
-                    variant="subtle"
-                    color="gray"
-                    size="md"
-                    radius="md"
-                    onClick={() => handleOpenEdit(quote)}
-                  >
-                    <IconEdit size={15} />
-                  </ActionIcon>
-                  <ActionIcon
-                    variant="subtle"
-                    color="red"
-                    size="md"
-                    radius="md"
-                    onClick={() => handleDelete(quote.id)}
-                  >
-                    <IconTrash size={15} />
-                  </ActionIcon>
-                </Group>
-              </Paper>
-            ))}
+                  <Group justify="flex-end" gap={8}>
+                    <Tooltip label="Create Revision" withArrow>
+                      <ActionIcon
+                        size="md"
+                        variant="light"
+                        color="indigo"
+                        radius="md"
+                        onClick={() => handleCreateRevision(quote)}
+                      >
+                        <IconPlus size={15} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="blue"
+                      leftSection={<IconEye size={13} />}
+                      onClick={() => setPrintingQuotation(quote)}
+                    >
+                      View PDF
+                    </Button>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="indigo"
+                      leftSection={<IconPrinter size={13} />}
+                      onClick={() => printQuotationDirect(quote)}
+                    >
+                      Print
+                    </Button>
+                    <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                      <Menu.Target>
+                        <ActionIcon
+                          variant="subtle"
+                          color="teal"
+                          size="md"
+                          radius="md"
+                          title="Update Status"
+                        >
+                          <IconRefresh size={15} />
+                        </ActionIcon>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Label>Update Status</Menu.Label>
+                        {QUOTATION_STATUS_OPTIONS.map((opt) => {
+                          const isSelected = (quote.status || '').toLowerCase() === opt.value.toLowerCase();
+                          return (
+                            <Menu.Item
+                              key={opt.value}
+                              onClick={() => handleStatusChange(quote.id, opt.value)}
+                              leftSection={
+                                <Box
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: '50%',
+                                    backgroundColor:
+                                      opt.color === 'teal'
+                                        ? '#10B981'
+                                        : opt.color === 'blue'
+                                        ? '#3B82F6'
+                                        : opt.color === 'yellow'
+                                        ? '#F59E0B'
+                                        : opt.color === 'orange'
+                                        ? '#F97316'
+                                        : opt.color === 'red'
+                                        ? '#EF4444'
+                                        : opt.color === 'green'
+                                        ? '#059669'
+                                        : '#94A3B8',
+                                  }}
+                                />
+                              }
+                              rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                              style={{
+                                fontWeight: isSelected ? 600 : 400,
+                                fontSize: 12,
+                              }}
+                            >
+                              {opt.label}
+                            </Menu.Item>
+                          );
+                        })}
+                      </Menu.Dropdown>
+                    </Menu>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="md"
+                      radius="md"
+                      onClick={() => handleOpenEdit(quote)}
+                    >
+                      <IconEdit size={15} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size="md"
+                      radius="md"
+                      onClick={() => handleDelete(quote.id)}
+                    >
+                      <IconTrash size={15} />
+                    </ActionIcon>
+                  </Group>
+                </Paper>
+              );
+            })}
           </Stack>
         </>
       )}

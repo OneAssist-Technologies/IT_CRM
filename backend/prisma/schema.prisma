@@ -277,6 +277,7 @@ model Lead {
   serviceList    String[]  @default([])
   status         String?   @default("New")
   stage          String?   @default("Initialization")
+  priority       String?   @default("Medium")
   assignedTo     String?
   assignedToName String?
   createdBy      String?
@@ -548,6 +549,7 @@ model Proposal {
   documentSize    String?
   notes           String?
   terms           String?
+  rejectionReason String?
   items           ProposalItem[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

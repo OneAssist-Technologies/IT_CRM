@@ -100,6 +100,29 @@ export async function syncExistingContactLeadMeetings() {
         AND (c."status" = 'Qualified' OR c."qualificationStatus" = 'Qualified')
         AND (b."status" != 'Qualified')
     `).catch(() => {});
+
+    // 6. Ensure Lead priority column exists and sync from Contact / BulkUploadContact
+    // 7. Ensure proposals rejectionReason column exists
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "proposals" ADD COLUMN IF NOT EXISTS "rejectionReason" TEXT;
+    `).catch(() => {});
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "Lead" ADD COLUMN IF NOT EXISTS "priority" TEXT DEFAULT 'Medium';
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead" l
+      SET "priority" = COALESCE(c."priority", 'Medium'),
+          "updatedAt" = NOW()
+      FROM "Contact" c
+      WHERE (c."internalReference" = l."leadId"
+             OR (l."phone" IS NOT NULL AND l."phone" != '' AND l."phone" = c."phone")
+             OR (l."email" IS NOT NULL AND l."email" != '' AND LOWER(l."email") = LOWER(c."email"))
+             OR l.id = c.id
+             OR l."leadId" = c."contactId")
+        AND c."priority" IS NOT NULL
+        AND (l."priority" IS NULL OR l."priority" = '' OR l."priority" = 'Medium');
+    `).catch(() => {});
   } catch (err) {
     console.warn('[syncExistingContactLeadMeetings Notice]:', err.message || err);
   }

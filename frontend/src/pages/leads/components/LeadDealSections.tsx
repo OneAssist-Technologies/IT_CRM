@@ -29,11 +29,13 @@ import {
   useComputedColorScheme,
   ComboboxItem,
   Alert,
+  Menu,
 } from '@mantine/core';
 import {
   IconScale,
   IconPlus,
   IconCheck,
+  IconRefresh,
   IconArrowRight,
   IconArrowLeft,
   IconCash,
@@ -386,6 +388,7 @@ export const getInitialLeadDealData = (lead: Lead): LeadDealData => {
 
 export const loadLeadDealData = (lead: Lead): LeadDealData => {
   try {
+    cleanupLocalStorageQuota();
     const saved = localStorage.getItem(`crm_lead_deal_${lead.id}`);
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -433,11 +436,64 @@ export const loadLeadDealData = (lead: Lead): LeadDealData => {
   return defaultData;
 };
 
+/**
+ * Strips large base64 data URLs from objects before saving to localStorage
+ * to prevent QuotaExceededError while keeping all metadata intact.
+ */
+function stripLargeDataUrls(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(stripLargeDataUrls);
+  }
+  const copy: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string' && (val.startsWith('data:') || (val.length > 2000 && !val.startsWith('http')))) {
+      copy[key] = '';
+    } else if (typeof val === 'object' && val !== null) {
+      copy[key] = stripLargeDataUrls(val);
+    } else {
+      copy[key] = val;
+    }
+  }
+  return copy;
+}
+
+/**
+ * Clean up oversized/bloated legacy keys from localStorage to free up space.
+ */
+export const cleanupLocalStorageQuota = (): void => {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('crm_lead_deal_') || k.startsWith('crm_meetings_') || k.startsWith('crm_activities_'))) {
+        const val = localStorage.getItem(k);
+        if (val && (val.includes('data:') || val.length > 100000)) {
+          toRemove.push(k);
+        }
+      }
+    }
+    toRemove.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch (_) {}
+    });
+  } catch (_) {}
+};
+
 export const saveLeadDealData = (leadId: string, data: LeadDealData): void => {
   try {
-    localStorage.setItem(`crm_lead_deal_${leadId}`, JSON.stringify(data));
-  } catch (e) {
-    console.error('Failed to save deal data to localStorage:', e);
+    const sanitized = stripLargeDataUrls(data);
+    localStorage.setItem(`crm_lead_deal_${leadId}`, JSON.stringify(sanitized));
+  } catch (e: any) {
+    try {
+      cleanupLocalStorageQuota();
+      const sanitized = stripLargeDataUrls(data);
+      localStorage.setItem(`crm_lead_deal_${leadId}`, JSON.stringify(sanitized));
+    } catch (_) {
+      // Gracefully fall back to in-memory state if localStorage is permanently restricted
+    }
   }
 };
 
@@ -461,6 +517,19 @@ type ActiveNegTabType =
   | 'REVISED_QUOTATION'
   | 'WON'
   | 'LOST';
+
+const NEGOTIATION_STATUS_OPTIONS: Array<{
+  value: NegotiationStatus;
+  label: string;
+  color: string;
+}> = [
+  { value: 'Draft', label: 'Draft', color: 'gray' },
+  { value: 'In Progress', label: 'In Progress', color: 'blue' },
+  { value: 'Awaiting Client', label: 'Awaiting Client', color: 'yellow' },
+  { value: 'Revised Quotation', label: 'Revised Quotation', color: 'indigo' },
+  { value: 'Won', label: 'Won', color: 'teal' },
+  { value: 'Lost', label: 'Lost', color: 'red' },
+];
 
 export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
   lead,
@@ -1180,22 +1249,25 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
     }
   };
 
-  // Quick Mark Won
-  const handleQuickMarkWon = async (neg: Negotiation) => {
+  // Quick Update Status
+  const handleQuickStatusChange = async (neg: Negotiation, newStatus: NegotiationStatus) => {
     try {
       await leadService.updateNegotiation(neg.id, {
-        status: 'Won',
-        notes: `Quick-marked as Won from Negotiation list view.`,
+        status: newStatus,
+        notes: `Status updated to ${newStatus} from Negotiation list view.`,
       });
       notifications.show({
-        title: 'Negotiation Won! 🎉',
-        message: `${neg.negotiationId} commercial terms accepted. Ready for Contract.`,
-        color: 'teal',
+        title: newStatus === 'Won' ? 'Negotiation Won! 🎉' : 'Status Updated',
+        message:
+          newStatus === 'Won'
+            ? `${neg.negotiationId} commercial terms accepted. Ready for Contract.`
+            : `${neg.negotiationId} status changed to ${newStatus}.`,
+        color: newStatus === 'Won' ? 'teal' : newStatus === 'Lost' ? 'red' : 'blue',
       });
       if (onUpdateNegotiation && legacyNegotiation) {
         onUpdateNegotiation({
           ...legacyNegotiation,
-          status: 'Terms Agreed',
+          status: newStatus === 'Won' ? 'Terms Agreed' : (newStatus as any),
         });
       }
       await loadData();
@@ -1648,19 +1720,60 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
                             </ActionIcon>
                           </Tooltip>
 
-                          {item.status !== 'Won' && (
-                            <Tooltip label="Mark Accepted" withArrow>
-                              <ActionIcon
-                                variant="subtle"
-                                color="teal"
-                                size="md"
-                                radius="md"
-                                onClick={() => handleQuickMarkWon(item)}
-                              >
-                                <IconCheck size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
+                          <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                            <Menu.Target>
+                              <Tooltip label="Update Status" withArrow>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="teal"
+                                  size="md"
+                                  radius="md"
+                                >
+                                  <IconRefresh size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Label>Update Status</Menu.Label>
+                              {NEGOTIATION_STATUS_OPTIONS.map((opt) => {
+                                const isSelected = item.status === opt.value;
+                                return (
+                                  <Menu.Item
+                                    key={opt.value}
+                                    onClick={() => handleQuickStatusChange(item, opt.value)}
+                                    leftSection={
+                                      <Box
+                                        style={{
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          backgroundColor:
+                                            opt.color === 'teal'
+                                              ? '#10B981'
+                                              : opt.color === 'blue'
+                                              ? '#3B82F6'
+                                              : opt.color === 'yellow'
+                                              ? '#F59E0B'
+                                              : opt.color === 'indigo'
+                                              ? '#6366F1'
+                                              : opt.color === 'red'
+                                              ? '#EF4444'
+                                              : '#94A3B8',
+                                        }}
+                                      />
+                                    }
+                                    rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                    style={{
+                                      fontWeight: isSelected ? 600 : 400,
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    {opt.label}
+                                  </Menu.Item>
+                                );
+                              })}
+                            </Menu.Dropdown>
+                          </Menu>
 
                           {canEdit && (
                             <Tooltip label="Edit Negotiation" withArrow>
@@ -1775,9 +1888,56 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
                 <Divider my="xs" />
 
                 <Group justify="flex-end" gap={6}>
-                  <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => setDetailsNegotiation(item)}>
+                  <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => setDetailsNegotiation(item)} title="View Details">
                     <IconEye size={15} />
                   </ActionIcon>
+                  <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                    <Menu.Target>
+                      <ActionIcon variant="subtle" color="teal" size="sm" title="Update Status">
+                        <IconRefresh size={15} />
+                      </ActionIcon>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Label>Update Status</Menu.Label>
+                      {NEGOTIATION_STATUS_OPTIONS.map((opt) => {
+                        const isSelected = item.status === opt.value;
+                        return (
+                          <Menu.Item
+                            key={opt.value}
+                            onClick={() => handleQuickStatusChange(item, opt.value)}
+                            leftSection={
+                              <Box
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  backgroundColor:
+                                    opt.color === 'teal'
+                                      ? '#10B981'
+                                      : opt.color === 'blue'
+                                      ? '#3B82F6'
+                                      : opt.color === 'yellow'
+                                      ? '#F59E0B'
+                                      : opt.color === 'indigo'
+                                      ? '#6366F1'
+                                      : opt.color === 'red'
+                                      ? '#EF4444'
+                                      : '#94A3B8',
+                                }}
+                              />
+                            }
+                            rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                            style={{
+                              fontWeight: isSelected ? 600 : 400,
+                              fontSize: 12,
+                            }}
+                          >
+                            {opt.label}
+                          </Menu.Item>
+                        );
+                      })}
+                    </Menu.Dropdown>
+                  </Menu>
                   {canEdit && (
                     <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => handleOpenEditModal(item)}>
                       <IconEdit size={15} />

@@ -352,7 +352,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
               label="Status"
               data={Array.from(
                 new Set(
-                  (metadata?.statuses || ['New', 'In Progress', 'Qualified', 'Proposal Sent', 'Complete', 'Lost']).map(
+                  (metadata?.statuses || ['New', 'In Progress', 'Follow-up', 'Interested', 'Qualified', 'Proposal Sent', 'Complete', 'Lost']).map(
                     (s) => (s === 'Contacted' ? 'In Progress' : (s === 'Won' || s === 'Completed' ? 'Complete' : s))
                   )
                 )

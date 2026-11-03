@@ -77,6 +77,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [rejectionReason, setRejectionReason] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [termsConditions, setTermsConditions] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -96,6 +97,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
       setProposalDate(proposal.issueDate || new Date().toISOString().split('T')[0]);
       setValidUntil(proposal.validUntil || '');
       setStatus(proposal.status || 'Draft');
+      setRejectionReason((proposal as any).rejectionReason || '');
       setPaymentTerms((proposal as any).paymentTerms || 'Net 30 Days');
 
       setProposalTitle(proposal.title || `${lead.companyName || lead.name} Solution Proposal`);
@@ -127,6 +129,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
       setProposalDate(new Date().toISOString().split('T')[0]);
       setValidUntil('');
       setStatus('Draft');
+      setRejectionReason('');
       setPaymentTerms('');
 
       setProposalTitle('');
@@ -269,6 +272,11 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
       return;
     }
 
+    if (status === 'Rejected' && !rejectionReason.trim()) {
+      notifications.show({ color: 'red', message: 'Rejection Reason is required when Status is Rejected' });
+      return;
+    }
+
     try {
       setSubmitting(true);
 
@@ -293,6 +301,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
           proposalDate,
           validUntil,
           status,
+          rejectionReason: status === 'Rejected' ? rejectionReason.trim() : null,
           paymentTerms,
           notes,
           terms: termsConditions,
@@ -340,6 +349,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
         issueDate: proposalDate,
         validUntil: validUntil,
         status: status,
+        rejectionReason: status === 'Rejected' ? rejectionReason.trim() : undefined,
         currency: 'INR (₹)',
         items: createdDbProposal?.items || [],
         discountPercent: 0,
@@ -519,6 +529,19 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
               radius="md"
             />
           </SimpleGrid>
+
+          {/* Dynamic Rejection Reason Field */}
+          {status === 'Rejected' && (
+            <TextInput
+              label="Rejection Reason"
+              withAsterisk
+              placeholder="Enter reason for proposal rejection (e.g. Budget constraints, selected another vendor)"
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.currentTarget.value)}
+              required
+              radius="md"
+            />
+          )}
 
           {/* 5. Proposal Date * & Valid Until * */}
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
