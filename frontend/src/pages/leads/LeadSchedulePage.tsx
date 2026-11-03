@@ -253,95 +253,92 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     }
   }, [activeLead?.id]);
 
-  const handleUpdateProposals = async (newProposals: any) => {
+  const handleUpdateProposals = useCallback(async (newProposals: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, proposals: newProposals };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Proposals', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Proposals',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Proposals' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Proposals', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Proposals',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateQuotations = async (newQuotations: any) => {
+  const handleUpdateQuotations = useCallback(async (newQuotations: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, quotations: newQuotations };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Quotations', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Quotations',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Quotations' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Quotations', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Quotations',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateNegotiation = async (newNeg: any) => {
+  const handleUpdateNegotiation = useCallback(async (newNeg: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, negotiation: newNeg };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Negotiation', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Negotiation',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Negotiation' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Negotiation', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Negotiation',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateContract = async (newContract: any) => {
+  const handleUpdateContract = useCallback(async (newContract: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, contract: newContract };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Contracts', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Contracts',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Contracts' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Contracts', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Contracts',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateInvoices = async (newInvoices: any) => {
+  const handleUpdateInvoices = useCallback(async (newInvoices: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, invoices: newInvoices };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Invoices', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Invoices',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+  }, [dealData, activeLead]);
 
   const handleUpdatePayments = async (newPayments: any) => {
     if (!dealData || !activeLead) return;
@@ -843,7 +840,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     };
     const updated = [newComment, ...customActivities];
     setCustomActivities(updated);
-    localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated));
+    try { localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated)); } catch (_) {}
     setCommentText('');
     setNoteTitle('');
     setCommentBoxOpened(false);
@@ -864,7 +861,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     };
     const updated = [newReply, ...customActivities];
     setCustomActivities(updated);
-    localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated));
+    try { localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated)); } catch (_) {}
     setReplyText('');
     setEmailSubject('');
     setReplyBoxOpened(false);

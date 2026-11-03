@@ -15252,6 +15252,7 @@ export namespace Prisma {
     category: string | null
     status: string | null
     stage: string | null
+    priority: string | null
     assignedTo: string | null
     assignedToName: string | null
     createdBy: string | null
@@ -15276,6 +15277,7 @@ export namespace Prisma {
     category: string | null
     status: string | null
     stage: string | null
+    priority: string | null
     assignedTo: string | null
     assignedToName: string | null
     createdBy: string | null
@@ -15302,6 +15304,7 @@ export namespace Prisma {
     serviceList: number
     status: number
     stage: number
+    priority: number
     assignedTo: number
     assignedToName: number
     createdBy: number
@@ -15328,6 +15331,7 @@ export namespace Prisma {
     category?: true
     status?: true
     stage?: true
+    priority?: true
     assignedTo?: true
     assignedToName?: true
     createdBy?: true
@@ -15352,6 +15356,7 @@ export namespace Prisma {
     category?: true
     status?: true
     stage?: true
+    priority?: true
     assignedTo?: true
     assignedToName?: true
     createdBy?: true
@@ -15378,6 +15383,7 @@ export namespace Prisma {
     serviceList?: true
     status?: true
     stage?: true
+    priority?: true
     assignedTo?: true
     assignedToName?: true
     createdBy?: true
@@ -15477,6 +15483,7 @@ export namespace Prisma {
     serviceList: string[]
     status: string | null
     stage: string | null
+    priority: string | null
     assignedTo: string | null
     assignedToName: string | null
     createdBy: string | null
@@ -15520,6 +15527,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -15546,6 +15554,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -15572,6 +15581,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -15598,6 +15608,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -15606,7 +15617,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type LeadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "leadId" | "name" | "email" | "phone" | "contactType" | "profession" | "companyName" | "designation" | "address" | "source" | "customSource" | "category" | "productList" | "serviceList" | "status" | "stage" | "assignedTo" | "assignedToName" | "createdBy" | "createdByName" | "createdAt" | "updatedAt", ExtArgs["result"]["lead"]>
+  export type LeadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "leadId" | "name" | "email" | "phone" | "contactType" | "profession" | "companyName" | "designation" | "address" | "source" | "customSource" | "category" | "productList" | "serviceList" | "status" | "stage" | "priority" | "assignedTo" | "assignedToName" | "createdBy" | "createdByName" | "createdAt" | "updatedAt", ExtArgs["result"]["lead"]>
 
   export type $LeadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Lead"
@@ -15629,6 +15640,7 @@ export namespace Prisma {
       serviceList: string[]
       status: string | null
       stage: string | null
+      priority: string | null
       assignedTo: string | null
       assignedToName: string | null
       createdBy: string | null
@@ -16075,6 +16087,7 @@ export namespace Prisma {
     readonly serviceList: FieldRef<"Lead", 'String[]'>
     readonly status: FieldRef<"Lead", 'String'>
     readonly stage: FieldRef<"Lead", 'String'>
+    readonly priority: FieldRef<"Lead", 'String'>
     readonly assignedTo: FieldRef<"Lead", 'String'>
     readonly assignedToName: FieldRef<"Lead", 'String'>
     readonly createdBy: FieldRef<"Lead", 'String'>
@@ -46445,6 +46458,7 @@ export namespace Prisma {
     serviceList: 'serviceList',
     status: 'status',
     stage: 'stage',
+    priority: 'priority',
     assignedTo: 'assignedTo',
     assignedToName: 'assignedToName',
     createdBy: 'createdBy',
@@ -48482,6 +48496,7 @@ export namespace Prisma {
     serviceList?: StringNullableListFilter<"Lead">
     status?: StringNullableFilter<"Lead"> | string | null
     stage?: StringNullableFilter<"Lead"> | string | null
+    priority?: StringNullableFilter<"Lead"> | string | null
     assignedTo?: StringNullableFilter<"Lead"> | string | null
     assignedToName?: StringNullableFilter<"Lead"> | string | null
     createdBy?: StringNullableFilter<"Lead"> | string | null
@@ -48508,6 +48523,7 @@ export namespace Prisma {
     serviceList?: SortOrder
     status?: SortOrderInput | SortOrder
     stage?: SortOrderInput | SortOrder
+    priority?: SortOrderInput | SortOrder
     assignedTo?: SortOrderInput | SortOrder
     assignedToName?: SortOrderInput | SortOrder
     createdBy?: SortOrderInput | SortOrder
@@ -48537,6 +48553,7 @@ export namespace Prisma {
     serviceList?: StringNullableListFilter<"Lead">
     status?: StringNullableFilter<"Lead"> | string | null
     stage?: StringNullableFilter<"Lead"> | string | null
+    priority?: StringNullableFilter<"Lead"> | string | null
     assignedTo?: StringNullableFilter<"Lead"> | string | null
     assignedToName?: StringNullableFilter<"Lead"> | string | null
     createdBy?: StringNullableFilter<"Lead"> | string | null
@@ -48563,6 +48580,7 @@ export namespace Prisma {
     serviceList?: SortOrder
     status?: SortOrderInput | SortOrder
     stage?: SortOrderInput | SortOrder
+    priority?: SortOrderInput | SortOrder
     assignedTo?: SortOrderInput | SortOrder
     assignedToName?: SortOrderInput | SortOrder
     createdBy?: SortOrderInput | SortOrder
@@ -48595,6 +48613,7 @@ export namespace Prisma {
     serviceList?: StringNullableListFilter<"Lead">
     status?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     stage?: StringNullableWithAggregatesFilter<"Lead"> | string | null
+    priority?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     assignedTo?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     assignedToName?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     createdBy?: StringNullableWithAggregatesFilter<"Lead"> | string | null
@@ -53408,6 +53427,7 @@ export namespace Prisma {
     serviceList?: LeadCreateserviceListInput | string[]
     status?: string | null
     stage?: string | null
+    priority?: string | null
     assignedTo?: string | null
     assignedToName?: string | null
     createdBy?: string | null
@@ -53434,6 +53454,7 @@ export namespace Prisma {
     serviceList?: LeadCreateserviceListInput | string[]
     status?: string | null
     stage?: string | null
+    priority?: string | null
     assignedTo?: string | null
     assignedToName?: string | null
     createdBy?: string | null
@@ -53460,6 +53481,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -53486,6 +53508,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -53512,6 +53535,7 @@ export namespace Prisma {
     serviceList?: LeadCreateserviceListInput | string[]
     status?: string | null
     stage?: string | null
+    priority?: string | null
     assignedTo?: string | null
     assignedToName?: string | null
     createdBy?: string | null
@@ -53538,6 +53562,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -53564,6 +53589,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -58562,6 +58588,7 @@ export namespace Prisma {
     serviceList?: SortOrder
     status?: SortOrder
     stage?: SortOrder
+    priority?: SortOrder
     assignedTo?: SortOrder
     assignedToName?: SortOrder
     createdBy?: SortOrder
@@ -58586,6 +58613,7 @@ export namespace Prisma {
     category?: SortOrder
     status?: SortOrder
     stage?: SortOrder
+    priority?: SortOrder
     assignedTo?: SortOrder
     assignedToName?: SortOrder
     createdBy?: SortOrder
@@ -58610,6 +58638,7 @@ export namespace Prisma {
     category?: SortOrder
     status?: SortOrder
     stage?: SortOrder
+    priority?: SortOrder
     assignedTo?: SortOrder
     assignedToName?: SortOrder
     createdBy?: SortOrder

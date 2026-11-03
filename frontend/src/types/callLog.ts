@@ -15,6 +15,7 @@ export interface CallLog {
   companyName?: string | null;
   phoneNumber: string;
   leadId?: string | null;
+  leadCode?: string | null;
   duration: string;
   status: CallStatus;
   callDate: string;
@@ -32,6 +33,7 @@ export interface ActivityLogItem {
   description?: string | null;
   leadId?: string | null;
   leadName?: string | null;
+  leadCode?: string | null;
   customerId?: string | null;
   customerName?: string | null;
   companyName?: string | null;

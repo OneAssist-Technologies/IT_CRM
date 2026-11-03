@@ -21,6 +21,253 @@ import {
 /**
  * 1. List leads with search, filters, pagination, and sorting
  */
+/**
+ * Helper to attach the most recent activity summary to each lead
+ */
+export async function attachLastActivityToLeads(leads = []) {
+  if (!leads || leads.length === 0) return [];
+
+  const leadIds = leads.map((l) => l.id).filter(Boolean);
+  const leadCodes = leads.map((l) => l.leadId).filter(Boolean);
+  const leadPhones = leads
+    .map((l) => (l.phone ? String(l.phone).replace(/\D/g, '') : null))
+    .filter(Boolean);
+  const leadEmails = leads
+    .map((l) => (l.email ? String(l.email).toLowerCase().trim() : null))
+    .filter(Boolean);
+  const allIdentifiers = Array.from(new Set([...leadIds, ...leadCodes]));
+
+  let linkedContacts = [];
+  try {
+    linkedContacts = await prisma.contact.findMany({
+      where: {
+        OR: [
+          { internalReference: { in: leadCodes } },
+          { id: { in: leadIds } },
+          { contactId: { in: leadCodes } },
+          ...(leadPhones.length > 0 ? [{ phone: { in: leadPhones } }] : []),
+          ...(leadEmails.length > 0
+            ? [{ email: { in: leadEmails, mode: 'insensitive' } }]
+            : []),
+        ],
+      },
+      select: {
+        id: true,
+        contactId: true,
+        phone: true,
+        email: true,
+        internalReference: true,
+        contactMode: true,
+        nextFollowDate: true,
+        updatedAt: true,
+      },
+    });
+  } catch (err) {
+    console.warn('[attachLastActivityToLeads Notice]:', err.message);
+  }
+
+  const allContactIds = Array.from(
+    new Set(linkedContacts.flatMap((c) => [c.id, c.contactId]).filter(Boolean))
+  );
+
+  let activities = [];
+  let meetings = [];
+  let callLogs = [];
+
+  try {
+    [activities, meetings, callLogs] = await Promise.all([
+      prisma.activity.findMany({
+        where: {
+          OR: [
+            { leadId: { in: allIdentifiers } },
+            { leadCode: { in: leadCodes } },
+            ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }).catch(() => []),
+      prisma.scheduledMeeting.findMany({
+        where: {
+          OR: [
+            { leadId: { in: allIdentifiers } },
+            ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }).catch(() => []),
+      prisma.callLog.findMany({
+        where: {
+          OR: [
+            { leadId: { in: allIdentifiers } },
+            ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
+            ...(leadPhones.length > 0 ? [{ phoneNumber: { in: leadPhones } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }).catch(() => []),
+    ]);
+  } catch (err) {
+    console.warn('[attachLastActivityToLeads Notice]:', err.message);
+  }
+
+  return leads.map((lead) => {
+    const lIds = new Set([lead.id, lead.leadId].filter(Boolean));
+    const cleanLeadPhone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
+    const cleanLeadEmail = lead.email ? String(lead.email).toLowerCase().trim() : '';
+
+    const matchedContactIds = new Set();
+    linkedContacts.forEach((c) => {
+      const match =
+        (c.internalReference && (c.internalReference === lead.leadId || c.internalReference === lead.id)) ||
+        (c.id === lead.id) ||
+        (c.contactId === lead.leadId) ||
+        (cleanLeadPhone && c.phone && String(c.phone).replace(/\D/g, '') === cleanLeadPhone) ||
+        (cleanLeadEmail && c.email && String(c.email).toLowerCase().trim() === cleanLeadEmail);
+
+      if (match) {
+        if (c.id) {
+          lIds.add(c.id);
+          matchedContactIds.add(c.id);
+        }
+        if (c.contactId) {
+          lIds.add(c.contactId);
+          matchedContactIds.add(c.contactId);
+        }
+      }
+    });
+
+    const candidateItems = [];
+
+    activities
+      .filter((a) => {
+        if (a.leadId && lIds.has(a.leadId)) return true;
+        if (a.leadCode && lIds.has(a.leadCode)) return true;
+        if (a.contactId && (lIds.has(a.contactId) || matchedContactIds.has(a.contactId))) return true;
+        return false;
+      })
+      .forEach((a) => {
+        const meta = typeof a.metadata === 'object' && a.metadata !== null ? a.metadata : {};
+        const direction = meta.emailType || meta.messageType || meta.callType || (a.type === 'call' ? 'Outgoing' : 'Outgoing');
+        const followUpDate = meta.nextFollowDate || meta.followUpDate || null;
+
+        candidateItems.push({
+          type: a.type || 'activity',
+          title: a.title || 'Activity Logged',
+          status: a.status || null,
+          direction: direction || 'Outgoing',
+          followUpDate: followUpDate || null,
+          date: a.activityDate || null,
+          time: a.activityTime || null,
+          performedBy: a.performedBy || null,
+          createdAt: a.createdAt,
+        });
+      });
+
+    meetings
+      .filter((m) => {
+        if (m.leadId && lIds.has(m.leadId)) return true;
+        if (m.contactId && (lIds.has(m.contactId) || matchedContactIds.has(m.contactId))) return true;
+        return false;
+      })
+      .forEach((m) => {
+        let followUpDate = null;
+        if (/follow/i.test(m.status || '')) {
+          const matchedContact = linkedContacts.find(c => (matchedContactIds.has(c.id) || matchedContactIds.has(c.contactId)) && c.nextFollowDate);
+          if (matchedContact) followUpDate = matchedContact.nextFollowDate;
+        }
+
+        candidateItems.push({
+          type: 'meeting',
+          title: m.title ? `Meeting: ${m.title}` : 'Scheduled Meeting',
+          meetingTitle: m.title || 'Meeting',
+          status: m.status || 'Scheduled',
+          direction: null,
+          followUpDate: followUpDate || null,
+          date: m.meetingDate || null,
+          time: m.startTime || null,
+          performedBy: m.employeeName || null,
+          createdAt: m.createdAt,
+        });
+      });
+
+    callLogs
+      .filter((c) => {
+        if (c.leadId && lIds.has(c.leadId)) return true;
+        if (c.contactId && (lIds.has(c.contactId) || matchedContactIds.has(c.contactId))) return true;
+        if (cleanLeadPhone && c.phoneNumber && String(c.phoneNumber).replace(/\D/g, '') === cleanLeadPhone) return true;
+        return false;
+      })
+      .forEach((c) => {
+        let followUpDate = null;
+        if (/follow/i.test(c.status || '')) {
+          const matchedContact = linkedContacts.find(con => (matchedContactIds.has(con.id) || matchedContactIds.has(con.contactId)) && con.nextFollowDate);
+          if (matchedContact) followUpDate = matchedContact.nextFollowDate;
+        }
+
+        candidateItems.push({
+          type: 'call',
+          title: c.callType ? `${c.callType} Call` : 'Call Log',
+          status: c.status || 'Completed',
+          direction: c.callType || 'Outgoing',
+          followUpDate: followUpDate || null,
+          date: c.callDate || null,
+          time: c.callTime || null,
+          performedBy: c.employeeName || null,
+          createdAt: c.createdAt,
+        });
+      });
+
+    candidateItems.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    const lastActivity = candidateItems[0] || {
+      type: 'lead_created',
+      title: 'Lead Created',
+      status: 'New',
+      direction: null,
+      followUpDate: null,
+      date: lead.createdAt ? new Date(lead.createdAt).toISOString().slice(0, 10) : null,
+      performedBy: lead.createdByName || 'Admin',
+      createdAt: lead.createdAt,
+    };
+
+    if (lastActivity && (/follow/i.test(lastActivity.status || '') || /follow/i.test(lastActivity.title || '')) && !lastActivity.followUpDate) {
+      const contactWithFollowUp = linkedContacts.find((c) => {
+        const isMatched =
+          matchedContactIds.has(c.id) ||
+          matchedContactIds.has(c.contactId) ||
+          lIds.has(c.id) ||
+          lIds.has(c.contactId) ||
+          lIds.has(c.internalReference) ||
+          (cleanLeadPhone && c.phone && String(c.phone).replace(/\D/g, '').endsWith(cleanLeadPhone.slice(-10))) ||
+          (cleanLeadEmail && c.email && String(c.email).toLowerCase().trim() === cleanLeadEmail);
+        return isMatched && c.nextFollowDate;
+      });
+      if (contactWithFollowUp) {
+        lastActivity.followUpDate = contactWithFollowUp.nextFollowDate;
+      } else {
+        const actWithFollowUp = activities.find(
+          (a) => (lIds.has(a.leadId) || lIds.has(a.leadCode) || matchedContactIds.has(a.contactId)) &&
+                 a.metadata && (a.metadata.nextFollowDate || a.metadata.followUpDate)
+        );
+        if (actWithFollowUp) {
+          lastActivity.followUpDate = actWithFollowUp.metadata.nextFollowDate || actWithFollowUp.metadata.followUpDate;
+        }
+      }
+    }
+
+    return {
+      ...lead,
+      nextFollowDate: lastActivity?.followUpDate || null,
+      lastActivity,
+    };
+  });
+}
+
 export async function getLeadsService(queryParams = {}, currentUser = null) {
   const {
     sortBy = 'createdAt',
@@ -59,8 +306,10 @@ export async function getLeadsService(queryParams = {}, currentUser = null) {
     }),
   ]);
 
+  const enrichedLeads = await attachLastActivityToLeads(leads);
+
   return {
-    data: leads.map(formatLeadResponse),
+    data: enrichedLeads.map(formatLeadResponse),
     pagination: {
       total,
       page: pageNum,
@@ -95,7 +344,8 @@ export async function getLeadByIdService(id, currentUser = null) {
     }
   }
 
-  return { data: formatLeadResponse(lead) };
+  const [enrichedLead] = await attachLastActivityToLeads([lead]);
+  return { data: formatLeadResponse(enrichedLead) };
 }
 
 /**
@@ -161,6 +411,9 @@ export async function createLeadService(body, currentUser = null) {
     serviceList = [],
     status = 'New',
     stage = 'Initialization',
+    priority = 'Medium',
+    tagPriority,
+    tag,
     assignedTo = null,
     assignedToName = null,
     createdBy = null,
@@ -214,6 +467,7 @@ export async function createLeadService(body, currentUser = null) {
       serviceList: Array.isArray(serviceList) ? serviceList : [],
       status: status || 'New',
       stage: stage || 'Initialization',
+      priority: (body.priority || body.tagPriority || body.tag || priority || 'Medium').trim(),
       assignedTo: finalAssignedTo,
       assignedToName: finalAssignedToName,
       createdBy: finalCreatedBy,
@@ -292,6 +546,10 @@ export async function updateLeadService(id, body, currentUser = null) {
   if (stage !== undefined) updateData.stage = stage;
   if (createdBy !== undefined) updateData.createdBy = createdBy;
   if (createdByName !== undefined) updateData.createdByName = createdByName;
+  if (body.priority !== undefined || body.tagPriority !== undefined || body.tag !== undefined) {
+    const rawP = body.priority ?? body.tagPriority ?? body.tag;
+    updateData.priority = rawP ? String(rawP).trim() : 'Medium';
+  }
 
   if (assignedTo !== undefined) {
     if (assignedTo && assignedTo !== 'null' && assignedTo !== 'Unassigned') {
@@ -316,6 +574,35 @@ export async function updateLeadService(id, body, currentUser = null) {
     where: { id: existing.id },
     data: updateData,
   });
+
+  if (updateData.priority) {
+    try {
+      await prisma.contact.updateMany({
+        where: {
+          OR: [
+            { id: existing.id },
+            { contactId: existing.leadId },
+            { internalReference: existing.leadId },
+            ...(existing.phone ? [{ phone: existing.phone }] : []),
+            ...(existing.email ? [{ email: { equals: existing.email, mode: 'insensitive' } }] : []),
+          ],
+        },
+        data: { priority: updateData.priority, updatedAt: new Date() },
+      });
+      await prisma.bulkUploadContact.updateMany({
+        where: {
+          OR: [
+            { bulkId: existing.leadId },
+            ...(existing.phone ? [{ phone: existing.phone }] : []),
+            ...(existing.email ? [{ email: { equals: existing.email, mode: 'insensitive' } }] : []),
+          ],
+        },
+        data: { priority: updateData.priority, updatedAt: new Date() },
+      });
+    } catch (tagSyncErr) {
+      console.warn('[updateLeadService] Failed to sync priority to contact:', tagSyncErr.message);
+    }
+  }
 
   // If lead is closed or won, automatically record or update closure activity in timeline
   try {
@@ -503,6 +790,7 @@ export async function createLeadProposalService(data, user) {
       documentSize: data.documentSize || null,
       notes: data.notes || null,
       terms: data.terms || data.termsConditions || null,
+      rejectionReason: data.rejectionReason || null,
       items: {
         create: (data.items || []).map((it) => ({
           itemName: it.itemName || it.description || 'Deliverable',
@@ -587,6 +875,7 @@ export async function updateLeadProposalService(id, data, user) {
   if (data.documentUrl !== undefined) updateData.documentUrl = data.documentUrl;
   if (data.documentSize !== undefined) updateData.documentSize = data.documentSize;
   if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.rejectionReason !== undefined) updateData.rejectionReason = data.rejectionReason;
   if (data.terms !== undefined || data.termsConditions !== undefined) {
     updateData.terms = data.terms !== undefined ? data.terms : data.termsConditions;
   }

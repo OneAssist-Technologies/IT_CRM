@@ -27,6 +27,20 @@ export type LeadStage =
   | 'Won'
   | 'Lost';
 
+export interface LeadActivity {
+  type: string;
+  title: string;
+  status?: string | null;
+  direction?: string | null;
+  meetingTitle?: string | null;
+  followUpDate?: string | null;
+  nextFollowDate?: string | null;
+  date?: string | null;
+  time?: string | null;
+  performedBy?: string | null;
+  createdAt: string;
+}
+
 export interface Lead {
   id: string;
   leadId: string;
@@ -55,6 +69,9 @@ export interface Lead {
   // Pipeline Status & Stage
   status: LeadStatus | string;
   stage?: LeadStage | string | null;
+  priority?: string | null;
+  tag?: string | null;
+  tagPriority?: string | null;
 
   // Assignment & Additional Details
   assignedTo?: string | null;
@@ -65,6 +82,8 @@ export interface Lead {
   agenda?: string | null;
 
   displayCompany?: string;
+  lastActivity?: LeadActivity | null;
+  nextFollowDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,10 +104,14 @@ export interface LeadFormData {
   serviceList?: string[];
   status?: LeadStatus | string;
   stage?: LeadStage | string;
+  priority?: string;
+  tag?: string;
+  tagPriority?: string;
   assignedTo?: string | null;
   assignedToName?: string | null;
   createdBy?: string | null;
   createdByName?: string | null;
+  notes?: string | null;
 }
 
 export interface LeadFilter {
@@ -211,6 +234,7 @@ export interface LeadProposal {
   issueDate: string;
   validUntil: string;
   status: 'Draft' | 'Sent' | 'Under Review' | 'Accepted' | 'Rejected';
+  rejectionReason?: string | null;
   currency: string;
   items: ProposalItem[];
   discountPercent: number;

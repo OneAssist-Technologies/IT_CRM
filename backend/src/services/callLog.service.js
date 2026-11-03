@@ -546,6 +546,34 @@ export async function createCallLogService(data) {
     },
   });
 
+  try {
+    const actCount = await prisma.activity.count();
+    await prisma.activity.create({
+      data: {
+        activityNumber: `CAL-2026-${1001 + actCount}`,
+        type: 'call',
+        title: `Call: ${callType} - ${normalizedStatus}`,
+        description: description.trim() || '',
+        leadId: leadId || null,
+        contactId: contactId || null,
+        contactName: contactName.trim() || 'Contact',
+        customerName: data.companyName || null,
+        status: normalizedStatus,
+        performedBy: employeeName.trim() || 'Staff',
+        performedById: employeeId ? String(employeeId) : null,
+        activityDate: callDate,
+        activityTime: callTime,
+        metadata: {
+          callType,
+          phoneNumber,
+          nextFollowDate: data.nextFollowDate || data.followUpDate || undefined,
+        },
+      },
+    });
+  } catch (actErr) {
+    console.warn('[createCallLogService] Activity log notice:', actErr.message);
+  }
+
   const enrichedCall = (await enrichCallLogsWithMetadata([newCall]))[0] || formatCallLogResponse(newCall);
 
   // Socket broadcast if available
@@ -990,6 +1018,81 @@ export async function createSectionActivityService(section, data, user) {
     }
   }
 
+  let leadId = data.leadId || null;
+  let leadCode = data.leadCode || null;
+  let leadName = data.leadName || null;
+
+  // Resolve lead linkage if not provided
+  if (!leadId && data.contactId) {
+    try {
+      const contact = await prisma.contact.findFirst({
+        where: {
+          OR: [{ id: data.contactId }, { contactId: data.contactId }],
+        },
+      });
+      if (contact) {
+        if (contact.internalReference) {
+          const l = await prisma.lead.findFirst({
+            where: {
+              OR: [
+                { id: contact.internalReference },
+                { leadId: contact.internalReference },
+              ],
+            },
+          });
+          if (l) {
+            leadId = l.id;
+            leadCode = l.leadId;
+            leadName = l.name;
+          }
+        }
+        if (!leadId && (contact.phone || contact.email)) {
+          const l = await prisma.lead.findFirst({
+            where: {
+              OR: [
+                ...(contact.phone ? [{ phone: contact.phone }] : []),
+                ...(contact.email ? [{ email: { equals: contact.email, mode: 'insensitive' } }] : []),
+              ],
+            },
+          });
+          if (l) {
+            leadId = l.id;
+            leadCode = l.leadId;
+            leadName = l.name;
+          }
+        }
+      }
+
+      if (!leadId) {
+        const l = await prisma.lead.findFirst({
+          where: {
+            OR: [{ id: data.contactId }, { leadId: data.contactId }],
+          },
+        });
+        if (l) {
+          leadId = l.id;
+          leadCode = l.leadId;
+          leadName = l.name;
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (leadId && (!leadName || !leadCode)) {
+    try {
+      const l = await prisma.lead.findFirst({
+        where: {
+          OR: [{ id: leadId }, { leadId: leadId }],
+        },
+      });
+      if (l) {
+        leadId = l.id;
+        leadCode = l.leadId || leadCode;
+        leadName = l.name || leadName;
+      }
+    } catch (_) {}
+  }
+
   const meta = {
     ...(data.metadata || {}),
     phoneNumber: data.phoneNumber || data.phone || undefined,
@@ -1007,6 +1110,9 @@ export async function createSectionActivityService(section, data, user) {
       type,
       title: data.title || `${sec.toUpperCase()}: ${data.status || 'Logged'}`,
       description: data.description || '',
+      leadId: leadId || null,
+      leadCode: leadCode || null,
+      leadName: leadName || null,
       contactId: data.contactId || null,
       contactName: data.contactName || 'Contact',
       customerName: customerName,
@@ -1018,6 +1124,19 @@ export async function createSectionActivityService(section, data, user) {
       metadata: meta,
     },
   });
+
+  if (leadId) {
+    try {
+      await prisma.lead.updateMany({
+        where: { OR: [{ id: leadId }, { leadId: leadId }] },
+        data: { updatedAt: new Date() },
+      });
+      if (io) {
+        io.emit('lead:updated', { id: leadId });
+        io.emit('crm_leads_updated');
+      }
+    } catch (_) {}
+  }
 
   try {
     if (io) {

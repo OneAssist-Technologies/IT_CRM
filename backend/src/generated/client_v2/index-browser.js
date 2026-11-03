@@ -359,6 +359,7 @@ exports.Prisma.LeadScalarFieldEnum = {
   serviceList: 'serviceList',
   status: 'status',
   stage: 'stage',
+  priority: 'priority',
   assignedTo: 'assignedTo',
   assignedToName: 'assignedToName',
   createdBy: 'createdBy',

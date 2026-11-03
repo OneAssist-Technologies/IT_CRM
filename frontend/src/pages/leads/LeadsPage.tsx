@@ -211,15 +211,14 @@ export const LeadsPage: React.FC = () => {
       phone: lead.phone || '',
       companyName: lead.companyName || null,
       contactPerson: lead.name || null,
-      designation: lead.designation || null,
-      profession: lead.profession || null,
       address: lead.address || null,
       location: lead.address || null,
       source: lead.source || 'Lead',
       category: (lead.category as any) || 'Product',
       status: (lead.status as any) || 'Qualified',
       stage: (lead.stage as any) || 'Qualification',
-      priority: (matchedContact?.priority || 'Medium') as any,
+
+
       assignedTo: lead.assignedTo || null,
       assignedToName: lead.assignedToName || null,
       description: (matchedContact as any)?.description || lead.notes || '',
@@ -227,9 +226,17 @@ export const LeadsPage: React.FC = () => {
       notes: lead.notes || '',
       contactMode: (matchedContact as any)?.contactMode || null,
       ...(matchedContact || {}),
+      designation: lead.designation || matchedContact?.designation || (lead as any).profession || (matchedContact as any)?.profession || null,
+      profession: lead.profession || matchedContact?.profession || lead.designation || matchedContact?.designation || null,
+      priority: (lead.priority || (lead as any).tag || matchedContact?.priority || 'Medium') as any,
+      tagPriority: (lead.priority || (lead as any).tag || matchedContact?.priority || 'Medium') as any,
+
+
       productList: matchedContact?.productList || lead.productList || [],
       serviceList: matchedContact?.serviceList || lead.serviceList || [],
-    } as Contact;
+      leadId: lead.id,
+      leadCode: lead.leadId || lead.id,
+    } as any;
 
     setSelectedContactForLogs(contactData);
     setUpdateLogsModalOpened(true);

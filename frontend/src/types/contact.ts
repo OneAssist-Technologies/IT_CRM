@@ -205,6 +205,8 @@ export interface Contact {
 export interface ContactFormData {
   id?: string;
   contactId?: string;
+  leadId?: string;
+  leadCode?: string;
 
   // 1. Basic Contact Information
   name?: string;
