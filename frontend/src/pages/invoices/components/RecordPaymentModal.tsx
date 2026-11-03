@@ -25,6 +25,7 @@ interface RecordPaymentModalProps {
   onClose: () => void;
   invoice: Invoice | null;
   onSuccess: () => void;
+  contractValue?: number;
 }
 
 export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
@@ -32,6 +33,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
   onClose,
   invoice,
   onSuccess,
+  contractValue,
 }) => {
   const [amountReceived, setAmountReceived] = useState<number>(0);
   const [paymentDate, setPaymentDate] = useState<Date | null>(new Date());
@@ -44,7 +46,8 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   useEffect(() => {
     if (invoice) {
-      setAmountReceived(invoice.outstandingBalance || 0);
+      // Amount Received field is fetched from invoice total as requested
+      setAmountReceived(invoice.grandTotal || invoice.outstandingBalance || 0);
       setPaymentDate(new Date());
       setPaymentMethod('Bank Transfer');
       setTransactionReference('');
@@ -58,6 +61,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
 
   const outstanding = Number(invoice.outstandingBalance || 0);
   const currencySymbol = invoice.currency === 'USD' ? '$' : invoice.currency === 'EUR' ? '€' : '₹';
+  const resolvedContractValue = contractValue ?? (invoice as any)?.contractValue ?? invoice.grandTotal ?? 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,10 +92,10 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
         amountReceived,
         paymentMethod,
         transactionReference: transactionReference.trim() || undefined,
-        bankName: bankName.trim() || undefined,
+        bankName: paymentMethod === 'Bank Transfer' ? (bankName.trim() || undefined) : undefined,
         notes: notes.trim() || undefined,
         invoiceId: invoice.id,
-        allocations: [{ invoiceId: invoice.id, amountAllocated: amountReceived }],
+        allocations: [{ invoiceId: invoice.id, amountAllocated: Math.min(amountReceived, outstanding > 0 ? outstanding : amountReceived) }],
       });
 
       notifications.show({
@@ -152,15 +156,25 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           <Paper p="sm" radius="md" withBorder style={{ backgroundColor: 'var(--mantine-color-gray-0)' }}>
             <Group justify="space-between" mb={4}>
               <Text size="xs" c="dimmed">
-                Invoice Grand Total:
+                Contract Value:
               </Text>
               <Text size="xs" fw={700}>
-                {currencySymbol}{invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {currencySymbol}{resolvedContractValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </Text>
             </Group>
+            {resolvedContractValue !== invoice.grandTotal && (
+              <Group justify="space-between" mb={4}>
+                <Text size="xs" c="dimmed">
+                  Invoice Total:
+                </Text>
+                <Text size="xs" fw={600}>
+                  {currencySymbol}{invoice.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </Text>
+              </Group>
+            )}
             <Group justify="space-between" mb={4}>
               <Text size="xs" c="dimmed">
-                Amount Paid So Far:
+                Amount Received:
               </Text>
               <Text size="xs" fw={600} c="teal">
                 {currencySymbol}{invoice.amountPaid.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -169,7 +183,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <Divider my={6} />
             <Group justify="space-between">
               <Text size="sm" fw={700} c="red">
-                Outstanding Balance Due:
+                Outstanding:
               </Text>
               <Text size="sm" fw={800} c="red">
                 {currencySymbol}{outstanding.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -186,10 +200,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           {/* Amount Input */}
           <NumberInput
             label="Amount Received"
-            description={`Must not exceed remaining balance of ${currencySymbol}${outstanding.toLocaleString('en-IN')}`}
+            description={`Fetched from invoice total (${currencySymbol}${invoice.grandTotal.toLocaleString('en-IN')})`}
             required
             min={1}
-            max={outstanding}
             value={amountReceived}
             onChange={(val) => setAmountReceived(Number(val) || 0)}
             prefix={currencySymbol + ' '}
@@ -224,21 +237,32 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             />
           </Group>
 
-          <Group grow>
+          {paymentMethod === 'Bank Transfer' ? (
+            <Group grow>
+              <TextInput
+                label="Transaction Reference"
+                placeholder="e.g. HDFC98234120 / UTR Ref"
+                value={transactionReference}
+                onChange={(e) => setTransactionReference(e.currentTarget.value)}
+                description="Bank reference number or UTR for audit"
+              />
+              <TextInput
+                label="Bank Name"
+                placeholder="e.g. HDFC Bank, ICICI Bank, SBI"
+                value={bankName}
+                onChange={(e) => setBankName(e.currentTarget.value)}
+                description="Receiving or remitting bank name"
+              />
+            </Group>
+          ) : (
             <TextInput
-              label="Transaction Reference / UTR"
-              placeholder="e.g. HDFC98234120 / UPI-89341"
+              label="Transaction Reference"
+              placeholder="e.g. UPI-89341 / UTR / Ref ID"
               value={transactionReference}
               onChange={(e) => setTransactionReference(e.currentTarget.value)}
-              description="Bank reference number for audit"
+              description="Transaction reference or receipt number for audit"
             />
-            <TextInput
-              label="Bank / Account Name"
-              placeholder="e.g. HDFC Bank, ICICI"
-              value={bankName}
-              onChange={(e) => setBankName(e.currentTarget.value)}
-            />
-          </Group>
+          )}
 
           <Textarea
             label="Payment Notes"
@@ -269,7 +293,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               color="teal"
               loading={submitting}
               leftSection={<IconReceipt size={16} />}
-              disabled={amountReceived <= 0 || amountReceived > outstanding + 0.01}
+              disabled={amountReceived <= 0}
             >
               Record Payment
             </Button>

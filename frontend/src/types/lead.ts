@@ -678,7 +678,7 @@ export interface LeadInvoiceItem {
   amount: number;
   taxAmount: number;
   totalAmount: number;
-  status: 'Draft' | 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue';
+  status: 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Void' | string;
   type: 'Advance (40%)' | 'Milestone 1 (30%)' | 'Final Handover (30%)' | 'Custom';
   description?: string;
 }
@@ -743,6 +743,21 @@ export interface HandoverCommentItem {
   role?: string;
 }
 
+export interface HandoverDeliverableItem {
+  id: string;
+  moduleId?: string;
+  projectId?: string;
+  name: string;
+  projectName?: string;
+  projectCode?: string;
+  assignedTo?: string;
+  deadline?: string;
+  progress?: number;
+  status?: string;
+  handoverStatus?: 'Ready for Handover' | 'Verified' | 'Accepted' | string;
+  transferredAt?: string;
+}
+
 export interface LeadHandoverData {
   // 14 Required Fields
   handoverId: string;
@@ -766,6 +781,9 @@ export interface LeadHandoverData {
   approvalStatus: 'Pending Approval' | 'Approved' | 'Rejected' | 'Revision Requested' | string;
   handoverStatus: 'Draft' | 'In Progress' | 'Submitted' | 'Completed' | 'On Hold' | string;
   comments: HandoverCommentItem[];
+
+  // Transferred deliverables & modules from Progress section
+  handoverModules?: HandoverDeliverableItem[];
 
   // Optional / compatibility properties
   leadId?: string;

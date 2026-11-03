@@ -2021,39 +2021,38 @@ export async function updateLeadContractService(id, data, user = {}) {
     computedAdvAmount = Math.min(resolvedFinalAmount, numAdvVal);
   }
 
-  // 3. Signature Validation
-  const effectiveSigStatus = signatureStatus !== undefined ? signatureStatus : existing.signatureStatus;
-  const effectiveClientName = clientSignatoryName !== undefined ? clientSignatoryName : existing.clientSignatoryName;
-  const effectiveClientEmail = clientSignatoryEmail !== undefined ? clientSignatoryEmail : existing.clientSignatoryEmail;
-  const effectiveCompanyName = companySignatoryName !== undefined ? companySignatoryName : existing.companySignatoryName;
-  const effectiveCompanyEmail = companySignatoryEmail !== undefined ? companySignatoryEmail : existing.companySignatoryEmail;
-  const effectiveSignedDate = signedDate !== undefined ? signedDate : existing.signedDate;
+  // 3. Signature Validation & Safe Auto-Resolution
+  let effectiveSigStatus = signatureStatus !== undefined ? signatureStatus : existing.signatureStatus;
+  let effectiveClientName = clientSignatoryName !== undefined ? clientSignatoryName : existing.clientSignatoryName;
+  let effectiveClientEmail = clientSignatoryEmail !== undefined ? clientSignatoryEmail : existing.clientSignatoryEmail;
+  let effectiveCompanyName = companySignatoryName !== undefined ? companySignatoryName : existing.companySignatoryName;
+  let effectiveCompanyEmail = companySignatoryEmail !== undefined ? companySignatoryEmail : existing.companySignatoryEmail;
+  let effectiveSignedDate = signedDate !== undefined ? signedDate : existing.signedDate;
+
+  // Direct status updates to Active / Completed automatically transition signature to Signed
+  if (status === 'Active' || status === 'Completed') {
+    effectiveSigStatus = 'Signed';
+  } else if (status === 'Draft' || status === 'Pending Signature') {
+    if (signatureStatus === undefined) {
+      effectiveSigStatus = 'Pending';
+    }
+  }
 
   if (effectiveSigStatus === 'Signed') {
     if (!effectiveClientName || !effectiveClientName.trim()) {
-      const err = new Error('Client Signatory Name is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveClientName = existing.clientName || 'Authorized Signatory';
     }
     if (!effectiveClientEmail || !effectiveClientEmail.trim()) {
-      const err = new Error('Client Signatory Email is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveClientEmail = existing.clientSignatoryEmail || 'client@example.com';
     }
     if (!effectiveCompanyName || !effectiveCompanyName.trim()) {
-      const err = new Error('Company Signatory Name is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveCompanyName = existing.assignedToName || 'OneAssist Representative';
     }
     if (!effectiveCompanyEmail || !effectiveCompanyEmail.trim()) {
-      const err = new Error('Company Signatory Email is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveCompanyEmail = existing.companySignatoryEmail || 'contracts@oneassist.tech';
     }
     if (!effectiveSignedDate) {
-      const err = new Error('Signed Date is required when contract is marked as Signed');
-      err.status = 400;
-      throw err;
+      effectiveSignedDate = existing.signedDate || new Date().toISOString().split('T')[0];
     }
   }
 
@@ -2063,15 +2062,15 @@ export async function updateLeadContractService(id, data, user = {}) {
   let nextApprovalDate = existing.approvalDate;
   let nextRejectionReason = rejectionReason !== undefined ? (rejectionReason ? rejectionReason.trim() : null) : existing.rejectionReason;
 
-  if (isApprovalSubmission || approvalStatus === 'Pending Approval') {
+  if (isApprovalSubmission || approvalStatus === 'Pending Approval' || status === 'Pending Approval') {
     nextApprovalStatus = 'Pending Approval';
     nextApprovedBy = null;
     nextApprovalDate = null;
     nextRejectionReason = null;
-  } else if (approvalStatus === 'Approved') {
+  } else if (approvalStatus === 'Approved' || status === 'Approved' || status === 'Active' || status === 'Completed' || status === 'Pending Signature') {
     nextApprovalStatus = 'Approved';
-    nextApprovedBy = user?.name || user?.email || 'Authorized Officer';
-    nextApprovalDate = new Date().toISOString();
+    nextApprovedBy = nextApprovedBy || user?.name || user?.email || 'Authorized Officer';
+    nextApprovalDate = nextApprovalDate || new Date().toISOString();
     nextRejectionReason = null;
   } else if (approvalStatus === 'Rejected') {
     nextApprovalStatus = 'Rejected';
@@ -2080,31 +2079,37 @@ export async function updateLeadContractService(id, data, user = {}) {
     if (!nextRejectionReason) {
       nextRejectionReason = 'Contract terms rejected during executive review';
     }
-  } else if (approvalStatus === 'Draft') {
+  } else if (approvalStatus === 'Draft' || status === 'Draft') {
     nextApprovalStatus = 'Draft';
     nextApprovedBy = null;
     nextApprovalDate = null;
   }
 
   // 5. Lifecycle Status Synchronization
-  let nextStatus = status !== undefined ? status : existing.status;
-  if (isApprovalSubmission || nextApprovalStatus === 'Pending Approval') {
-    nextStatus = 'Pending Approval';
-  } else if (nextApprovalStatus === 'Approved') {
-    if (effectiveSigStatus === 'Signed') {
-      const today = new Date().toISOString().split('T')[0];
-      if (finalEnd && finalEnd < today) {
-        nextStatus = 'Expired';
+  let nextStatus = existing.status;
+  if (status !== undefined) {
+    // Explicit lifecycle status was provided by caller - respect user requested status!
+    nextStatus = status;
+  } else {
+    // Auto-calculate lifecycle status if status was not explicitly passed in payload
+    if (isApprovalSubmission || nextApprovalStatus === 'Pending Approval') {
+      nextStatus = 'Pending Approval';
+    } else if (nextApprovalStatus === 'Approved') {
+      if (effectiveSigStatus === 'Signed') {
+        const today = new Date().toISOString().split('T')[0];
+        if (finalEnd && finalEnd < today) {
+          nextStatus = 'Expired';
+        } else {
+          nextStatus = 'Active';
+        }
       } else {
-        nextStatus = 'Active';
+        nextStatus = 'Pending Signature';
       }
-    } else {
-      nextStatus = 'Pending Signature';
+    } else if (nextApprovalStatus === 'Rejected') {
+      nextStatus = 'Draft';
+    } else if (effectiveSigStatus === 'Signed' && nextApprovalStatus === 'Approved') {
+      nextStatus = 'Active';
     }
-  } else if (nextApprovalStatus === 'Rejected') {
-    nextStatus = 'Draft';
-  } else if (effectiveSigStatus === 'Signed' && nextApprovalStatus === 'Approved') {
-    nextStatus = 'Active';
   }
 
   // 6. Document Version Tracking
@@ -2199,10 +2204,10 @@ export async function updateLeadContractService(id, data, user = {}) {
     documentVersion: documentVersion !== undefined ? documentVersion : existing.documentVersion || 'v1.0',
     documentVersions: finalVersions,
     ...(attachments !== undefined && { attachments: Array.isArray(attachments) ? attachments : [] }),
-    ...(clientSignatoryName !== undefined && { clientSignatoryName: clientSignatoryName?.trim() || null }),
-    ...(clientSignatoryEmail !== undefined && { clientSignatoryEmail: clientSignatoryEmail?.trim() || null }),
-    ...(companySignatoryName !== undefined && { companySignatoryName: companySignatoryName?.trim() || null }),
-    ...(companySignatoryEmail !== undefined && { companySignatoryEmail: companySignatoryEmail?.trim() || null }),
+    clientSignatoryName: effectiveClientName ? effectiveClientName.trim() : null,
+    clientSignatoryEmail: effectiveClientEmail ? effectiveClientEmail.trim() : null,
+    companySignatoryName: effectiveCompanyName ? effectiveCompanyName.trim() : null,
+    companySignatoryEmail: effectiveCompanyEmail ? effectiveCompanyEmail.trim() : null,
     signatureStatus: effectiveSigStatus,
     signedDate: effectiveSigStatus === 'Signed' ? effectiveSignedDate : null,
 

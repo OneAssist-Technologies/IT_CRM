@@ -122,19 +122,32 @@ export async function downloadInvoicePDF(
   const imgWidth = pdfWidth;
   const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-  let heightLeft = imgHeight;
-  let position = 0;
+  // If content height is close to a single A4 page (up to ~15% extra), scale to fit on 1 page cleanly
+  if (imgHeight > pdfPageHeight && imgHeight <= pdfPageHeight * 1.15) {
+    const scaleRatio = pdfPageHeight / imgHeight;
+    const fittedWidth = pdfWidth * scaleRatio;
+    const fittedHeight = pdfPageHeight;
+    const marginX = (pdfWidth - fittedWidth) / 2;
+    pdf.addImage(imgData, 'PNG', marginX, 0, fittedWidth, fittedHeight, undefined, 'FAST');
+  } else if (imgHeight <= pdfPageHeight) {
+    // Fits naturally on 1 page
+    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+  } else {
+    // Multi-page handling with exact page height offsets
+    let heightLeft = imgHeight;
+    let pageIndex = 0;
 
-  // First page
-  pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-  heightLeft -= pdfPageHeight;
-
-  // Multi-page handling if content is long
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+    // Page 1
+    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
     heightLeft -= pdfPageHeight;
+
+    while (heightLeft > 5) {
+      pageIndex++;
+      pdf.addPage();
+      const pos = -(pageIndex * pdfPageHeight);
+      pdf.addImage(imgData, 'PNG', 0, pos, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pdfPageHeight;
+    }
   }
 
   const cleanName = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;

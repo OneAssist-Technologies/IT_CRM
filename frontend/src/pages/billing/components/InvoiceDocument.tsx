@@ -129,7 +129,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
         maxWidth: 900,
         width: '100%',
         margin: '0 auto',
-        padding: '44px 48px',
+        padding: '38px 40px',
         boxShadow: '0 4px 25px rgba(0,0,0,0.06)',
         borderRadius: 8,
         lineHeight: 1.5,
@@ -184,46 +184,56 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
           </table>
         </Box>
 
-        {/* Right: Dual-Tone Brand Lockup (Deep Navy & Tracked Purple Subtitle) */}
-        <Box style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img
-            src={companyLogo}
-            alt={companyName}
-            style={{ width: 44, height: 44, objectFit: 'contain' }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/oneassist-logo.png';
+        {/* Right: Dual-Tone Brand Lockup matching OneAssist CRM & TECHNOLOGIES PVT LTD */}
+        <Box style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Box
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 10,
+              background: 'linear-gradient(135deg, rgba(79, 70, 229, 0.12), rgba(14, 165, 233, 0.12))',
+              border: '1px solid rgba(79, 70, 229, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 4,
+              boxShadow: '0 2px 8px rgba(79, 70, 229, 0.12)',
+              flexShrink: 0,
             }}
-          />
+          >
+            <img
+              src="/oneassist-logo.png"
+              alt="OneAssist Technologies"
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          </Box>
           <Box style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Text
               style={{
-                fontSize: 19,
+                fontSize: 17,
                 fontWeight: 900,
                 color: '#0F172A',
-                letterSpacing: '0.04em',
-                lineHeight: 1.1,
+                letterSpacing: '-0.02em',
+                lineHeight: 1.15,
                 fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
-                textTransform: 'uppercase',
               }}
             >
-              {brandWord1}
+              OneAssist <Text span inherit c="#0EA5E9" fw={900}>CRM</Text>
             </Text>
-            {brandWordRest && (
-              <Text
-                style={{
-                  fontSize: 10.5,
-                  fontWeight: 800,
-                  color: '#6D28D9',
-                  letterSpacing: '0.36em',
-                  lineHeight: 1.2,
-                  marginTop: 2,
-                  fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
-                  textTransform: 'uppercase',
-                }}
-              >
-                {brandWordRest}
-              </Text>
-            )}
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: 750,
+                color: '#64748B',
+                letterSpacing: '0.06em',
+                lineHeight: 1.1,
+                marginTop: 3,
+                textTransform: 'uppercase',
+                fontFamily: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+              }}
+            >
+              Technologies Pvt Ltd
+            </Text>
           </Box>
         </Box>
       </Box>
@@ -340,10 +350,11 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
       </Box>
 
       {/* 3. ITEMS TABLE WITH SOLID PURPLE HEADER */}
-      <Box style={{ marginBottom: 28 }}>
+      <Box style={{ marginBottom: 28, overflowX: 'auto' }}>
         <table
           style={{
             width: '100%',
+            minWidth: 760,
             borderCollapse: 'collapse',
             fontSize: 12,
           }}
