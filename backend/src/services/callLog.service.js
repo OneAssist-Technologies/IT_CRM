@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { generateCallId, formatCallLogResponse } from '../utils/callLog.util.js';
 import { io } from '../utils/socket.js';
+import { recordActivity } from './activity.service.js';
 
 /**
  * Scope call logs by user (Super Admin sees all, Employees only see their own calls)
@@ -575,6 +576,26 @@ export async function createCallLogService(data) {
   }
 
   const enrichedCall = (await enrichCallLogsWithMetadata([newCall]))[0] || formatCallLogResponse(newCall);
+
+  // Record Call Log Activity for timeline
+  try {
+    await recordActivity({
+      type: 'call',
+      title: newCall.callType === 'Outgoing' ? 'Discovery Call Log' : 'Inbound Client Call',
+      description: `Call #${newCall.callId} (${newCall.callType}) with ${newCall.contactName}. Duration: ${newCall.duration}. ${newCall.description ? newCall.description : 'Call completed with client.'}`,
+      contactId: newCall.contactId,
+      contactName: newCall.contactName,
+      leadId: newCall.leadId,
+      entityId: newCall.id,
+      entityType: 'CallLog',
+      entityNumber: newCall.callId,
+      status: newCall.status,
+      performedBy: newCall.employeeName,
+      performedById: newCall.employeeId,
+      activityDate: newCall.callDate,
+      activityTime: newCall.callTime,
+    });
+  } catch (_) {}
 
   // Socket broadcast if available
   try {

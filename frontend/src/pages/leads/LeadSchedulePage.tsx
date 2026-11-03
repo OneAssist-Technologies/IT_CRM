@@ -173,11 +173,24 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
         saved &&
         ['meetings', 'proposals', 'quotation', 'quotations', 'negotiation', 'contracts', 'invoices', 'payments', 'progress', 'handover'].includes(saved)
       ) {
-        return saved;
+        return saved === 'quotation' ? 'quotations' : saved;
       }
     } catch (_) {}
     return 'meetings';
   });
+
+  // Re-sync active tab if crm_lead_active_section was updated in sessionStorage
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('crm_lead_active_section');
+      if (
+        saved &&
+        ['meetings', 'proposals', 'quotation', 'quotations', 'negotiation', 'contracts', 'invoices', 'payments', 'progress', 'handover'].includes(saved)
+      ) {
+        setActiveTab(saved === 'quotation' ? 'quotations' : saved);
+      }
+    } catch (_) {}
+  }, [activeLead?.id]);
 
   const handleSelectTab = (tab: string) => {
     const normalized = tab === 'quotation' ? 'quotations' : tab;
@@ -1171,7 +1184,9 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
             }}
             onClick={onBack}
           >
-            Leads
+            {typeof window !== 'undefined' && sessionStorage.getItem('crm_lead_nav_source') === 'activity-timeline'
+              ? 'Activity Timeline'
+              : 'Leads'}
           </Text>
           <IconChevronRight size={13} color="#94A3B8" />
           <Text
@@ -1180,6 +1195,14 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
             style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}
           >
             {leadName}
+          </Text>
+          <IconChevronRight size={13} color="#94A3B8" />
+          <Text
+            size="13px"
+            fw={600}
+            style={{ color: isDark ? '#60A5FA' : '#2563EB' }}
+          >
+            Deal Pipeline
           </Text>
         </Group>
 

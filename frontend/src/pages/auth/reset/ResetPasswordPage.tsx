@@ -172,8 +172,8 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
           width: '100%',
           maxWidth: 440,
           background: '#FFFFFF',
-          border: 'none',
-          boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.48), 0 0 50px rgba(0, 180, 255, 0.14)',
+          border: '1px solid rgba(226, 232, 240, 0.85)',
+          boxShadow: '0 20px 50px -10px rgba(0, 102, 255, 0.08), 0 10px 30px -5px rgba(15, 23, 42, 0.04), 0 0 1px rgba(0, 0, 0, 0.08)',
           padding: '38px 36px 32px',
           position: 'relative',
           transition: 'all 0.3s ease',
@@ -217,12 +217,12 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
               radius="12px"
               fullWidth
               style={{
-                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
+                background: 'linear-gradient(90deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
                 color: '#FFFFFF',
                 fontWeight: 700,
                 fontSize: 15,
                 height: 46,
-                boxShadow: 'var(--crm-btn-shadow, 0 4px 14px rgba(37, 99, 235, 0.22))',
+                boxShadow: '0 6px 18px rgba(0, 112, 243, 0.35)',
               }}
               leftSection={<IconArrowLeft size={16} />}
             >
@@ -353,12 +353,12 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
                   mt={6}
                   rightSection={<IconCheck size={16} />}
                   style={{
-                    background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
+                    background: 'linear-gradient(90deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
                     color: '#FFFFFF',
                     fontWeight: 700,
                     fontSize: 15,
                     height: 46,
-                    boxShadow: 'var(--crm-btn-shadow, 0 4px 14px rgba(37, 99, 235, 0.22))',
+                    boxShadow: '0 6px 18px rgba(0, 112, 243, 0.35)',
                   }}
                 >
                   Change Password
@@ -370,7 +370,7 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
               <Anchor
                 size="xs"
                 fw={700}
-                style={{ color: '#1D4ED8', cursor: 'pointer' }}
+                style={{ color: '#0066FF', cursor: 'pointer' }}
                 onClick={handleReturnToLogin}
               >
                 ← Back to Login

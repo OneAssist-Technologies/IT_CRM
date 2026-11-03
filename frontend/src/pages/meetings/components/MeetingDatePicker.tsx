@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Popover,
@@ -6,15 +6,18 @@ import {
   ActionIcon,
   Group,
   Text,
-  Badge,
-  Divider,
   SimpleGrid,
-  Button,
+  UnstyledButton,
   useComputedColorScheme,
 } from '@mantine/core';
-import { IconCalendar, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
+import {
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconX,
+} from '@tabler/icons-react';
 
-interface MeetingDatePickerProps {
+export interface MeetingDatePickerProps {
   value: string; // expects YYYY-MM-DD or DD-MM-YYYY
   onChange: (value: string) => void; // outputs YYYY-MM-DD
   label?: string;
@@ -25,6 +28,10 @@ interface MeetingDatePickerProps {
   leftSection?: React.ReactNode;
   rightSection?: React.ReactNode;
   error?: React.ReactNode;
+  clearable?: boolean;
+  disabled?: boolean;
+  minDate?: Date | string;
+  maxDate?: Date | string;
 }
 
 const MONTH_NAMES = [
@@ -32,7 +39,13 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const MONTH_SHORT = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+// Week starts on Monday to match exact reference design: M T W T F S S
+const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 const formatToYMD = (d: Date): string => {
   const y = d.getFullYear();
@@ -127,19 +140,27 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
   leftSection,
   rightSection,
   error,
+  clearable = true,
+  disabled = false,
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
 
   const [opened, setOpened] = useState(false);
 
-  // Local text input state so typing is completely smooth without cursor jumps
+  // Dynamic view mode: 'days' | 'months' | 'years'
+  const [viewMode, setViewMode] = useState<'days' | 'months' | 'years'>('days');
+
+  // Local text input state for fluid typing
   const [inputText, setInputText] = useState<string>(() => formatToDMY(value));
 
   // Calendar navigator state
   const initialDate = parseFlexibleDate(value) || new Date();
   const [viewYear, setViewYear] = useState<number>(initialDate.getFullYear());
   const [viewMonth, setViewMonth] = useState<number>(initialDate.getMonth());
+
+  // Decade / 12-year window calculation for years mode
+  const yearRangeStart = Math.floor(viewYear / 12) * 12;
 
   // Synchronize internal state when external value changes
   useEffect(() => {
@@ -157,29 +178,50 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
     }
   }, [value]);
 
-  // Calendar calculations
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay(); // 0 is Sunday
-
-  const today = new Date();
+  // Today reference
+  const today = useMemo(() => new Date(), []);
+  const todayMidnight = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
   const todayYMD = formatToYMD(today);
-  const selectedYMD = value ? (parseFlexibleDate(value) ? formatToYMD(parseFlexibleDate(value)!) : value) : '';
+  const selectedDateObj = parseFlexibleDate(value);
+  const selectedYMD = selectedDateObj ? formatToYMD(selectedDateObj) : '';
 
-  const handlePrevMonth = () => {
-    if (viewMonth === 0) {
-      setViewMonth(11);
+  // Monday-first offset & days in month
+  const firstDay = new Date(viewYear, viewMonth, 1);
+  const mondayFirstOffset = (firstDay.getDay() + 6) % 7; // Mon: 0, Tue: 1, ..., Sun: 6
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  // Navigation handlers
+  const handlePrev = () => {
+    if (viewMode === 'days') {
+      if (viewMonth === 0) {
+        setViewMonth(11);
+        setViewYear((y) => y - 1);
+      } else {
+        setViewMonth((m) => m - 1);
+      }
+    } else if (viewMode === 'months') {
       setViewYear((y) => y - 1);
-    } else {
-      setViewMonth((m) => m - 1);
+    } else if (viewMode === 'years') {
+      setViewYear((y) => y - 12);
     }
   };
 
-  const handleNextMonth = () => {
-    if (viewMonth === 11) {
-      setViewMonth(0);
+  const handleNext = () => {
+    if (viewMode === 'days') {
+      if (viewMonth === 11) {
+        setViewMonth(0);
+        setViewYear((y) => y + 1);
+      } else {
+        setViewMonth((m) => m + 1);
+      }
+    } else if (viewMode === 'months') {
       setViewYear((y) => y + 1);
-    } else {
-      setViewMonth((m) => m + 1);
+    } else if (viewMode === 'years') {
+      setViewYear((y) => y + 12);
     }
   };
 
@@ -191,18 +233,17 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
     onChange(ymd);
   };
 
-  const handleQuickSelect = (daysFromToday: number) => {
-    const target = new Date();
-    target.setDate(today.getDate() + daysFromToday);
-    setViewYear(target.getFullYear());
-    setViewMonth(target.getMonth());
-    const ymd = formatToYMD(target);
-    const dmy = formatToDMY(ymd);
-    setInputText(dmy);
-    onChange(ymd);
+  const handleSelectMonth = (monthIndex: number) => {
+    setViewMonth(monthIndex);
+    setViewMode('days');
   };
 
-  const handleClear = () => {
+  const handleSelectYear = (year: number) => {
+    setViewYear(year);
+    setViewMode('months');
+  };
+
+  const handleResetToday = () => {
     const now = new Date();
     setViewYear(now.getFullYear());
     setViewMonth(now.getMonth());
@@ -210,6 +251,16 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
     const dmy = formatToDMY(ymd);
     setInputText(dmy);
     onChange(ymd);
+    setViewMode('days');
+  };
+
+  const handleClear = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setInputText('');
+    onChange('');
   };
 
   const handleManualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,7 +285,6 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
       setInputText('');
       onChange('');
     } else {
-      // If invalid or incomplete string was typed, revert to last valid value or clear
       if (value) {
         setInputText(formatToDMY(value));
       } else {
@@ -258,11 +308,14 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
     <Box>
       <Popover
         opened={opened}
-        onChange={setOpened}
+        onChange={(o) => {
+          setOpened(o);
+          if (!o) setViewMode('days');
+        }}
         position="bottom-start"
         shadow="xl"
-        radius="md"
-        width={310}
+        radius="xl"
+        width={288}
         withArrow
         withinPortal
         zIndex={zIndex}
@@ -274,197 +327,279 @@ export const MeetingDatePicker: React.FC<MeetingDatePickerProps> = ({
             required={required}
             withAsterisk={required}
             value={inputText}
+            disabled={disabled}
             onChange={handleManualChange}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            onClick={() => setOpened(true)}
-            styles={styles || {
-              label: { fontWeight: 600, fontSize: 13, color: isDark ? '#E2E8F0' : '#374151', marginBottom: 6 },
-              input: {
-                height: 44,
-                borderRadius: 10,
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                borderColor: isDark ? '#334155' : '#E2E8F0',
-                fontSize: 14,
-                color: isDark ? '#F8FAFC' : '#1E293B',
-              },
+            onClick={() => {
+              if (!disabled) setOpened(true);
             }}
+            styles={
+              styles || {
+                label: {
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: isDark ? '#E2E8F0' : '#374151',
+                  marginBottom: 6,
+                },
+                input: {
+                  height: 44,
+                  borderRadius: 10,
+                  backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  fontSize: 14,
+                  color: isDark ? '#F8FAFC' : '#1E293B',
+                  fontWeight: 500,
+                },
+              }
+            }
             radius="md"
-            leftSection={leftSection !== undefined ? leftSection : <IconCalendar size={16} />}
+            leftSection={
+              leftSection !== undefined ? (
+                leftSection
+              ) : (
+                <IconCalendar size={17} color="#0091FF" />
+              )
+            }
             error={error}
-            rightSection={rightSection}
+            rightSection={
+              rightSection !== undefined ? (
+                rightSection
+              ) : (
+                <Group gap={4} wrap="nowrap" style={{ paddingRight: 6 }}>
+                  {clearable && (value || inputText) && !disabled && (
+                    <ActionIcon
+                      size="xs"
+                      variant="subtle"
+                      color="gray"
+                      onClick={handleClear}
+                      title="Clear date"
+                    >
+                      <IconX size={13} />
+                    </ActionIcon>
+                  )}
+                </Group>
+              )
+            }
           />
         </Popover.Target>
 
-        <Popover.Dropdown p="sm">
-          {/* Header */}
-          <Group justify="space-between" align="center" mb={8}>
-            <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: '0.05em' }}>
-              CALENDAR DATE
-            </Text>
-            <Badge
-              size="md"
-              radius="sm"
-              variant="outline"
-              styles={{
-                root: {
-                  borderColor: isDark ? '#475569' : '#D1D5DB',
-                  color: isDark ? '#F1F5F9' : '#1F2937',
-                  fontWeight: 700,
-                  backgroundColor: isDark ? '#1E293B' : '#F3F4F6',
-                },
-              }}
-            >
-              {formatToDMY(value) || inputText || formatToDMY(todayYMD)}
-            </Badge>
-          </Group>
-          <Divider mb={8} />
-
-          {/* Quick Select Presets */}
-          <Text size="xs" fw={700} c="dimmed" mb={4} style={{ letterSpacing: '0.03em' }}>
-            QUICK SELECT
-          </Text>
-          <SimpleGrid cols={3} spacing={6} mb={10}>
-            {[
-              { label: 'Today', offset: 0 },
-              { label: 'Tomorrow', offset: 1 },
-              { label: '+1 Week', offset: 7 },
-            ].map((p) => {
-              const testDate = new Date();
-              testDate.setDate(today.getDate() + p.offset);
-              const isMatch = selectedYMD === formatToYMD(testDate);
-              return (
-                <Button
-                  key={p.label}
-                  size="xs"
-                  radius="md"
-                  onClick={() => handleQuickSelect(p.offset)}
-                  style={{
-                    backgroundColor: isMatch ? '#4B5563' : isDark ? '#1E293B' : '#F3F4F6',
-                    color: isMatch ? '#FFFFFF' : isDark ? '#94A3B8' : '#4B5563',
-                    fontWeight: 700,
-                    height: 28,
-                    border: isMatch ? 'none' : isDark ? '1px solid #334155' : '1px solid #E5E7EB',
-                    transition: 'all 150ms ease',
-                  }}
-                >
-                  {p.label}
-                </Button>
-              );
-            })}
-          </SimpleGrid>
-
-          {/* Month / Year Navigator */}
-          <Group justify="space-between" align="center" mb={8} px={4}>
-            <ActionIcon variant="subtle" size="sm" color="gray" onClick={handlePrevMonth}>
-              <IconChevronLeft size={16} />
-            </ActionIcon>
-            <Text size="sm" fw={700} style={{ color: isDark ? '#F8FAFC' : '#1F2937' }}>
-              {MONTH_NAMES[viewMonth]} {viewYear}
-            </Text>
-            <ActionIcon variant="subtle" size="sm" color="gray" onClick={handleNextMonth}>
-              <IconChevronRight size={16} />
-            </ActionIcon>
-          </Group>
-
-          {/* Day of Week Headers */}
-          <SimpleGrid cols={7} spacing={2} mb={4}>
-            {DAY_LABELS.map((d) => (
-              <Text
-                key={d}
-                size="xs"
-                fw={700}
-                c="dimmed"
-                ta="center"
-                style={{ fontSize: 11 }}
+        <Popover.Dropdown className="crm-calendar-dropdown">
+          {/* Header matching reference image: "Month Year" on left, "<" and ">" on right */}
+          <Group justify="space-between" align="center" mb={14} px={4}>
+            {/* Interactive Header Title */}
+            {viewMode === 'days' && (
+              <UnstyledButton
+                className="crm-calendar-nav-title"
+                onClick={() => setViewMode('months')}
+                title="Click to choose month"
               >
-                {d}
-              </Text>
-            ))}
-          </SimpleGrid>
+                <span>{MONTH_NAMES[viewMonth]} {viewYear}</span>
+              </UnstyledButton>
+            )}
 
-          {/* Day Buttons Grid */}
-          <SimpleGrid cols={7} spacing={2} mb={10}>
-            {/* Blank placeholders for days before 1st of month */}
-            {Array.from({ length: firstDayOfWeek }).map((_, i) => (
-              <Box key={`blank-${i}`} style={{ height: 28 }} />
-            ))}
+            {viewMode === 'months' && (
+              <UnstyledButton
+                className="crm-calendar-nav-title"
+                onClick={() => setViewMode('years')}
+                title="Click to choose year"
+              >
+                <span>{viewYear}</span>
+              </UnstyledButton>
+            )}
 
-            {/* Days in Month */}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const dayNum = i + 1;
-              const dateObj = new Date(viewYear, viewMonth, dayNum);
-              const dateYMD = formatToYMD(dateObj);
-              const isSelected = selectedYMD === dateYMD;
-              const isToday = todayYMD === dateYMD;
+            {viewMode === 'years' && (
+              <UnstyledButton
+                className="crm-calendar-nav-title"
+                onClick={() => setViewMode('days')}
+                title="Click to return to calendar"
+              >
+                <span>{yearRangeStart} - {yearRangeStart + 11}</span>
+              </UnstyledButton>
+            )}
 
-              return (
-                <Button
-                  key={`day-${dayNum}`}
-                  size="xs"
-                  radius="sm"
-                  p={0}
-                  onClick={() => handleSelectDay(dayNum)}
+            {/* Clean Chevron Arrows */}
+            <Group gap={4} wrap="nowrap">
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                className="crm-calendar-nav-arrow"
+                onClick={handlePrev}
+                title="Previous"
+              >
+                <IconChevronLeft size={16} strokeWidth={2.4} />
+              </ActionIcon>
+
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                className="crm-calendar-nav-arrow"
+                onClick={handleNext}
+                title="Next"
+              >
+                <IconChevronRight size={16} strokeWidth={2.4} />
+              </ActionIcon>
+            </Group>
+          </Group>
+
+          {/* VIEW MODE 1: DAYS (EXACT MATCH TO REFERENCE IMAGE) */}
+          {viewMode === 'days' && (
+            <Box>
+              {/* Weekday headers: M T W T F S S */}
+              <SimpleGrid cols={7} spacing={0} mb={10}>
+                {DAY_LABELS.map((d, idx) => (
+                  <Text key={`weekday-${idx}`} className="crm-calendar-weekday-label">
+                    {d}
+                  </Text>
+                ))}
+              </SimpleGrid>
+
+              {/* Days Grid */}
+              <SimpleGrid cols={7} spacing={2} mb={12}>
+                {/* Blank spaces before 1st of month */}
+                {Array.from({ length: mondayFirstOffset }).map((_, i) => (
+                  <Box key={`blank-${i}`} style={{ width: 33, height: 33 }} />
+                ))}
+
+                {/* Days of current month */}
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const dayNum = i + 1;
+                  const dateObj = new Date(viewYear, viewMonth, dayNum);
+                  const dateYMD = formatToYMD(dateObj);
+                  const isSelected = selectedYMD === dateYMD;
+                  const isToday = todayYMD === dateYMD;
+                  const isPast = dateObj < todayMidnight;
+
+                  const cellClasses = [
+                    'crm-calendar-day-circle',
+                    isSelected ? 'is-selected' : '',
+                    isToday ? 'is-today' : '',
+                    !isSelected && isPast ? 'is-past' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ');
+
+                  return (
+                    <UnstyledButton
+                      key={`day-${dayNum}`}
+                      className={cellClasses}
+                      onClick={() => handleSelectDay(dayNum)}
+                    >
+                      {dayNum}
+                    </UnstyledButton>
+                  );
+                })}
+              </SimpleGrid>
+            </Box>
+          )}
+
+          {/* VIEW MODE 2: MONTHS SELECTOR GRID */}
+          {viewMode === 'months' && (
+            <SimpleGrid cols={3} spacing={8} mb={12} mt={4}>
+              {MONTH_SHORT.map((mName, mIdx) => {
+                const isSelected =
+                  selectedDateObj !== null &&
+                  selectedDateObj.getFullYear() === viewYear &&
+                  selectedDateObj.getMonth() === mIdx;
+                const isCurrentMonth =
+                  today.getFullYear() === viewYear && today.getMonth() === mIdx;
+
+                const classes = [
+                  'crm-calendar-view-cell',
+                  isSelected ? 'is-selected' : '',
+                  isCurrentMonth ? 'is-current' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+
+                return (
+                  <UnstyledButton
+                    key={mName}
+                    className={classes}
+                    onClick={() => handleSelectMonth(mIdx)}
+                  >
+                    {mName}
+                  </UnstyledButton>
+                );
+              })}
+            </SimpleGrid>
+          )}
+
+          {/* VIEW MODE 3: YEARS SELECTOR GRID */}
+          {viewMode === 'years' && (
+            <SimpleGrid cols={3} spacing={8} mb={12} mt={4}>
+              {Array.from({ length: 12 }).map((_, i) => {
+                const yr = yearRangeStart + i;
+                const isSelected =
+                  selectedDateObj !== null && selectedDateObj.getFullYear() === yr;
+                const isCurrentYear = today.getFullYear() === yr;
+
+                const classes = [
+                  'crm-calendar-view-cell',
+                  isSelected ? 'is-selected' : '',
+                  isCurrentYear ? 'is-current' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
+
+                return (
+                  <UnstyledButton
+                    key={yr}
+                    className={classes}
+                    onClick={() => handleSelectYear(yr)}
+                  >
+                    {yr}
+                  </UnstyledButton>
+                );
+              })}
+            </SimpleGrid>
+          )}
+
+          {/* Minimalist Bottom Actions */}
+          <Group justify="space-between" align="center" pt={4} px={4}>
+            <UnstyledButton
+              onClick={handleResetToday}
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#0091FF',
+                cursor: 'pointer',
+              }}
+            >
+              Today
+            </UnstyledButton>
+
+            <Group gap={8}>
+              {value && (
+                <UnstyledButton
+                  onClick={handleClear}
                   style={{
-                    backgroundColor: isSelected
-                      ? '#4B5563'
-                      : isToday
-                      ? isDark ? '#14532D' : '#DCFCE7'
-                      : isDark ? '#1E293B' : '#FFFFFF',
-                    color: isSelected
-                      ? '#FFFFFF'
-                      : isToday
-                      ? isDark ? '#86EFAC' : '#15803D'
-                      : isDark ? '#F1F5F9' : '#1F2937',
-                    height: 28,
                     fontSize: 12,
-                    fontWeight: isSelected || isToday ? 700 : 500,
-                    border: isSelected
-                      ? 'none'
-                      : isToday
-                      ? '1px solid #16A34A'
-                      : isDark ? '1px solid #334155' : '1px solid #E5E7EB',
-                    transition: 'all 150ms ease',
+                    fontWeight: 600,
+                    color: isDark ? '#94A3B8' : '#6B7280',
+                    cursor: 'pointer',
                   }}
                 >
-                  {dayNum}
-                </Button>
-              );
-            })}
-          </SimpleGrid>
+                  Clear
+                </UnstyledButton>
+              )}
 
-          <Divider my={8} />
-
-          {/* Footer */}
-          <Group justify="space-between" align="center">
-            <Button
-              variant="subtle"
-              size="xs"
-              p={0}
-              onClick={handleClear}
-              style={{
-                color: '#0078D4',
-                fontWeight: 600,
-                fontSize: 13,
-              }}
-            >
-              Reset Today
-            </Button>
-
-            <Button
-              size="xs"
-              radius="sm"
-              onClick={() => setOpened(false)}
-              style={{
-                backgroundColor: '#374151',
-                color: '#FFFFFF',
-                fontWeight: 700,
-                height: 26,
-                padding: '0 14px',
-              }}
-            >
-              Done
-            </Button>
+              <UnstyledButton
+                onClick={() => setOpened(false)}
+                style={{
+                  backgroundColor: '#0091FF',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: 11,
+                  padding: '4px 12px',
+                  borderRadius: 9999,
+                  boxShadow: '0 2px 8px rgba(0, 145, 255, 0.35)',
+                  cursor: 'pointer',
+                }}
+              >
+                Done
+              </UnstyledButton>
+            </Group>
           </Group>
         </Popover.Dropdown>
       </Popover>

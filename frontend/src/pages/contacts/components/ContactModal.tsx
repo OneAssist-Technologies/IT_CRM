@@ -12,6 +12,7 @@ import {
   Textarea,
   Select,
   Autocomplete,
+  Switch,
   useComputedColorScheme,
 } from '@mantine/core';
 import {
@@ -238,6 +239,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const [callToTime, setCallToTime] = useState<string>('');
   const [callDuration, setCallDuration] = useState<string>('');
   const [callStatus, setCallStatus] = useState<string>('Follow-up');
+  const [logCallActivity, setLogCallActivity] = useState<boolean>(false);
   const [generalStatus, setGeneralStatus] = useState<string>('Not Connected');
   const [nextFollowDate, setNextFollowDate] = useState<string>('');
 
@@ -634,8 +636,8 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       const targetLeadId = (contact as any)?.leadId || (contact as any)?.lead_id || (contact as any)?.internalReference || contactIdentifier;
       const targetLeadCode = (contact as any)?.leadCode || (contact as any)?.leadId || (contact as any)?.internalReference;
 
-      // 1. If contact mode is Call, auto-log call activity to Activity Logs module
-      if (formData.contactMode === 'Call') {
+      // 1. If contact mode is Call and user explicitly enabled call logging
+      if (formData.contactMode === 'Call' && logCallActivity) {
         try {
           await createCallLogApi({
             callType: (callType as any) || 'Outgoing',
@@ -1085,16 +1087,22 @@ export const ContactModal: React.FC<ContactModalProps> = ({
               }}
             >
               <Stack gap="md">
-                <Group justify="space-between" align="center">
+                <Group justify="space-between" align="center" wrap="wrap" gap="xs">
                   <Group gap={8}>
                     <IconPhoneCall size={16} color={isDark ? '#60A5FA' : '#2563EB'} />
                     <Text size="xs" fw={700} style={{ color: isDark ? '#93C5FD' : '#1D4ED8', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                       Call Details
                     </Text>
                   </Group>
-                  <Text size="11px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                    Auto-logs call activity
-                  </Text>
+                  <Switch
+                    size="xs"
+                    label="Log this call in Call Logs"
+                    checked={logCallActivity}
+                    onChange={(e) => setLogCallActivity(e.currentTarget.checked)}
+                    styles={{
+                      label: { fontSize: 11.5, fontWeight: 600, color: isDark ? '#94A3B8' : '#64748B', cursor: 'pointer' },
+                    }}
+                  />
                 </Group>
 
                 {/* Call Type | Call Date */}

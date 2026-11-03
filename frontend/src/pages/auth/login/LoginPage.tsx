@@ -41,7 +41,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onSwitchToSignup,
   defaultEmail = '',
 }) => {
-  const { setCurrentUser, setActiveNav } = useCRM();
+  const { currentUser, setCurrentUser, setActiveNav } = useCRM();
 
   const [loading, setLoading] = useState(false);
 
@@ -49,9 +49,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [identifier, setIdentifier] = useState(() => {
     if (defaultEmail) return defaultEmail;
     try {
-      return localStorage.getItem('crm_remembered_email') || '';
+      return localStorage.getItem('crm_remembered_email') || 'jaga00627@gmail.com';
     } catch {
-      return '';
+      return 'jaga00627@gmail.com';
     }
   });
 
@@ -69,11 +69,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   // Error State
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleReturnToDashboard = () => {
+  const handleReturnToDashboard = (loggedInRole?: string) => {
     if (onSuccess) {
       onSuccess();
     } else {
-      setActiveNav('dashboard');
+      const roleUpper = String(loggedInRole || currentUser?.role || '').toUpperCase();
+      const isAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN';
+      setActiveNav(isAdmin ? 'dashboard' : 'employee-dashboard');
     }
   };
 
@@ -180,7 +182,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           color: 'teal',
           icon: <IconShieldCheck size={18} />,
         });
-        handleReturnToDashboard();
+        handleReturnToDashboard(res.user?.role);
       } else {
         setErrorMsg(res.message || 'Invalid email or password.');
       }
@@ -197,28 +199,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         radius="28px"
         style={{
           width: '100%',
-          maxWidth: 440,
+          maxWidth: 430,
           background: '#FFFFFF',
-          border: 'none',
-          boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.48), 0 0 50px rgba(0, 180, 255, 0.14)',
+          border: '1px solid rgba(226, 232, 240, 0.85)',
+          boxShadow: '0 20px 50px -10px rgba(0, 102, 255, 0.08), 0 10px 30px -5px rgba(15, 23, 42, 0.04), 0 0 1px rgba(0, 0, 0, 0.08)',
           padding: '38px 36px 32px',
           position: 'relative',
           transition: 'all 0.3s ease',
         }}
       >
-        {/* Header: Centered Login Title */}
+        {/* Header: Centered Login Title with Gradient Underline Bar */}
         <Box mb={24} style={{ textAlign: 'center' }}>
           <Text
             fw={800}
-            size="26px"
+            size="28px"
             style={{
-              color: '#111827',
+              color: '#071126',
               letterSpacing: '-0.025em',
               lineHeight: 1.2,
             }}
           >
             Login
           </Text>
+          <Box
+            style={{
+              width: 34,
+              height: 3.5,
+              borderRadius: 3,
+              background: 'linear-gradient(90deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
+              margin: '8px auto 0',
+            }}
+          />
         </Box>
 
         {/* Error Alert Banner */}
@@ -243,23 +254,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <Stack gap="md">
             {/* Work Email Field with Label */}
             <Box>
-              <Text size="xs" fw={600} mb={6} style={{ color: '#374151' }}>
+              <Text size="13px" fw={700} mb={6} style={{ color: '#0F172A' }}>
                 Work Email
               </Text>
               <TextInput
-                placeholder="name@company.com"
+                placeholder="jaga00627@gmail.com"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.currentTarget.value)}
-                leftSection={<IconMail size={16} color="#9CA3AF" />}
-                radius="12px"
+                leftSection={<IconMail size={17} color="#2563EB" stroke={2} />}
+                radius="14px"
                 size="md"
                 styles={{
                   input: {
-                    background: '#F9FAFB',
-                    borderColor: '#E5E7EB',
-                    color: '#111827',
+                    background: '#F8FAFC',
+                    borderColor: '#E2E8F0',
+                    color: '#0F172A',
                     fontSize: 14,
-                    height: 46,
+                    height: 48,
+                    fontWeight: 500,
                     transition: 'all 0.2s ease',
                   },
                 }}
@@ -270,13 +282,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             {/* Password Field with Label & Forgot Password Link */}
             <Box>
               <Group justify="space-between" align="center" mb={6}>
-                <Text size="xs" fw={600} style={{ color: '#374151' }}>
+                <Text size="13px" fw={700} style={{ color: '#0F172A' }}>
                   Password
                 </Text>
                 <Anchor
-                  size="xs"
+                  size="12px"
                   fw={600}
-                  style={{ color: '#1D4ED8', cursor: 'pointer' }}
+                  style={{ color: '#0066FF', cursor: 'pointer' }}
                   onClick={handleOpenForgotPassword}
                 >
                   Forgot password?
@@ -286,23 +298,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => setPassword(e.currentTarget.value)}
-                leftSection={<IconLock size={16} color="#9CA3AF" />}
+                leftSection={<IconLock size={17} color="#0066FF" stroke={2} />}
                 visibilityToggleIcon={({ reveal }) =>
                   reveal ? (
-                    <IconEyeOff size={16} color="#9CA3AF" />
+                    <IconEyeOff size={17} color="#64748B" />
                   ) : (
-                    <IconEye size={16} color="#9CA3AF" />
+                    <IconEye size={17} color="#64748B" />
                   )
                 }
-                radius="12px"
+                radius="14px"
                 size="md"
                 styles={{
                   input: {
-                    background: '#F9FAFB',
-                    borderColor: '#E5E7EB',
-                    color: '#111827',
+                    background: '#F8FAFC',
+                    borderColor: '#E2E8F0',
+                    color: '#071126',
                     fontSize: 14,
-                    height: 46,
+                    height: 48,
+                    fontWeight: 500,
                     transition: 'all 0.2s ease',
                   },
                 }}
@@ -326,27 +339,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     console.warn(err);
                   }
                 }}
-                label={<Text size="12px" style={{ color: '#6B7280' }}>Remember me</Text>}
+                label={<Text size="13px" fw={500} style={{ color: '#334155' }}>Remember me</Text>}
+                color="blue"
                 radius="sm"
                 size="xs"
               />
             </Box>
 
-            {/* Main Action Button */}
+            {/* Main Action Button: Login -> */}
             <Button
               type="submit"
               loading={loading}
               size="md"
-              radius="12px"
+              radius="14px"
               mt={6}
               rightSection={<IconArrowRight size={16} />}
               style={{
-                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
+                background: 'linear-gradient(90deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
                 color: '#FFFFFF',
                 fontWeight: 700,
                 fontSize: 15,
-                height: 46,
-                boxShadow: 'var(--crm-btn-shadow, 0 4px 14px rgba(37, 99, 235, 0.22))',
+                height: 48,
+                boxShadow: '0 8px 24px rgba(0, 112, 243, 0.42)',
                 transition: 'all 0.2s ease',
               }}
             >
@@ -356,13 +370,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </form>
 
         {/* Card Footer Switch to Signup */}
-        <Box mt={26} pt={16} style={{ borderTop: '1px solid #F3F4F6', textAlign: 'center' }}>
-          <Text size="xs" style={{ color: '#6B7280' }}>
+        <Box mt={26} pt={16} style={{ borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>
+          <Text size="13px" style={{ color: '#64748B' }}>
             Don't have an account?{' '}
             <Anchor
-              size="xs"
+              size="13px"
               fw={700}
-              style={{ color: '#1D4ED8', cursor: 'pointer' }}
+              style={{ color: '#0066FF', cursor: 'pointer' }}
               onClick={handleGoToSignup}
             >
               Register Super Admin →
@@ -468,12 +482,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   mt={4}
                   rightSection={<IconArrowRight size={16} />}
                   style={{
-                    background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
+                    background: 'linear-gradient(90deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
                     color: '#FFFFFF',
                     fontWeight: 700,
                     fontSize: 14,
                     height: 46,
-                    boxShadow: 'var(--crm-btn-shadow, 0 4px 14px rgba(37, 99, 235, 0.22))',
+                    boxShadow: '0 6px 18px rgba(0, 112, 243, 0.35)',
                   }}
                 >
                   Send Reset Link to Email

@@ -430,7 +430,7 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
           padding: '20px',
         },
         content: {
-          border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
           boxShadow: isDark ? '0 20px 40px rgba(0, 0, 0, 0.6)' : '0 20px 40px rgba(0, 0, 0, 0.12)',
           maxWidth: 1040,
         },
@@ -727,7 +727,7 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
             </Group>
 
             {/* Parsed Contacts Preview Table with Clear Issue Reason Column */}
-            <Box style={{ maxHeight: 280, overflowY: 'auto', borderRadius: 8, border: isDark ? '2px solid rgba(255, 255, 255, 0.12)' : '2px solid #CBD5E1' }}>
+            <Box style={{ maxHeight: 280, overflowY: 'auto', borderRadius: 8, border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #E2E8F0' }}>
               <Table highlightOnHover striped withTableBorder style={{ width: '100%' }}>
                 <Table.Thead style={{ backgroundColor: isDark ? '#0F172A' : '#F1F5F9', position: 'sticky', top: 0, zIndex: 1 }}>
                   <Table.Tr>

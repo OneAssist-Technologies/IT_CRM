@@ -28,6 +28,7 @@ import {
   IconClock,
   IconChevronDown,
   IconChevronsRight,
+  IconLock,
 } from '@tabler/icons-react';
 import { useCRM } from '../../context/CRMContext';
 import { usePermissions } from '../../context/AccessControlContext';
@@ -86,40 +87,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
     };
   }, [activeNav]);
 
-  const renderNavBadge = (count: number | string, isItemActive: boolean = false) => {
-    const num = typeof count === 'number' ? count : parseInt(String(count), 10);
-    if (isNaN(num) || num <= 0) return null;
-
-    return (
-      <Box
-        style={{
-          background: isItemActive
-            ? 'rgba(255, 255, 255, 0.18)'
-            : 'linear-gradient(135deg, #1D4ED8 0%, #2563EB 100%)',
-          color: '#FFFFFF',
-          borderRadius: 999,
-          minWidth: 19,
-          height: 19,
-          padding: '0 5px',
-          fontSize: '10.5px',
-          fontWeight: 700,
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          border: isItemActive
-            ? '1px solid rgba(255, 255, 255, 0.28)'
-            : '1px solid rgba(255, 255, 255, 0.12)',
-          boxShadow: isItemActive
-            ? 'none'
-            : '0 1px 4px rgba(37, 99, 235, 0.35)',
-          letterSpacing: '-0.01em',
-          lineHeight: 1,
-          flexShrink: 0,
-        }}
-      >
-        {count}
-      </Box>
-    );
+  const renderNavBadge = (_count: number | string, _isItemActive: boolean = false) => {
+    return null;
   };
 
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
@@ -127,9 +96,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
 
   const isCollapsed = !isMobile && Boolean(sidebarCollapsed);
 
-  const sidebarBg = isDark ? '#050B1A' : '#071126';
-  const sidebarBorder = 'rgba(255, 255, 255, 0.08)';
-  const headerBorder = 'rgba(255, 255, 255, 0.06)';
+  const sidebarBg = isDark
+    ? '#050B1A'
+    : 'radial-gradient(ellipse at 85% 15%, #E1EEFD 0%, #F5F9FE 45%, #EAF2FC 100%)';
+  const sidebarBorder = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(226, 232, 240, 0.8)';
+  const headerBorder = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(226, 232, 240, 0.8)';
 
   const renderNavItem = (
     key: string,
@@ -244,7 +215,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
             width: 240,
             height: 240,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, rgba(37, 99, 235, 0.2) 50%, transparent 75%)',
+            background: isDark
+              ? 'radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, rgba(37, 99, 235, 0.2) 50%, transparent 75%)'
+              : 'radial-gradient(circle, rgba(0, 198, 255, 0.06) 0%, rgba(0, 112, 243, 0.02) 50%, transparent 75%)',
             filter: 'blur(45px)',
             animation: 'sidebarAuroraDrift 12s ease-in-out infinite',
           }}
@@ -258,7 +231,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
             width: 200,
             height: 200,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(37, 99, 235, 0.22) 0%, rgba(99, 102, 241, 0.12) 50%, transparent 75%)',
+            background: isDark
+              ? 'radial-gradient(circle, rgba(37, 99, 235, 0.22) 0%, rgba(99, 102, 241, 0.12) 50%, transparent 75%)'
+              : 'radial-gradient(circle, rgba(0, 112, 243, 0.04) 0%, rgba(99, 102, 241, 0.02) 50%, transparent 75%)',
             filter: 'blur(40px)',
             animation: 'sidebarAuroraDrift2 16s ease-in-out infinite',
           }}
@@ -283,6 +258,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
           gap: isCollapsed ? 0 : 8,
           position: 'relative',
           zIndex: 2,
+          background: isDark ? 'rgba(5, 11, 26, 0.88)' : 'rgba(255, 255, 255, 0.88)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          boxShadow: isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.02)',
         }}
       >
         {!isCollapsed ? (
@@ -295,11 +274,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
               style={{ cursor: 'pointer', minWidth: 0, flex: 1 }}
               onClick={() => onSelectNav('dashboard')}
             >
+              <Box
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 12px rgba(0, 112, 243, 0.35)',
+                  color: '#FFFFFF',
+                  flexShrink: 0,
+                }}
+              >
+                <IconLock size={18} color="#FFFFFF" stroke={2.4} />
+              </Box>
               <Box style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-                <Text fw={800} size="16px" truncate c="#FFFFFF" style={{ letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                  OneAssist <Text span inherit fw={800} style={{ color: '#38BDF8' }}>CRM</Text>
+                <Text
+                  fw={800}
+                  size="16px"
+                  truncate
+                  style={{
+                    color: isDark ? '#FFFFFF' : '#071126',
+                    letterSpacing: '-0.025em',
+                    lineHeight: 1.2,
+                  }}
+                >
+                  OneAssist <Text span inherit fw={800} style={{ color: isDark ? '#38BDF8' : '#0066FF' }}>CRM</Text>
                 </Text>
-                <Text size="9px" fw={700} c="#64748B" tt="uppercase" truncate style={{ letterSpacing: '0.06em', lineHeight: 1.1, marginTop: 2 }}>
+                <Text
+                  size="9px"
+                  fw={700}
+                  tt="uppercase"
+                  truncate
+                  style={{
+                    color: isDark ? '#94A3B8' : '#64748B',
+                    letterSpacing: '0.07em',
+                    lineHeight: 1.1,
+                    marginTop: 2,
+                  }}
+                >
                   IT Sales & Operations Hub
                 </Text>
               </Box>
@@ -309,18 +324,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
             <Tooltip label="Collapse sidebar" position="right" withArrow>
               <ActionIcon
                 variant="subtle"
-                size={28}
+                size={30}
                 style={{
-                  color: '#94A3B8',
-                  background: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: isDark ? '#94A3B8' : '#64748B',
+                  background: isDark ? 'rgba(255, 255, 255, 0.06)' : '#FFFFFF',
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(226, 232, 240, 0.9)',
+                  boxShadow: isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04)',
                   borderRadius: '50%',
                   transition: 'all 0.2s ease',
+                  flexShrink: 0,
                 }}
                 onClick={() => setSidebarCollapsed(true)}
                 aria-label="Collapse sidebar"
               >
-                <IconChevronLeft size={14} stroke={2.5} />
+                <IconChevronLeft size={15} stroke={2.2} />
               </ActionIcon>
             </Tooltip>
           </>
@@ -330,8 +347,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
               variant="subtle"
               size="md"
               style={{
-                color: isDark ? '#38BDF8' : '#4F46E5',
-                background: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(79, 70, 229, 0.08)',
+                color: isDark ? '#38BDF8' : '#0062FF',
+                background: isDark ? 'rgba(37, 99, 235, 0.15)' : '#FFFFFF',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(226, 232, 240, 0.9)',
+                boxShadow: isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04)',
                 borderRadius: 10,
                 width: 38,
                 height: 38,
@@ -363,7 +382,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
               className="sidebar-section-header"
               size="10px"
               fw={800}
-              c="dimmed"
               tt="uppercase"
               px="xs"
               style={{ letterSpacing: '0.08em' }}
@@ -422,15 +440,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 activeNav === 'leads' ||
                   activeNav === 'add-lead' ||
                   activeNav === 'lead-schedule' ||
-                  activeNav === 'lead-details',
-                false,
-                renderNavBadge(
-                  leads?.length || 0,
-                  activeNav === 'leads' ||
-                    activeNav === 'add-lead' ||
-                    activeNav === 'lead-schedule' ||
-                    activeNav === 'lead-details'
-                )
+                  activeNav === 'lead-details'
               )}
 
             {can('scheduled_meetings', 'view') &&
@@ -446,12 +456,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 'call-logs',
                 'Call Logs',
                 <IconPhoneCall size={18} stroke={2} />,
-                activeNav === 'call-logs' || activeNav === 'calls' || activeNav === 'activity-logs',
-                false,
-                renderNavBadge(
-                  callCount,
-                  activeNav === 'call-logs' || activeNav === 'calls' || activeNav === 'activity-logs'
-                )
+                activeNav === 'call-logs' || activeNav === 'calls' || activeNav === 'activity-logs'
               )}
 
             {can('customers', 'view') &&
@@ -462,15 +467,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 activeNav === 'customers' ||
                   activeNav === 'customer' ||
                   activeNav === 'customer-details' ||
-                  activeNav === 'add-customer',
-                false,
-                renderNavBadge(
-                  customerCount,
-                  activeNav === 'customers' ||
-                    activeNav === 'customer' ||
-                    activeNav === 'customer-details' ||
-                    activeNav === 'add-customer'
-                )
+                  activeNav === 'add-customer'
               )}
 
             {can('projects', 'view') &&
@@ -478,12 +475,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 'projects',
                 'Projects Management',
                 <IconFolders size={18} stroke={2} />,
-                activeNav.startsWith('projects') || activeNav === 'project' || activeNav === 'add-project',
-                false,
-                renderNavBadge(
-                  projectCount,
-                  activeNav.startsWith('projects') || activeNav === 'project' || activeNav === 'add-project'
-                )
+                activeNav.startsWith('projects') || activeNav === 'project' || activeNav === 'add-project'
               )}
 
             {(can('activity_timeline', 'view') || can('activities', 'view') || isSuperAdmin || can('leads', 'view')) &&
@@ -505,7 +497,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                   className="sidebar-section-header"
                   size="10px"
                   fw={800}
-                  c="dimmed"
                   tt="uppercase"
                   px="xs"
                   mt="sm"

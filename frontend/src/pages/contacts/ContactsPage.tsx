@@ -602,11 +602,12 @@ export const ContactsPage: React.FC = () => {
       {/* 1. Header Toolbar */}
       <Paper
         p="sm"
-        radius="lg"
+        radius="16px"
+        mb="sm"
         style={{
           backgroundColor: isDark ? '#111827' : '#FFFFFF',
-          border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
-          boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0,0,0,0.03)',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+          boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 10px rgba(0, 112, 243, 0.04)',
         }}
       >
         <Group justify="space-between" align="center" wrap="wrap" gap={8}>
@@ -999,11 +1000,12 @@ export const ContactsPage: React.FC = () => {
             {/* Header Banner with Download Template and Import CSV buttons */}
             <Paper
               p="md"
-              radius="lg"
-              mb="md"
+              radius="16px"
+              mb="sm"
               style={{
                 backgroundColor: isDark ? '#111827' : '#FFFFFF',
-                border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+                boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 10px rgba(0, 112, 243, 0.04)',
               }}
             >
               <Group justify="space-between" align="center" wrap="wrap" gap="md">
@@ -1115,13 +1117,13 @@ export const ContactsPage: React.FC = () => {
 
           {/* Unified Pagination Footer */}
           <Paper
-            mt="md"
-            p="md"
+            mt="sm"
+            p="sm"
             radius="16px"
             style={{
               backgroundColor: isDark ? '#111827' : '#FFFFFF',
-              border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
-              boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0,0,0,0.03)',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+              boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 10px rgba(0, 112, 243, 0.04)',
             }}
           >
             <Group justify="space-between" align="center" wrap="wrap">
@@ -1286,7 +1288,7 @@ export const ContactsPage: React.FC = () => {
               radius="md"
               style={{
                 backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
               }}
             >
               <Group justify="space-between" align="center" wrap="nowrap">
@@ -1400,7 +1402,7 @@ export const ContactsPage: React.FC = () => {
               radius="md"
               style={{
                 backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
               }}
             >
               <Group justify="space-between" align="center" wrap="nowrap">

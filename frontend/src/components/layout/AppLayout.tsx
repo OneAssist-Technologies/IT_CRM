@@ -70,38 +70,7 @@ export const AppLayout: React.FC = () => {
   const [selectedInvoice, setSelectedInvoice] = React.useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = React.useState<Invoice | null>(null);
 
-  if (activeNav === 'signup') {
-    return (
-      <SignupPage
-        onSuccess={() => setActiveNav('dashboard')}
-        onSwitchToLogin={() => setActiveNav('login')}
-      />
-    );
-  }
-
-  if (activeNav === 'login') {
-    return (
-      <LoginPage
-        onSuccess={() => setActiveNav('dashboard')}
-        onSwitchToSignup={() => setActiveNav('signup')}
-      />
-    );
-  }
-
-  if (activeNav === 'reset-password') {
-    return (
-      <ResetPasswordPage
-        onSuccess={() => setActiveNav('login')}
-        onBackToLogin={() => setActiveNav('login')}
-      />
-    );
-  }
-
-  if (activeNav === 'auth') {
-    return <AuthPage onSuccess={() => setActiveNav('dashboard')} />;
-  }
-
-  const findFirstAllowedNav = (): string => {
+  const findFirstAllowedNav = React.useCallback((): string => {
     const candidateModules: { nav: string; id: string }[] = [
       { nav: 'dashboard', id: 'dashboard' },
       { nav: 'employee-dashboard', id: 'employee_dashboard' },
@@ -121,13 +90,70 @@ export const AppLayout: React.FC = () => {
     for (const m of candidateModules) {
       if (can(m.id, 'view')) return m.nav;
     }
-    return 'dashboard';
-  };
+    return isSuperAdmin ? 'dashboard' : 'employee-dashboard';
+  }, [can, isSuperAdmin]);
+
+  // Automatically redirect non-admin users to Employee Dashboard or their first permitted screen
+  // (MUST be called before any conditional return to satisfy Rules of Hooks)
+  React.useEffect(() => {
+    if (activeNav === 'dashboard' && !isSuperAdmin && !can('dashboard', 'view')) {
+      if (can('employee_dashboard', 'view')) {
+        setActiveNav('employee-dashboard');
+      } else {
+        const allowed = findFirstAllowedNav();
+        if (allowed && allowed !== 'dashboard') {
+          setActiveNav(allowed);
+        }
+      }
+    }
+  }, [activeNav, isSuperAdmin, can, findFirstAllowedNav]);
+
+  if (activeNav === 'signup') {
+    return (
+      <SignupPage
+        onSuccess={() => setActiveNav('dashboard')}
+        onSwitchToLogin={() => setActiveNav('login')}
+      />
+    );
+  }
+
+  if (activeNav === 'login') {
+    return (
+      <LoginPage
+        onSuccess={() => {
+          if (isSuperAdmin || can('dashboard', 'view')) {
+            setActiveNav('dashboard');
+          } else if (can('employee_dashboard', 'view')) {
+            setActiveNav('employee-dashboard');
+          } else {
+            setActiveNav(findFirstAllowedNav());
+          }
+        }}
+        onSwitchToSignup={() => setActiveNav('signup')}
+      />
+    );
+  }
+
+  if (activeNav === 'reset-password') {
+    return (
+      <ResetPasswordPage
+        onSuccess={() => setActiveNav('login')}
+        onBackToLogin={() => setActiveNav('login')}
+      />
+    );
+  }
+
+  if (activeNav === 'auth') {
+    return <AuthPage onSuccess={() => setActiveNav('dashboard')} />;
+  }
 
   const renderActiveScreen = () => {
     switch (activeNav) {
       case 'dashboard':
         if (!can('dashboard', 'view') && !isSuperAdmin) {
+          if (can('employee_dashboard', 'view')) {
+            return <EmployeeDashboard onNavigate={(nav) => setActiveNav(nav)} />;
+          }
           return (
             <AccessRestrictedView
               moduleName="Dashboard"
@@ -210,17 +236,28 @@ export const AppLayout: React.FC = () => {
       case 'leads/schedule':
       case 'schedule-meeting': {
         let activeLead = selectedLead;
-        if (!activeLead && typeof window !== 'undefined') {
+        let navSource: string | null = null;
+        if (typeof window !== 'undefined') {
           try {
-            const saved = sessionStorage.getItem('crm_selected_lead');
-            if (saved) activeLead = JSON.parse(saved);
+            if (!activeLead) {
+              const saved = sessionStorage.getItem('crm_selected_lead');
+              if (saved) activeLead = JSON.parse(saved);
+            }
+            navSource = sessionStorage.getItem('crm_lead_nav_source');
           } catch (e) {}
         }
+        const handleBackFromSchedule = () => {
+          if (navSource === 'activity-timeline') {
+            setActiveNav('activity-timeline');
+          } else {
+            setActiveNav('leads');
+          }
+        };
         return (
           <LeadSchedulePage
             lead={activeLead}
-            onBack={() => setActiveNav('leads')}
-            onSuccess={() => setActiveNav('leads')}
+            onBack={handleBackFromSchedule}
+            onSuccess={handleBackFromSchedule}
           />
         );
       }
@@ -766,7 +803,7 @@ export const AppLayout: React.FC = () => {
           position: 'relative',
           background: isDark
             ? '#070D1E'
-            : 'linear-gradient(135deg, #F0F5FE 0%, #E8F0FC 40%, #F4F1FD 100%)',
+            : 'radial-gradient(ellipse at 85% 15%, #E1EEFD 0%, #F5F9FE 45%, #EAF2FC 100%)',
         }}
       >
         {/* Top Header Bar (64px Fixed, never scrolls) */}
