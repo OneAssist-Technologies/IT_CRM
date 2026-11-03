@@ -1572,7 +1572,8 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                                 </Badge>
                               )}
 
-                              {contact.nextFollowDate && (
+                              {contact.nextFollowDate &&
+                                Boolean(contact.status && contact.status.toLowerCase().includes('follow')) && (
                                 <Badge color="orange" variant="light" size="sm" leftSection={<IconCalendar size={11} />}>
                                   Follow-up: {formatDisplayDate(contact.nextFollowDate)}
                                 </Badge>

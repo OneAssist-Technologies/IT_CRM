@@ -123,6 +123,22 @@ export async function syncExistingContactLeadMeetings() {
         AND c."priority" IS NOT NULL
         AND (l."priority" IS NULL OR l."priority" = '' OR l."priority" = 'Medium');
     `).catch(() => {});
+
+    // 7. Update leads converted from qualified contacts to have status 'New' and stage 'Initialization'
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead" l
+      SET "status" = 'New',
+          "stage" = 'Initialization',
+          "updatedAt" = NOW()
+      FROM "Contact" c
+      WHERE (c."internalReference" = l."leadId"
+             OR (l."phone" IS NOT NULL AND l."phone" != '' AND l."phone" = c."phone")
+             OR (l."email" IS NOT NULL AND l."email" != '' AND LOWER(l."email") = LOWER(c."email"))
+             OR l.id = c.id
+             OR l."leadId" = c."contactId")
+        AND (c."status" = 'Qualified' OR c."qualificationStatus" = 'Qualified')
+        AND (l."status" = 'Qualified' OR l."stage" = 'Qualification');
+    `).catch(() => {});
   } catch (err) {
     console.warn('[syncExistingContactLeadMeetings Notice]:', err.message || err);
   }

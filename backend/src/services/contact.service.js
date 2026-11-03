@@ -650,7 +650,7 @@ export function mapContactStatusToLead(contactStatus, currentLeadStatus = 'New')
   if (s.includes('not interested') || s.includes('not-interested') || s.includes('disqual') || s.includes('lost') || s.includes('cancel')) {
     return 'Lost';
   }
-  if (s.includes('qualif')) return 'Qualified';
+  if (s.includes('qualif')) return 'New';
   if (s.includes('interest')) return 'Interested';
   if (s.includes('follow')) return 'Follow-up';
   if (s.includes('proposal')) return 'Proposal Sent';
@@ -727,8 +727,8 @@ export async function syncContactToLead(contact, user = null) {
           category,
           productList: productList.length > 0 ? productList : existingLead.productList,
           serviceList: serviceList.length > 0 ? serviceList : existingLead.serviceList,
-          status: mapContactStatusToLead(contact.status, existingLead.status),
-          stage: contact.stage || existingLead.stage || 'Initialization',
+          status: 'New',
+          stage: 'Initialization',
           priority: contact.priority || existingLead.priority || 'Medium',
           assignedTo: contact.assignedTo || existingLead.assignedTo || assignedTo,
           assignedToName: contact.assignedToName || existingLead.assignedToName || assignedToName,
@@ -907,8 +907,8 @@ export async function syncContactToLead(contact, user = null) {
           productList,
           serviceList,
           priority: contact.priority || 'Medium',
-          status: mapContactStatusToLead(contact.status, 'New'),
-          stage: contact.stage || 'Initialization',
+          status: 'New',
+          stage: 'Initialization',
           assignedTo,
           assignedToName,
           createdBy,
@@ -1461,7 +1461,11 @@ export async function updateContactService(id, body, user) {
       ...(body.disqualificationReason !== undefined && { disqualificationReason: body.disqualificationReason }),
       ...(body.notes !== undefined && { notes: body.notes }),
       ...(body.remarks !== undefined && { remarks: body.remarks }),
-      ...(body.nextFollowDate !== undefined && { nextFollowDate: body.nextFollowDate }),
+      ...(body.nextFollowDate !== undefined
+        ? { nextFollowDate: body.nextFollowDate || null }
+        : (body.status && !body.status.toLowerCase().includes('follow')
+            ? { nextFollowDate: null }
+            : {})),
       ...(body.contactPerson !== undefined && { contactPerson: body.contactPerson }),
       ...(body.estimatedValue !== undefined && { estimatedValue: body.estimatedValue }),
       ...(body.expectedCloseDate !== undefined && { expectedCloseDate: body.expectedCloseDate }),
@@ -1549,10 +1553,14 @@ export async function updateContactService(id, body, user) {
   await syncContactToLead(updated, user);
 
   try {
-    const mappedLeadStatus = mapContactStatusToLead(updated.status, existing?.status || 'New');
+    const isContactQualified =
+      (updated.status && updated.status.toLowerCase() === 'qualified') ||
+      (updated.qualificationStatus && updated.qualificationStatus.toLowerCase() === 'qualified');
+
+    const mappedLeadStatus = isContactQualified ? 'New' : mapContactStatusToLead(updated.status, existing?.status || 'New');
     const leadUpdateData = {
       ...(mappedLeadStatus && { status: mappedLeadStatus }),
-      ...(updated.stage && { stage: updated.stage }),
+      ...(isContactQualified ? { stage: 'Initialization' } : (updated.stage && { stage: updated.stage })),
       ...(updated.notes && { notes: updated.notes }),
       ...(updated.priority && { priority: updated.priority }),
       ...(updated.designation !== undefined && { designation: updated.designation }),
