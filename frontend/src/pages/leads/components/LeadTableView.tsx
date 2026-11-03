@@ -760,7 +760,9 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
   // Sleek Modern STATUS Badge matching Contacts design
   const renderStatusBadge = (statusVal?: string | null, stageVal?: string | null) => {
     let raw = (statusVal || stageVal || 'New').trim();
-    if (raw.toLowerCase() === 'contacted') {
+    if (raw.toLowerCase() === 'qualified' && (!stageVal || stageVal.toLowerCase() === 'qualification' || stageVal.toLowerCase() === 'initialization')) {
+      raw = 'New';
+    } else if (raw.toLowerCase() === 'contacted') {
       raw = 'In Progress';
     } else if (raw.toLowerCase() === 'won' || raw.toLowerCase() === 'closed won' || raw.toLowerCase() === 'completed') {
       raw = 'Complete';
@@ -1248,7 +1250,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                               {renderStatusBadge(lead.status, lead.stage)}
                               {lead.stage && (
                                 <Text size="11px" c="dimmed" style={{ paddingLeft: 4 }}>
-                                  {lead.stage}
+                                  {lead.stage?.toLowerCase() === 'qualification' ? 'Initialization' : lead.stage}
                                 </Text>
                               )}
                             </Stack>
@@ -1560,7 +1562,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
 
               {lead.stage && (
                 <Badge variant="outline" size="xs" color="gray" style={{ textTransform: 'none' }}>
-                  {lead.stage}
+                  {lead.stage?.toLowerCase() === 'qualification' ? 'Initialization' : lead.stage}
                 </Badge>
               )}
             </Group>

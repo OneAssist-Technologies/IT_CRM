@@ -12,7 +12,6 @@ import {
   Textarea,
   Select,
   Autocomplete,
-  Switch,
   useComputedColorScheme,
 } from '@mantine/core';
 import {
@@ -57,12 +56,32 @@ interface ContactModalProps {
 }
 
 
+const isLeadIdentifier = (idStr: any): boolean => {
+  if (!idStr || typeof idStr !== 'string') return false;
+  const s = idStr.trim();
+  if (
+    s.startsWith('BLK-') ||
+    s.startsWith('CNT-') ||
+    s.startsWith('EMP-') ||
+    s.startsWith('PRJ-') ||
+    s.startsWith('INV-') ||
+    s.startsWith('PAY-') ||
+    s.startsWith('QTN-') ||
+    s.startsWith('PRP-')
+  ) {
+    return false;
+  }
+  if (s.startsWith('LDN-') || s.startsWith('lead-')) return true;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return true;
+  return false;
+};
+
 const mapStatusToLeadStatus = (statusStr: string): string => {
   const s = (statusStr || '').toLowerCase();
   if (s.includes('not interested') || s.includes('not-interested') || s.includes('disqual') || s.includes('lost') || s.includes('cancel')) {
     return 'Lost';
   }
-  if (s.includes('qualif')) return 'Qualified';
+  if (s.includes('qualif')) return 'New';
   if (s.includes('interest')) return 'Interested';
   if (s.includes('follow')) return 'Follow-up';
   if (s.includes('proposal')) return 'Proposal Sent';
@@ -239,7 +258,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   const [callToTime, setCallToTime] = useState<string>('');
   const [callDuration, setCallDuration] = useState<string>('');
   const [callStatus, setCallStatus] = useState<string>('Follow-up');
-  const [logCallActivity, setLogCallActivity] = useState<boolean>(false);
   const [generalStatus, setGeneralStatus] = useState<string>('Not Connected');
   const [nextFollowDate, setNextFollowDate] = useState<string>('');
 
@@ -493,25 +511,29 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
     try {
       let finalStatus = generalStatus || contact?.status || 'Not Connected';
-      let finalFollowDate: string | undefined = undefined;
+      let finalFollowDate: string | null = null;
 
       if (formData.contactMode === 'Call') {
         finalStatus = callStatus === 'Follow-up' ? 'Follow-up Required' : callStatus;
-        if (callStatus === 'Follow-up') finalFollowDate = nextFollowDate || undefined;
+        if (callStatus === 'Follow-up') finalFollowDate = nextFollowDate?.trim() || null;
       } else if (formData.contactMode === 'WhatsApp') {
         finalStatus = whatsappStatus === 'Follow up' ? 'Follow-up Required' : (whatsappStatus === 'Interested' ? 'Interested' : (whatsappStatus === 'Not Interested' ? 'Not Interested' : whatsappStatus));
-        if (whatsappStatus === 'Follow up') finalFollowDate = nextFollowDate || undefined;
+        if (whatsappStatus === 'Follow up') finalFollowDate = nextFollowDate?.trim() || null;
       } else if (formData.contactMode === 'Email') {
         finalStatus = emailStatus === 'Follow up' ? 'Follow-up Required' : (emailStatus === 'Interested' ? 'Interested' : (emailStatus === 'Not Interested' ? 'Not Interested' : emailStatus));
-        if (emailStatus === 'Follow up') finalFollowDate = nextFollowDate || undefined;
+        if (emailStatus === 'Follow up') finalFollowDate = nextFollowDate?.trim() || null;
       } else if (formData.contactMode === 'Other' || formData.contactMode === 'Others') {
         finalStatus = otherStatus === 'Follow up' ? 'Follow-up Required' : (otherStatus === 'Interested' ? 'Interested' : (otherStatus === 'Not Interested' ? 'Not Interested' : otherStatus));
-        if (otherStatus === 'Follow up') finalFollowDate = nextFollowDate || undefined;
+        if (otherStatus === 'Follow up') finalFollowDate = nextFollowDate?.trim() || null;
       } else if (formData.contactMode === 'Meeting') {
         finalStatus = meetingStatus === 'Completed'
           ? 'Qualified'
           : (meetingStatus === 'Cancelled' ? 'Disqualified' : (meetingStatus === 'Follow-up' ? 'Follow-up Required' : 'In Progress'));
-        if (meetingStatus === 'Follow-up') finalFollowDate = nextFollowDate || undefined;
+        if (meetingStatus === 'Follow-up') finalFollowDate = nextFollowDate?.trim() || null;
+      } else {
+        if (finalStatus === 'Follow-up Required' || finalStatus.toLowerCase().includes('follow')) {
+          finalFollowDate = nextFollowDate?.trim() || null;
+        }
       }
 
       const resolvedName = formData.contactPerson?.trim() || formData.companyName?.trim() || formData.name?.trim() || contact?.name || 'Contact';
@@ -599,13 +621,17 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       }
 
       let leadUpdatedDirectly = false;
-      const explicitLeadId = (contact as any)?.leadId || (contact as any)?.lead_id || (contact as any)?.internalReference || (contact?.id && String(contact.id).startsWith('lead-') ? contact.id : undefined);
+      const rawLeadId =
+        (contact as any)?.leadId ||
+        (contact as any)?.lead_id ||
+        (contact?.id && String(contact.id).startsWith('lead-') ? contact.id : undefined);
+      const explicitLeadId = isLeadIdentifier(rawLeadId) ? String(rawLeadId) : undefined;
       if (explicitLeadId) {
         try {
           const leadMapped = mapStatusToLeadStatus(finalStatus);
           await leadService.updateLead(explicitLeadId, {
             status: leadMapped,
-            stage: payload.stage || (leadMapped === 'Qualified' ? 'Qualification' : (leadMapped === 'Lost' ? 'Lost' : undefined)),
+            stage: payload.stage || (leadMapped === 'New' ? 'Initialization' : (leadMapped === 'Lost' ? 'Lost' : undefined)),
             notes: formData.description?.trim() || undefined,
             priority: tagPriority?.trim() || 'Medium',
             assignedTo: formData.assignedTo && formData.assignedTo !== 'none' ? formData.assignedTo : undefined,
@@ -633,11 +659,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         currentUser?.name ||
         'Sandy';
       const assignedEmployeeId = foundEmp?.id || (contact as any)?.assignedTo || currentUser?.id || undefined;
-      const targetLeadId = (contact as any)?.leadId || (contact as any)?.lead_id || (contact as any)?.internalReference || contactIdentifier;
-      const targetLeadCode = (contact as any)?.leadCode || (contact as any)?.leadId || (contact as any)?.internalReference;
+      const targetLeadId = isLeadIdentifier((contact as any)?.leadId || (contact as any)?.lead_id)
+        ? (contact as any)?.leadId || (contact as any)?.lead_id
+        : undefined;
+      const targetLeadCode = isLeadIdentifier((contact as any)?.leadCode)
+        ? (contact as any)?.leadCode
+        : targetLeadId;
 
-      // 1. If contact mode is Call and user explicitly enabled call logging
-      if (formData.contactMode === 'Call' && logCallActivity) {
+      // 1. If contact mode is Call, always auto-log call activity to Activity Logs module
+      if (formData.contactMode === 'Call') {
         try {
           await createCallLogApi({
             callType: (callType as any) || 'Outgoing',
@@ -657,6 +687,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             nextFollowDate: callStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
           } as any);
           window.dispatchEvent(new CustomEvent('crm_call_logs_updated'));
+          window.dispatchEvent(new CustomEvent('crm_activities_updated'));
         } catch (callErr) {
           console.error('Error auto-logging call activity:', callErr);
         }
@@ -1065,7 +1096,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                   { value: 'Busy', label: 'Busy' },
                   { value: 'No Answer', label: 'No Answer' },
                   { value: 'Not Interested', label: 'Not Interested' },
-                  { value: 'Qualified', label: 'Qualified' },
                   { value: 'Unqualified', label: 'Unqualified' },
                 ]}
                 leftSection={<IconCheck size={18} stroke={1.6} />}
@@ -1094,15 +1124,9 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                       Call Details
                     </Text>
                   </Group>
-                  <Switch
-                    size="xs"
-                    label="Log this call in Call Logs"
-                    checked={logCallActivity}
-                    onChange={(e) => setLogCallActivity(e.currentTarget.checked)}
-                    styles={{
-                      label: { fontSize: 11.5, fontWeight: 600, color: isDark ? '#94A3B8' : '#64748B', cursor: 'pointer' },
-                    }}
-                  />
+                  <Text size="11px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+                    Auto-logs call in Activity Logs
+                  </Text>
                 </Group>
 
                 {/* Call Type | Call Date */}
@@ -1175,7 +1199,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
                     data={[
                       { value: 'Interested', label: 'Interested' },
                       { value: 'Follow-up', label: 'Follow-up' },
-                      { value: 'Qualified', label: 'Qualified' },
                       { value: 'Missed', label: 'Missed' },
                       { value: 'Busy', label: 'Busy' },
                       { value: 'No Answer', label: 'No Answer' },

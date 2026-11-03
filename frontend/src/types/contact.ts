@@ -256,7 +256,7 @@ export interface ContactFormData {
   callStatus?: string;
   customContactMode?: string;
   meetingType?: MeetingType | string;
-  nextFollowDate?: string;
+  nextFollowDate?: string | null;
   remarks?: string;
   notes?: string;
 

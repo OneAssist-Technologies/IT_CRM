@@ -305,7 +305,6 @@ export const BulkImportSection: React.FC<BulkImportSectionProps> = ({
 
       const contactsToImport = validRows.map((r) => ({
         customId: r.customId || undefined,
-        leadId: r.customId || undefined,
         name: r.name,
         phone: r.phone,
         email: r.email || null,

@@ -22,6 +22,38 @@ import {
  * 1. List leads with search, filters, pagination, and sorting
  */
 /**
+ * Computes accurate effective timestamp for an activity item based on its business date and time
+ */
+export function getActivityEffectiveTime(item) {
+  if (item && item.date) {
+    try {
+      const datePart = String(item.date).trim().slice(0, 10);
+      let timePart = '12:00:00';
+      if (item.time) {
+        const tStr = String(item.time).trim();
+        const match12 = tStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+        if (match12) {
+          let h = parseInt(match12[1], 10);
+          const m = match12[2];
+          const s = match12[3] || '00';
+          const meridiem = (match12[4] || '').toUpperCase();
+          if (meridiem === 'PM' && h < 12) h += 12;
+          if (meridiem === 'AM' && h === 12) h = 0;
+          timePart = `${String(h).padStart(2, '0')}:${m}:${s}`;
+        } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(tStr)) {
+          timePart = tStr;
+        }
+      }
+      const combined = new Date(`${datePart}T${timePart}`);
+      if (!isNaN(combined.getTime())) {
+        return combined.getTime();
+      }
+    } catch (_) {}
+  }
+  return item && item.createdAt ? new Date(item.createdAt).getTime() : 0;
+}
+
+/**
  * Helper to attach the most recent activity summary to each lead
  */
 export async function attachLastActivityToLeads(leads = []) {
@@ -220,9 +252,11 @@ export async function attachLastActivityToLeads(leads = []) {
         });
       });
 
-    candidateItems.sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    candidateItems.sort((a, b) => {
+      const diff = getActivityEffectiveTime(b) - getActivityEffectiveTime(a);
+      if (diff !== 0) return diff;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
 
     const lastActivity = candidateItems[0] || {
       type: 'lead_created',
@@ -323,11 +357,34 @@ export async function getLeadsService(queryParams = {}, currentUser = null) {
  * 2. Get Single Lead by ID
  */
 export async function getLeadByIdService(id, currentUser = null) {
-  const lead = await prisma.lead.findFirst({
+  let lead = await prisma.lead.findFirst({
     where: {
       OR: [{ id }, { leadId: id }],
     },
   });
+
+  if (!lead && typeof id === 'string' && (id.startsWith('BLK-') || id.startsWith('CNT-'))) {
+    const contactOrBulk =
+      (await prisma.contact.findFirst({
+        where: { OR: [{ id }, { contactId: id }, { internalReference: id }] },
+      })) ||
+      (await prisma.bulkUploadContact.findFirst({
+        where: { OR: [{ id }, { bulkId: id }] },
+      }));
+
+    if (contactOrBulk) {
+      const cleanPhone = contactOrBulk.phone ? contactOrBulk.phone.replace(/\D/g, '') : null;
+      lead = await prisma.lead.findFirst({
+        where: {
+          OR: [
+            ...(contactOrBulk.email ? [{ email: { equals: contactOrBulk.email.trim(), mode: 'insensitive' } }] : []),
+            ...(cleanPhone ? [{ phone: { contains: cleanPhone } }] : []),
+            ...(contactOrBulk.name ? [{ name: { equals: contactOrBulk.name.trim(), mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+    }
+  }
 
   if (!lead) {
     const error = new Error('Lead not found');
@@ -487,9 +544,32 @@ export async function createLeadService(body, currentUser = null) {
  * 6. Update Lead
  */
 export async function updateLeadService(id, body, currentUser = null) {
-  const existing = await prisma.lead.findFirst({
+  let existing = await prisma.lead.findFirst({
     where: { OR: [{ id }, { leadId: id }] },
   });
+
+  if (!existing && typeof id === 'string' && (id.startsWith('BLK-') || id.startsWith('CNT-'))) {
+    const contactOrBulk =
+      (await prisma.contact.findFirst({
+        where: { OR: [{ id }, { contactId: id }, { internalReference: id }] },
+      })) ||
+      (await prisma.bulkUploadContact.findFirst({
+        where: { OR: [{ id }, { bulkId: id }] },
+      }));
+
+    if (contactOrBulk) {
+      const cleanPhone = contactOrBulk.phone ? contactOrBulk.phone.replace(/\D/g, '') : null;
+      existing = await prisma.lead.findFirst({
+        where: {
+          OR: [
+            ...(contactOrBulk.email ? [{ email: { equals: contactOrBulk.email.trim(), mode: 'insensitive' } }] : []),
+            ...(cleanPhone ? [{ phone: { contains: cleanPhone } }] : []),
+            ...(contactOrBulk.name ? [{ name: { equals: contactOrBulk.name.trim(), mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+    }
+  }
 
   if (!existing) {
     const error = new Error('Lead not found');
@@ -603,6 +683,43 @@ export async function updateLeadService(id, body, currentUser = null) {
       console.warn('[updateLeadService] Failed to sync priority to contact:', tagSyncErr.message);
     }
   }
+
+  // Record status or stage change activity in timeline
+  try {
+    if (status !== undefined && status !== existing.status) {
+      await recordActivity({
+        type: 'status_change',
+        title: `Status: ${status}`,
+        description: `Lead status updated to ${status}.`,
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    } else if (stage !== undefined && stage !== existing.stage) {
+      await recordActivity({
+        type: 'stage_change',
+        title: `Stage: ${stage}`,
+        description: `Lead stage updated to ${stage}.`,
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: updated.status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    }
+  } catch (_) {}
 
   // If lead is closed or won, automatically record or update closure activity in timeline
   try {
