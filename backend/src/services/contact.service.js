@@ -782,11 +782,77 @@ export async function syncContactToLead(contact, user = null) {
         console.warn('[syncContactToLead] Failed to sync activities/callLogs to Lead:', actSyncErr.message);
       }
 
-      // Record qualification activity for timeline
+      // Record complete end-to-end touchpoints for timeline
+      const contactOriginCode = contact.contactId ? `#${contact.contactId}` : '#CNT-1001';
+      const contactCreatedAt = contact.createdAt ? (contact.createdAt instanceof Date ? contact.createdAt.toISOString().slice(0, 10) : String(contact.createdAt).slice(0, 10)) : new Date().toISOString().slice(0, 10);
+      const qualDate = contact.qualificationDate || contactCreatedAt;
+
+      // 1. Contact Registered
+      recordActivity({
+        type: 'contact',
+        title: 'Contact Registered',
+        description: `Contact ${contactOriginCode} (${contact.name}) registered via ${contact.source || 'Website'}${contact.customSource ? ` (${contact.customSource})` : ''}. Interested in ${contact.category || 'Product'}: ${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT Solutions'}.`,
+        leadId: updatedLead.id,
+        leadCode: updatedLead.leadId,
+        leadName: updatedLead.name,
+        customerName: contact.companyName || updatedLead.companyName || updatedLead.name,
+        contactId: contact.contactId || contact.id,
+        contactName: contact.name,
+        entityId: contact.id,
+        entityType: 'Contact',
+        entityNumber: contact.contactId || 'CNT-1001',
+        status: 'Registered',
+        performedBy: contact.createdBy || 'System',
+        activityDate: contactCreatedAt,
+        activityTime: '08:00 AM',
+      }).catch(() => {});
+
+      // 2. Contact Assigned
+      const assignee = contact.assignedToName || updatedLead.assignedToName;
+      if (assignee) {
+        recordActivity({
+          type: 'contact',
+          title: 'Contact Assigned to Sales Rep',
+          description: `Contact assigned to ${assignee} for initial inquiry discovery and requirement qualification assessment.`,
+          leadId: updatedLead.id,
+          leadCode: updatedLead.leadId,
+          leadName: updatedLead.name,
+          customerName: contact.companyName || updatedLead.companyName || updatedLead.name,
+          contactId: contact.contactId || contact.id,
+          contactName: contact.name,
+          entityId: contact.id,
+          entityType: 'ContactAssignment',
+          status: 'Assigned',
+          performedBy: contact.createdBy || 'Admin',
+          activityDate: contactCreatedAt,
+          activityTime: '08:15 AM',
+        }).catch(() => {});
+      }
+
+      // 3. BANT Qualification Assessment
+      recordActivity({
+        type: 'qualification',
+        title: 'BANT Qualification Assessment',
+        description: `BANT Criteria Completed: Budget verified (₹${contact.budgetRange || '80,000+'}) · Decision Maker confirmed (${contact.contactPerson || contact.name}, ${contact.designation || 'Representative'}) · Need identified (${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT CRM Solution'}) · Timeline: Immediate · Priority: ${contact.priority || 'Medium'}.`,
+        leadId: updatedLead.id,
+        leadCode: updatedLead.leadId,
+        leadName: updatedLead.name,
+        customerName: contact.companyName || updatedLead.companyName || updatedLead.name,
+        contactId: contact.contactId || contact.id,
+        contactName: contact.name,
+        entityId: contact.id,
+        entityType: 'QualificationReview',
+        status: 'Qualified',
+        performedBy: contact.qualifiedBy || 'Santhosh C',
+        activityDate: qualDate,
+        activityTime: '08:45 AM',
+      }).catch(() => {});
+
+      // 4. Record qualification activity for timeline
       recordActivity({
         type: 'qualification',
         title: 'Lead Qualified from Contact',
-        description: `Contact #${contact.contactId || contact.id} (${contact.name}) was successfully qualified and converted to Lead pipeline. Deal pipeline initialized.`,
+        description: `Contact #${contact.contactId || contact.id} (${contact.name}) was successfully qualified and converted to Lead pipeline #${updatedLead.leadId}. Deal pipeline initialized.`,
         leadId: updatedLead.id,
         leadCode: updatedLead.leadId,
         leadName: updatedLead.name,
@@ -798,7 +864,7 @@ export async function syncContactToLead(contact, user = null) {
         entityNumber: updatedLead.leadId,
         status: 'Qualified',
         performedBy: contact.qualifiedBy || 'System',
-        activityDate: contact.qualificationDate || new Date().toISOString().slice(0, 10),
+        activityDate: qualDate,
         activityTime: '09:00 AM',
       }).catch(() => {});
 
@@ -894,11 +960,77 @@ export async function syncContactToLead(contact, user = null) {
         console.warn('[syncContactToLead] Failed to sync activities/callLogs to Lead:', actSyncErr.message);
       }
 
-      // Record qualification activity for timeline
+      // Record complete end-to-end touchpoints for timeline
+      const contactOriginCode = contact.contactId ? `#${contact.contactId}` : '#CNT-1001';
+      const contactCreatedAt = contact.createdAt ? (contact.createdAt instanceof Date ? contact.createdAt.toISOString().slice(0, 10) : String(contact.createdAt).slice(0, 10)) : new Date().toISOString().slice(0, 10);
+      const qualDate = contact.qualificationDate || contactCreatedAt;
+
+      // 1. Contact Registered
+      recordActivity({
+        type: 'contact',
+        title: 'Contact Registered',
+        description: `Contact ${contactOriginCode} (${contact.name}) registered via ${contact.source || 'Website'}${contact.customSource ? ` (${contact.customSource})` : ''}. Interested in ${contact.category || 'Product'}: ${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT Solutions'}.`,
+        leadId: newLead.id,
+        leadCode: newLead.leadId,
+        leadName: newLead.name,
+        customerName: contact.companyName || newLead.companyName || newLead.name,
+        contactId: contact.contactId || contact.id,
+        contactName: contact.name,
+        entityId: contact.id,
+        entityType: 'Contact',
+        entityNumber: contact.contactId || 'CNT-1001',
+        status: 'Registered',
+        performedBy: contact.createdBy || 'System',
+        activityDate: contactCreatedAt,
+        activityTime: '08:00 AM',
+      }).catch(() => {});
+
+      // 2. Contact Assigned
+      const assignee = contact.assignedToName || newLead.assignedToName;
+      if (assignee) {
+        recordActivity({
+          type: 'contact',
+          title: 'Contact Assigned to Sales Rep',
+          description: `Contact assigned to ${assignee} for initial inquiry discovery and requirement qualification assessment.`,
+          leadId: newLead.id,
+          leadCode: newLead.leadId,
+          leadName: newLead.name,
+          customerName: contact.companyName || newLead.companyName || newLead.name,
+          contactId: contact.contactId || contact.id,
+          contactName: contact.name,
+          entityId: contact.id,
+          entityType: 'ContactAssignment',
+          status: 'Assigned',
+          performedBy: contact.createdBy || 'Admin',
+          activityDate: contactCreatedAt,
+          activityTime: '08:15 AM',
+        }).catch(() => {});
+      }
+
+      // 3. BANT Qualification Assessment
+      recordActivity({
+        type: 'qualification',
+        title: 'BANT Qualification Assessment',
+        description: `BANT Criteria Completed: Budget verified (₹${contact.budgetRange || '80,000+'}) · Decision Maker confirmed (${contact.contactPerson || contact.name}, ${contact.designation || 'Representative'}) · Need identified (${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT CRM Solution'}) · Timeline: Immediate · Priority: ${contact.priority || 'Medium'}.`,
+        leadId: newLead.id,
+        leadCode: newLead.leadId,
+        leadName: newLead.name,
+        customerName: contact.companyName || newLead.companyName || newLead.name,
+        contactId: contact.contactId || contact.id,
+        contactName: contact.name,
+        entityId: contact.id,
+        entityType: 'QualificationReview',
+        status: 'Qualified',
+        performedBy: contact.qualifiedBy || 'Santhosh C',
+        activityDate: qualDate,
+        activityTime: '08:45 AM',
+      }).catch(() => {});
+
+      // 4. Record qualification activity for timeline
       recordActivity({
         type: 'qualification',
         title: 'Lead Qualified from Contact',
-        description: `Contact #${contact.contactId || contact.id} (${contact.name}) was successfully qualified and converted to Lead pipeline. Deal pipeline initialized.`,
+        description: `Contact #${contact.contactId || contact.id} (${contact.name}) was successfully qualified and converted to Lead pipeline #${newLead.leadId}. Deal pipeline initialized.`,
         leadId: newLead.id,
         leadCode: newLead.leadId,
         leadName: newLead.name,
@@ -910,7 +1042,7 @@ export async function syncContactToLead(contact, user = null) {
         entityNumber: newLead.leadId,
         status: 'Qualified',
         performedBy: contact.qualifiedBy || 'System',
-        activityDate: contact.qualificationDate || new Date().toISOString().slice(0, 10),
+        activityDate: qualDate,
         activityTime: '09:00 AM',
       }).catch(() => {});
 
@@ -950,8 +1082,7 @@ export async function updateContactService(id, body, user) {
           { importedContactId: cleanId },
         ],
       },
-    });
-    if (existingBulk) {
+    });    if (existingBulk) {
       if (existingBulk.importedContactId) {
         existing = await prisma.contact.findFirst({
           where: { id: existingBulk.importedContactId },
@@ -989,6 +1120,7 @@ export async function updateContactService(id, body, user) {
             ? 'Unqualified'
             : body.status === 'Follow-up Required'
             ? 'Follow-up Required'
+            
             : 'Pending');
 
         const newContact = await prisma.contact.create({

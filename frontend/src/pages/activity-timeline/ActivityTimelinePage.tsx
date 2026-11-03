@@ -19,6 +19,7 @@ import {
   Divider,
   useComputedColorScheme,
   Grid,
+  SimpleGrid,
   Table,
   Avatar,
   SegmentedControl,
@@ -26,6 +27,7 @@ import {
   ScrollArea,
   Modal,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import {
   IconClock,
   IconSearch,
@@ -62,6 +64,9 @@ import {
   IconScale,
   IconReceipt,
   IconSparkles,
+  IconChevronRight,
+  IconPlayerPlay,
+  IconUserCheck,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import dayjs from 'dayjs';
@@ -119,6 +124,8 @@ export const getLeadPipelineStageIndex = (lead: Lead): number => {
 
 const ACTIVITY_TYPE_OPTIONS = [
   { value: 'all', label: 'All Activities' },
+  { value: 'contact', label: 'Contact Ingestion' },
+  { value: 'call', label: 'Call Logs' },
   { value: 'qualification', label: 'Lead Qualification' },
   { value: 'meeting', label: 'Meetings' },
   { value: 'proposal', label: 'Proposals / Quotations' },
@@ -130,9 +137,52 @@ const ACTIVITY_TYPE_OPTIONS = [
   { value: 'closure', label: 'Closure' },
 ];
 
+export const cleanActivityDescription = (desc?: string | null, status?: string | null): string => {
+  if (!desc) return '';
+  let cleaned = desc.trim();
+
+  // Strip redundant client/customer names or author suffixes (since view is already for this specific lead)
+  cleaned = cleaned.replace(/[·•]\s*Client:\s*[^•·\n]+/gi, '');
+  cleaned = cleaned.replace(/\(By\s+[^)]+\)/gi, '');
+
+  // Strip verbose boilerplate sentences and simplify to concise data
+  cleaned = cleaned.replace(/Commercial terms,\s*license volume,\s*and GST breakdown agreed at\s*/gi, 'Agreed deal value: ');
+  cleaned = cleaned.replace(/\.?\s*Approved for contract execution\.?/gi, '');
+  cleaned = cleaned.replace(/Handover completed\s*-\s*Assigned to\s*/gi, 'Project assigned to ');
+  cleaned = cleaned.replace(/Contact assigned to ([^ ]+) for initial inquiry discovery and requirement qualification assessment\.?/gi, 'Assigned to $1');
+  cleaned = cleaned.replace(/Contact #?([A-Za-z0-9_-]+)(?: \([^)]+\))? was successfully qualified and converted to Lead pipeline\. Deal pipeline initialized\.?/gi, 'Qualified from Contact #$1');
+  cleaned = cleaned.replace(/was successfully qualified and converted to Lead pipeline\. Deal pipeline initialized\.?/gi, 'Qualified from Contact to Lead pipeline');
+  cleaned = cleaned.replace(/Contact #?([A-Za-z0-9_-]+)(?: \([^)]+\))? registered via /gi, 'Registered via ');
+  cleaned = cleaned.replace(/Interested in Product:\s*/gi, 'Product: ');
+  cleaned = cleaned.replace(/BANT Criteria Completed:\s*/gi, 'BANT Criteria: ');
+
+  // Strip redundant tags
+  cleaned = cleaned.replace(/[·•]\s*Full Settlement/gi, '');
+  cleaned = cleaned.replace(/[·•]\s*ITCRM/gi, '');
+
+  // Strip duplicate status ending if badge already displays it
+  if (status) {
+    const sClean = status.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    cleaned = cleaned.replace(new RegExp(`[·•]\\s*${sClean}\\s*$`, 'i'), '');
+  }
+
+  // Common statuses to strip if repeated at the end
+  cleaned = cleaned.replace(/[·•]\s*(?:Accepted|Paid|Draft|Completed|Won|In Progress|Signed|Cancelled|Active)\s*$/i, '');
+
+  // Clean trailing punctuation or separators
+  cleaned = cleaned.replace(/\s*[·•,-]\s*$/, '').trim();
+
+  return cleaned;
+};
+
 export const ActivityTimelinePage: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
+
+  // Responsive Breakpoints for full fit across all screen sizes
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isTablet = useMediaQuery('(max-width: 1024px)');
+  const isLaptop = useMediaQuery('(max-width: 1366px)');
 
   const { setActiveNav } = useCRM();
   const { leads, setSelectedLead: setGlobalSelectedLead, fetchLeads, deleteLead, loading: leadsLoading } = useLead();
@@ -160,6 +210,9 @@ export const ActivityTimelinePage: React.FC = () => {
   // Timeline data states (Level 2)
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [summary, setSummary] = useState<ActivitySummary>({
+    qualifications: 0,
+    contacts: 0,
+    calls: 0,
     meetings: 0,
     proposals: 0,
     contracts: 0,
@@ -191,6 +244,8 @@ export const ActivityTimelinePage: React.FC = () => {
   const [datePickerOpened, setDatePickerOpened] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const [activeRibbonStage, setActiveRibbonStage] = useState<string>('discovery');
+  const [isStageFilterActive, setIsStageFilterActive] = useState<boolean>(false);
 
   // Fetch leads once on mount
   useEffect(() => {
@@ -359,11 +414,51 @@ export const ActivityTimelinePage: React.FC = () => {
   };
 
   // Navigate to full lead deal page
-  const handleOpenLeadDealPage = (lead: Lead) => {
-    setGlobalSelectedLead(lead);
+  const handleOpenLeadDealPage = (lead: Lead | null) => {
+    const targetLead = lead || selectedLead;
+    if (!targetLead) {
+      notifications.show({
+        title: 'Notice',
+        message: 'No lead selected to open pipeline.',
+        color: 'blue',
+      });
+      return;
+    }
+
+    // Match fresh complete lead record from context if available
+    const fullLead =
+      leads.find((l) => l.id === targetLead.id || (l.leadId && l.leadId === targetLead.leadId)) ||
+      targetLead;
+
+    setGlobalSelectedLead(fullLead);
+
+    // Map lead stage/status to target deal module section
+    const st = (fullLead.stage || fullLead.status || '').toLowerCase();
+    let targetSection = 'meetings';
+    if (st.includes('proposal')) targetSection = 'proposals';
+    else if (st.includes('quotation')) targetSection = 'quotations';
+    else if (st.includes('negotiat')) targetSection = 'negotiation';
+    else if (st.includes('contract')) targetSection = 'contracts';
+    else if (st.includes('invoice')) targetSection = 'invoices';
+    else if (st.includes('payment')) targetSection = 'payments';
+    else if (st.includes('progress')) targetSection = 'progress';
+    else if (st.includes('handover') || st.includes('complete') || st.includes('won')) targetSection = 'handover';
+    else targetSection = 'meetings';
+
     try {
-      sessionStorage.setItem('crm_selected_lead', JSON.stringify(lead));
+      sessionStorage.setItem('crm_selected_lead', JSON.stringify(fullLead));
+      sessionStorage.setItem('crm_lead_active_section', targetSection);
+      sessionStorage.setItem('crm_schedule_tab', 'pipeline');
+      sessionStorage.setItem('crm_lead_nav_source', 'activity-timeline');
     } catch (_) {}
+
+    notifications.show({
+      title: 'Opening Lead Pipeline',
+      message: `Navigating to ${fullLead.name}'s deal pipeline (${targetSection.toUpperCase()})...`,
+      color: 'blue',
+      autoClose: 1800,
+    });
+
     setActiveNav('lead-schedule');
   };
 
@@ -433,6 +528,18 @@ export const ActivityTimelinePage: React.FC = () => {
     return null;
   }, [qualificationActivity]);
 
+  // Helper to normalize date string to YYYY-MM-DD
+  const normalizeDate = (d?: string): string => {
+    if (!d) return '';
+    const clean = d.trim();
+    if (clean.includes('-')) {
+      const parts = clean.split('-');
+      if (parts[0].length === 4) return clean; // YYYY-MM-DD
+      if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`; // DD-MM-YYYY
+    }
+    return clean;
+  };
+
   // Helper to parse time strings like '04:15 PM', '12:00 AM' into minutes for accurate comparison
   const parseTimeMinutes = (timeStr?: string): number => {
     if (!timeStr) return 0;
@@ -446,21 +553,13 @@ export const ActivityTimelinePage: React.FC = () => {
     return h * 60 + m;
   };
 
-  // Sort activities: default descending (latest/newest first) or pipeline flow (oldest first)
-  // Qualification is the root origin of the lead:
-  // - In descending (newest first) order, qualification is ALWAYS at the very bottom!
-  // - In ascending (pipeline flow) order, qualification is ALWAYS at the very top!
+  // Sort activities: latest/newest first or chronological pipeline flow (oldest first)
   const sortedActivities = useMemo(() => {
     const list = [...activities];
     if (sortOrder === 'newest') {
       return list.sort((a, b) => {
-        // Qualification is the birth event; in latest-first, it must strictly be at the bottom
-        if (a.type === 'qualification' && b.type !== 'qualification') return 1;
-        if (b.type === 'qualification' && a.type !== 'qualification') return -1;
-        if (a.type === 'qualification' && b.type === 'qualification') return 0;
-
-        const dateA = a.activityDate || '';
-        const dateB = b.activityDate || '';
+        const dateA = normalizeDate(a.activityDate);
+        const dateB = normalizeDate(b.activityDate);
         if (dateA !== dateB) {
           return dateB.localeCompare(dateA);
         }
@@ -472,13 +571,8 @@ export const ActivityTimelinePage: React.FC = () => {
       });
     } else {
       return list.sort((a, b) => {
-        // In pipeline flow, qualification is strictly at the top
-        if (a.type === 'qualification' && b.type !== 'qualification') return -1;
-        if (b.type === 'qualification' && a.type !== 'qualification') return 1;
-        if (a.type === 'qualification' && b.type === 'qualification') return 0;
-
-        const dateA = a.activityDate || '';
-        const dateB = b.activityDate || '';
+        const dateA = normalizeDate(a.activityDate);
+        const dateB = normalizeDate(b.activityDate);
         if (dateA !== dateB) {
           return dateA.localeCompare(dateB);
         }
@@ -490,6 +584,41 @@ export const ActivityTimelinePage: React.FC = () => {
       });
     }
   }, [activities, sortOrder]);
+
+  const STAGE_TYPES_MAP: Record<string, string[]> = {
+    discovery: ['contact', 'call'],
+    qualification: ['qualification'],
+    engagement: ['meeting'],
+    proposal: ['proposal', 'quotation'],
+    negotiation: ['negotiation', 'contract', 'invoice', 'payment', 'progress', 'closure'],
+  };
+
+  const displayedActivities = useMemo(() => {
+    if (!isStageFilterActive || !activeRibbonStage || activeRibbonStage === 'all') {
+      return sortedActivities;
+    }
+    const allowedTypes = STAGE_TYPES_MAP[activeRibbonStage] || [];
+    return sortedActivities.filter((a) => {
+      const t = (a.type || '').toLowerCase();
+      return allowedTypes.includes(t);
+    });
+  }, [sortedActivities, isStageFilterActive, activeRibbonStage]);
+
+  const ribbonStageCounts = useMemo(() => {
+    return {
+      discovery: (summary.contacts || 0) + (summary.calls || 0),
+      qualification: summary.qualifications || 0,
+      engagement: summary.meetings || 0,
+      proposal: summary.proposals || 0,
+      negotiation:
+        (summary.negotiations || 0) +
+        (summary.contracts || 0) +
+        (summary.invoices || 0) +
+        (summary.payments || 0) +
+        (summary.progress || 0) +
+        (summary.closure || 0),
+    };
+  }, [summary]);
 
   // Group label helper (Today, Yesterday, MMM DD) matching Touchpoints timeline reference
   const getDateGroupLabel = (dateStr?: string) => {
@@ -529,6 +658,24 @@ export const ActivityTimelinePage: React.FC = () => {
   const getActivityStyle = (type: string) => {
     const t = (type || '').toLowerCase();
     switch (t) {
+      case 'contact':
+        return {
+          label: 'Contact Ingestion',
+          icon: <IconUserPlus size={23} stroke={2.2} />,
+          badgeBg: isDark ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
+          badgeText: isDark ? '#60A5FA' : '#1D4ED8',
+          iconBg: isDark ? 'rgba(59, 130, 246, 0.25)' : '#EFF6FF',
+          iconColor: isDark ? '#60A5FA' : '#2563EB',
+        };
+      case 'call':
+        return {
+          label: 'Call Log',
+          icon: <IconPhone size={23} stroke={2.2} />,
+          badgeBg: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ECFDF5',
+          badgeText: isDark ? '#34D399' : '#047857',
+          iconBg: isDark ? 'rgba(16, 185, 129, 0.25)' : '#ECFDF5',
+          iconColor: isDark ? '#10B981' : '#059669',
+        };
       case 'qualification':
       case 'qualified':
         return {
@@ -623,26 +770,53 @@ export const ActivityTimelinePage: React.FC = () => {
     const s = (status || '').trim();
     const normalized = s.toLowerCase();
 
-    // Success / Completed / Qualified / Won / Accepted / Signed / Handover / Paid
+    // Specific Status Styles to match design
+    if (normalized.includes('qualif')) {
+      return {
+        label: s || 'Qualified',
+        color: isDark ? '#2DD4BF' : '#0D9488',
+        bg: isDark ? 'rgba(20, 184, 166, 0.15)' : '#F0FDFA',
+        border: isDark ? 'rgba(20, 184, 166, 0.35)' : '#99F6E4',
+        dotColor: '#0D9488',
+      };
+    }
+
+    if (normalized.includes('assigned') || normalized.includes('in progress')) {
+      return {
+        label: s || 'Assigned',
+        color: isDark ? '#60A5FA' : '#2563EB',
+        bg: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+        border: isDark ? 'rgba(59, 130, 246, 0.35)' : '#BFDBFE',
+        dotColor: '#2563EB',
+      };
+    }
+
+    if (normalized.includes('registered')) {
+      return {
+        label: s || 'Registered',
+        color: isDark ? '#A78BFA' : '#7C3AED',
+        bg: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F5F3FF',
+        border: isDark ? 'rgba(139, 92, 246, 0.35)' : '#DDD6FE',
+        dotColor: '#7C3AED',
+      };
+    }
+
     if (
       normalized.includes('complete') ||
-      normalized.includes('qualif') ||
       normalized.includes('won') ||
       normalized.includes('accept') ||
       normalized.includes('paid') ||
-      normalized.includes('signed') ||
-      normalized.includes('handover')
+      normalized.includes('signed')
     ) {
       return {
         label: s || 'Completed',
         color: isDark ? '#34D399' : '#059669',
-        bg: isDark ? 'rgba(16, 185, 129, 0.12)' : 'rgba(16, 185, 129, 0.08)',
+        bg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
         border: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
-        dotColor: '#10B981',
+        dotColor: '#059669',
       };
     }
 
-    // Pending / Action Required / Amber / Rescheduled / Draft / Revised / Partially Paid
     if (
       normalized.includes('resched') ||
       normalized.includes('pending') ||
@@ -652,34 +826,14 @@ export const ActivityTimelinePage: React.FC = () => {
       normalized.includes('awaiting')
     ) {
       return {
-        label: s || 'Pending',
+        label: s || 'Draft',
         color: isDark ? '#FBBF24' : '#D97706',
-        bg: isDark ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.08)',
+        bg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB',
         border: isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
-        dotColor: '#F59E0B',
+        dotColor: '#D97706',
       };
     }
 
-    // Active / Scheduled / In Progress / Sent / Issued / Blue
-    if (
-      normalized.includes('schedul') ||
-      normalized.includes('progress') ||
-      normalized.includes('sent') ||
-      normalized.includes('issued') ||
-      normalized.includes('under review') ||
-      normalized.includes('request') ||
-      normalized.includes('active')
-    ) {
-      return {
-        label: s || 'Scheduled',
-        color: isDark ? '#38BDF8' : '#0284C7',
-        bg: isDark ? 'rgba(2, 132, 199, 0.12)' : 'rgba(2, 132, 199, 0.08)',
-        border: isDark ? 'rgba(2, 132, 199, 0.35)' : '#BAE6FD',
-        dotColor: '#0284C7',
-      };
-    }
-
-    // Cancelled / Rejected / Lost / Overdue
     if (
       normalized.includes('cancel') ||
       normalized.includes('reject') ||
@@ -689,21 +843,19 @@ export const ActivityTimelinePage: React.FC = () => {
       return {
         label: s || 'Cancelled',
         color: isDark ? '#F87171' : '#DC2626',
-        bg: isDark ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+        bg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
         border: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA',
-        dotColor: '#EF4444',
+        dotColor: '#DC2626',
       };
     }
 
-    // Fallback
+    // Default neutral
     return {
-      label: s || 'Logged',
-      color: isFirst ? '#FF5722' : isDark ? '#E2E8F0' : '#475569',
-      bg: isFirst
-        ? isDark ? 'rgba(255, 87, 34, 0.12)' : 'rgba(255, 87, 34, 0.06)'
-        : isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.02)',
-      border: isFirst ? '#FF5722' : isDark ? 'rgba(255, 255, 255, 0.2)' : '#CBD5E1',
-      dotColor: isFirst ? '#FF5722' : '#94A3B8',
+      label: s || 'Active',
+      color: isDark ? '#60A5FA' : '#2563EB',
+      bg: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+      border: isDark ? 'rgba(59, 130, 246, 0.35)' : '#BFDBFE',
+      dotColor: '#2563EB',
     };
   };
 
@@ -730,7 +882,7 @@ export const ActivityTimelinePage: React.FC = () => {
   // =========================================================================
   if (!selectedLead) {
     return (
-      <Box style={{ width: '100%', maxWidth: 1440, margin: '0 auto' }}>
+      <Box style={{ width: '100%', maxWidth: '100%', margin: '0 auto' }}>
         {/* Page Header */}
         <Box mb="lg">
           <Group justify="space-between" align="flex-start" wrap="wrap" gap="md">
@@ -851,7 +1003,8 @@ export const ActivityTimelinePage: React.FC = () => {
               </Stack>
             </Center>
           ) : (
-            <Table
+            <Table.ScrollContainer minWidth={720}>
+              <Table
               verticalSpacing="md"
               horizontalSpacing="lg"
               highlightOnHover
@@ -1073,7 +1226,8 @@ export const ActivityTimelinePage: React.FC = () => {
                   );
                 })}
               </Table.Tbody>
-            </Table>
+              </Table>
+            </Table.ScrollContainer>
           )}
         </Paper>
 
@@ -1120,13 +1274,14 @@ export const ActivityTimelinePage: React.FC = () => {
     <Box
       style={{
         width: '100%',
-        maxWidth: 1440,
+        maxWidth: '100%',
         margin: '0 auto',
-        height: 'calc(100vh - 144px)',
-        maxHeight: 'calc(100vh - 144px)',
+        height: isTablet ? 'auto' : 'calc(100vh - 138px)',
+        maxHeight: isTablet ? 'none' : 'calc(100vh - 138px)',
         display: 'flex',
         flexDirection: 'column',
-        overflow: 'hidden',
+        overflow: isTablet ? 'visible' : 'hidden',
+        boxSizing: 'border-box',
       }}
     >
       {/* Top Action & Filter Toolbar for this Lead's Timeline (Includes Back Button) */}
@@ -1141,116 +1296,121 @@ export const ActivityTimelinePage: React.FC = () => {
           borderColor: isDark ? 'rgba(255,255,255,0.08)' : CRM_COLORS.border,
           boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
           flexShrink: 0,
+          width: '100%',
         }}
       >
-        <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
+        <Group justify="space-between" align="center" gap="xs" wrap={isMobile ? 'wrap' : 'nowrap'}>
           {/* Back Button to return to Leads list */}
-          <Button
-            variant="default"
-            size="sm"
-            radius="md"
-            leftSection={<IconArrowLeft size={16} stroke={2} />}
-            onClick={handleBackToLeadsList}
-            style={{
-              borderColor: isDark ? 'rgba(255,255,255,0.12)' : '#E2E8F0',
-              fontWeight: 600,
-              fontSize: 13,
-              flexShrink: 0,
-            }}
-          >
-            Back
-          </Button>
+          <Group gap="xs" align="center" style={{ flex: 1, minWidth: isMobile ? '100%' : 220 }} wrap="nowrap">
+            <Button
+              variant="default"
+              size="sm"
+              radius="md"
+              leftSection={<IconArrowLeft size={16} stroke={2} />}
+              onClick={handleBackToLeadsList}
+              style={{
+                borderColor: isDark ? 'rgba(255,255,255,0.12)' : '#E2E8F0',
+                fontWeight: 600,
+                fontSize: 13,
+                flexShrink: 0,
+              }}
+            >
+              Back
+            </Button>
 
-          <Divider orientation="vertical" />
+            <Divider orientation="vertical" />
 
-          {/* Search bar within this lead */}
-          <TextInput
-            placeholder="Search activities in this lead..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-            leftSection={<IconSearch size={16} stroke={1.8} color="dimmed" />}
-            rightSection={
-              search ? (
-                <ActionIcon size="xs" variant="transparent" c="dimmed" onClick={() => setSearch('')}>
-                  <IconX size={14} />
-                </ActionIcon>
-              ) : null
-            }
-            radius="md"
-            size="sm"
-            style={{ flex: 1, minWidth: 200 }}
-          />
+            {/* Search bar within this lead */}
+            <TextInput
+              placeholder="Search activities in this lead..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              leftSection={<IconSearch size={16} stroke={1.8} color="dimmed" />}
+              rightSection={
+                search ? (
+                  <ActionIcon size="xs" variant="transparent" c="dimmed" onClick={() => setSearch('')}>
+                    <IconX size={14} />
+                  </ActionIcon>
+                ) : null
+              }
+              radius="md"
+              size="sm"
+              style={{ flex: 1, minWidth: 140 }}
+            />
+          </Group>
 
-          {/* Activity Type Dropdown */}
-          <Select
-            data={ACTIVITY_TYPE_OPTIONS}
-            value={activityType}
-            onChange={(val) => {
-              setActivityType(val || 'all');
-              setPage(1);
-            }}
-            radius="md"
-            size="sm"
-            style={{ width: 170, flexShrink: 0 }}
-          />
+          {/* Activity Type Dropdown, Date Range, Reset, Refresh */}
+          <Group gap="xs" align="center" wrap="nowrap" style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
+            <Select
+              data={ACTIVITY_TYPE_OPTIONS}
+              value={activityType}
+              onChange={(val) => {
+                setActivityType(val || 'all');
+                setPage(1);
+              }}
+              radius="md"
+              size="sm"
+              style={{ width: isMobile ? 'auto' : 160, flex: isMobile ? 1 : 'none' }}
+            />
 
-          {/* Date Range Selector Popover */}
-          <Popover opened={datePickerOpened} onChange={setDatePickerOpened} position="bottom-end" withArrow shadow="md">
-            <Popover.Target>
-              <Button
-                variant="default"
-                radius="md"
-                size="sm"
-                leftSection={<IconCalendar size={15} stroke={1.8} color="dimmed" />}
-                onClick={() => setDatePickerOpened((o) => !o)}
-                style={{ fontWeight: 500, fontSize: 13, flexShrink: 0 }}
-              >
-                Date Range
-              </Button>
-            </Popover.Target>
-            <Popover.Dropdown p="sm" style={{ width: 260 }}>
-              <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
-                Select Date Range
-              </Text>
-              <Stack gap={6}>
-                {[
-                  { key: 'all', label: 'All Activities' },
-                  { key: 'today', label: 'Today' },
-                  { key: 'week', label: 'This Week' },
-                  { key: 'month', label: 'This Month' },
-                ].map((item) => (
-                  <Button
-                    key={item.key}
-                    variant={dateRangePreset === item.key ? 'light' : 'subtle'}
-                    color="oneassist"
-                    size="xs"
-                    justify="flex-start"
-                    radius="md"
-                    onClick={() => handleSelectDatePreset(item.key)}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
-              </Stack>
-            </Popover.Dropdown>
-          </Popover>
+            {/* Date Range Selector Popover */}
+            <Popover opened={datePickerOpened} onChange={setDatePickerOpened} position="bottom-end" withArrow shadow="md">
+              <Popover.Target>
+                <Button
+                  variant="default"
+                  radius="md"
+                  size="sm"
+                  leftSection={<IconCalendar size={15} stroke={1.8} color="dimmed" />}
+                  onClick={() => setDatePickerOpened((o) => !o)}
+                  style={{ fontWeight: 500, fontSize: 13, flexShrink: 0 }}
+                >
+                  Date Range
+                </Button>
+              </Popover.Target>
+              <Popover.Dropdown p="sm" style={{ width: 260 }}>
+                <Text size="xs" fw={700} c="dimmed" tt="uppercase" mb="xs">
+                  Select Date Range
+                </Text>
+                <Stack gap={6}>
+                  {[
+                    { key: 'all', label: 'All Activities' },
+                    { key: 'today', label: 'Today' },
+                    { key: 'week', label: 'This Week' },
+                    { key: 'month', label: 'This Month' },
+                  ].map((item) => (
+                    <Button
+                      key={item.key}
+                      variant={dateRangePreset === item.key ? 'light' : 'subtle'}
+                      color="oneassist"
+                      size="xs"
+                      justify="flex-start"
+                      radius="md"
+                      onClick={() => handleSelectDatePreset(item.key)}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </Stack>
+              </Popover.Dropdown>
+            </Popover>
 
-          {/* Reset button */}
-          <Tooltip label="Reset filters" withArrow>
-            <ActionIcon variant="default" size={36} radius="md" onClick={handleResetTimelineFilters} style={{ flexShrink: 0 }}>
-              <IconAdjustmentsHorizontal size={17} stroke={1.8} />
-            </ActionIcon>
-          </Tooltip>
+            {/* Reset button */}
+            <Tooltip label="Reset filters" withArrow>
+              <ActionIcon variant="default" size={36} radius="md" onClick={handleResetTimelineFilters} style={{ flexShrink: 0 }}>
+                <IconAdjustmentsHorizontal size={17} stroke={1.8} />
+              </ActionIcon>
+            </Tooltip>
 
-          {/* Refresh button */}
-          <Tooltip label="Refresh activities" withArrow>
-            <ActionIcon variant="default" size={36} radius="md" loading={loading} onClick={fetchActivities} style={{ flexShrink: 0 }}>
-              <IconRefresh size={16} stroke={1.8} />
-            </ActionIcon>
-          </Tooltip>
+            {/* Refresh button */}
+            <Tooltip label="Refresh activities" withArrow>
+              <ActionIcon variant="default" size={36} radius="md" loading={loading} onClick={fetchActivities} style={{ flexShrink: 0 }}>
+                <IconRefresh size={16} stroke={1.8} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
       </Paper>
 
@@ -1260,8 +1420,9 @@ export const ActivityTimelinePage: React.FC = () => {
           flex: 1,
           minHeight: 0,
           display: 'flex',
+          flexDirection: isTablet ? 'column' : 'row',
           gap: 16,
-          overflow: 'hidden',
+          overflow: isTablet ? 'visible' : 'hidden',
           width: '100%',
         }}
       >
@@ -1272,380 +1433,456 @@ export const ActivityTimelinePage: React.FC = () => {
             ----------------------------------------------------------------- */}
         <Box
           style={{
-            width: 360,
-            minWidth: 300,
-            maxWidth: 380,
+            width: isTablet ? '100%' : (isLaptop ? 340 : 360),
+            minWidth: isTablet ? '100%' : 320,
+            maxWidth: isTablet ? '100%' : 380,
+            flex: isTablet ? 'none' : (isLaptop ? '0 0 340px' : '0 0 360px'),
             flexShrink: 0,
-            height: '100%',
+            height: isTablet ? 'auto' : '100%',
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflow: isTablet ? 'visible' : 'hidden',
           }}
         >
-          <Stack gap="xs" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4, scrollbarWidth: 'thin' }}>
+          <Stack
+            gap="sm"
+            style={{
+              width: '100%',
+              flex: 1,
+              minHeight: 0,
+              overflowY: isTablet ? 'visible' : 'auto',
+              overflowX: 'hidden',
+              paddingRight: isTablet ? 0 : 2,
+              scrollbarWidth: 'thin',
+            }}
+          >
             {/* =============================================================
-                CARD 1: LEAD DETAILS
+                CARD 1: LEAD DETAILS (Styled with Blue Gradient Header Banner)
                 ============================================================= */}
             <Paper
-              p="md"
               radius="lg"
               withBorder
               style={{
-                backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : CRM_COLORS.cardBg,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : CRM_COLORS.border,
+                backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
                 boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
                 flexShrink: 0,
+                overflow: 'hidden',
+                width: '100%',
               }}
             >
-              {/* Card 1 Header */}
-              <Group justify="space-between" align="center" mb="xs">
-                <Group gap={8} align="center">
-                  <IconUser size={18} stroke={2.2} color={isDark ? '#A5B4FC' : '#4F46E5'} />
-                  <Text fw={700} size="15px">
-                    Lead Details
-                  </Text>
-                </Group>
-                <Group gap={6} align="center">
-                  <Badge size="xs" radius="sm" variant="light" color="oneassist">
-                    {selectedLead.leadId || 'LEAD'}
-                  </Badge>
-                  <Tooltip label="Delete Lead" withArrow>
-                    <ActionIcon
-                      variant="subtle"
-                      size="sm"
-                      color="red"
-                      onClick={() => setDeleteTarget(selectedLead)}
-                    >
-                      <IconTrash size={15} stroke={1.8} color="#F87171" />
-                    </ActionIcon>
-                  </Tooltip>
-                </Group>
-              </Group>
-
-              {/* Lead Avatar & Name */}
+              {/* Top Blue Gradient Banner */}
               <Box
-                p="xs"
-                mb="xs"
+                p="md"
                 style={{
-                  borderRadius: 10,
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
-                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'}`,
+                  background: 'linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%)',
+                  position: 'relative',
+                  color: '#FFFFFF',
+                  width: '100%',
+                  boxSizing: 'border-box',
                 }}
               >
-                <Group gap="sm" align="center">
-                  <Box
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 10,
-                      backgroundColor: isDark ? 'rgba(79, 70, 229, 0.25)' : '#EEF2FF',
-                      color: isDark ? '#A5B4FC' : '#4F46E5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: 16,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {leadInitial}
-                  </Box>
-                  <Box style={{ minWidth: 0, flex: 1 }}>
-                    <Text fw={700} size="14.5px" style={{ wordBreak: 'break-word' }}>
-                      {selectedLead.name}
-                    </Text>
-                    <Text size="12px" c="dimmed" style={{ wordBreak: 'break-word' }}>
-                      {selectedLead.companyName || selectedLead.profession || 'Direct Client'}
-                    </Text>
-                  </Box>
+                <Group justify="space-between" align="center" wrap="nowrap" style={{ width: '100%' }}>
+                  {/* Avatar & Lead Identity */}
+                  <Group gap="sm" align="center" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                    <Box
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        backgroundColor: '#FFFFFF',
+                        color: '#2563EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: 18,
+                        boxShadow: '0 4px 10px rgba(0, 0, 0, 0.14)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {leadInitial}
+                    </Box>
+                    <Box style={{ minWidth: 0, flex: 1 }}>
+                      <Text fw={700} size="15.5px" style={{ color: '#FFFFFF', lineHeight: 1.25 }} truncate>
+                        {selectedLead.name}
+                      </Text>
+                      <Text size="12px" style={{ color: 'rgba(255, 255, 255, 0.88)', marginTop: 2 }} truncate>
+                        {selectedLead.companyName || selectedLead.profession || 'Direct Client'}
+                      </Text>
+                    </Box>
+                  </Group>
+
+                  {/* Actions & ID Badge */}
+                  <Group gap={6} align="center" wrap="nowrap" style={{ flexShrink: 0, alignSelf: 'flex-start' }}>
+                    <Badge
+                      size="sm"
+                      radius="xl"
+                      variant="filled"
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.22)',
+                        color: '#FFFFFF',
+                        backdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(255, 255, 255, 0.35)',
+                        fontWeight: 700,
+                        fontSize: 11,
+                        height: 24,
+                        padding: '0 8px',
+                      }}
+                    >
+                      {selectedLead.leadId || 'LED-1001'}
+                    </Badge>
+                    <Tooltip label="Delete Lead" withArrow position="top">
+                      <ActionIcon
+                        variant="subtle"
+                        size="sm"
+                        radius="xl"
+                        style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.18)',
+                          color: '#FFFFFF',
+                          border: '1px solid rgba(255, 255, 255, 0.25)',
+                          height: 24,
+                          width: 24,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        onClick={() => setDeleteTarget(selectedLead)}
+                      >
+                        <IconTrash size={13} stroke={1.8} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
                 </Group>
               </Box>
 
-              {/* Lead Field Values */}
-              <Stack gap={8} my="xs">
-                {/* Qualified Date Row */}
-                <Group
-                  justify="space-between"
-                  align="center"
-                  py={4}
+              {/* Lead Field Values (White / Dark body) */}
+              <Box p="md" style={{ width: '100%', boxSizing: 'border-box' }}>
+                <Stack gap={8} mb="sm">
+                  {/* Qualified Date Row */}
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    py={5}
+                    style={{
+                      borderBottom: `1px dashed ${isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0'}`,
+                      width: '100%',
+                    }}
+                  >
+                    <Group gap={6} align="center">
+                      <IconCalendar size={14} color={isDark ? '#818CF8' : '#2563EB'} />
+                      <Text size="12px" c="dimmed" fw={500}>Qualified Date</Text>
+                    </Group>
+                    <Text size="12.5px" fw={600} style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>
+                      {formatDateDisplay(qualificationDate) || '-'}
+                    </Text>
+                  </Group>
+
+                  {/* Phone */}
+                  {selectedLead.phone && (
+                    <Group
+                      justify="space-between"
+                      align="center"
+                      py={5}
+                      style={{
+                        borderBottom: `1px dashed ${isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0'}`,
+                        width: '100%',
+                      }}
+                    >
+                      <Group gap={6} align="center">
+                        <IconPhone size={14} color="#10B981" />
+                        <Text size="12px" c="dimmed" fw={500}>Phone</Text>
+                      </Group>
+                      <Text size="12.5px" fw={600} style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>
+                        {selectedLead.phone}
+                      </Text>
+                    </Group>
+                  )}
+
+                  {/* Email */}
+                  {selectedLead.email && (
+                    <Group
+                      justify="space-between"
+                      align="center"
+                      py={5}
+                      style={{
+                        borderBottom: `1px dashed ${isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0'}`,
+                        width: '100%',
+                      }}
+                    >
+                      <Group gap={6} align="center">
+                        <IconMail size={14} color="#3B82F6" />
+                        <Text size="12px" c="dimmed" fw={500}>Email</Text>
+                      </Group>
+                      <Text size="12.5px" fw={600} style={{ wordBreak: 'break-all', textAlign: 'right', maxWidth: 185, color: isDark ? '#F1F5F9' : '#0F172A' }}>
+                        {selectedLead.email}
+                      </Text>
+                    </Group>
+                  )}
+
+                  {/* Assigned To */}
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    py={5}
+                    style={{ width: '100%' }}
+                  >
+                    <Group gap={6} align="center">
+                      <IconUserCircle size={14} color={isDark ? '#A5B4FC' : '#6366F1'} />
+                      <Text size="12px" c="dimmed" fw={500}>Assigned To</Text>
+                    </Group>
+                    <Text size="12.5px" fw={600} style={{ color: isDark ? '#60A5FA' : '#2563EB' }}>
+                      {selectedLead.assignedToName || 'Unassigned'}
+                    </Text>
+                  </Group>
+                </Stack>
+
+                <Button
+                  variant="light"
+                  radius="md"
+                  size="xs"
+                  fullWidth
+                  h={34}
+                  rightSection={<IconArrowRight size={13} />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenLeadDealPage(selectedLead);
+                  }}
                   style={{
-                    borderBottom: `1px dashed ${isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0'}`,
+                    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                    color: isDark ? '#60A5FA' : '#2563EB',
+                    fontWeight: 600,
+                    border: `1px solid ${isDark ? 'rgba(59, 130, 246, 0.25)' : 'rgba(37, 99, 235, 0.15)'}`,
+                    width: '100%',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    zIndex: 2,
                   }}
                 >
-                  <Group gap={6} align="center">
-                    <IconCalendar size={14} color={isDark ? '#818CF8' : '#4F46E5'} />
-                    <Text size="12px" c="dimmed">Qualified Date</Text>
-                  </Group>
-                  <Text size="12.5px" fw={600}>
-                    {formatDateDisplay(qualificationDate) || '-'}
-                  </Text>
-                </Group>
-
-                {/* Phone */}
-                {selectedLead.phone && (
-                  <Group
-                    justify="space-between"
-                    align="center"
-                    py={4}
-                    style={{
-                      borderBottom: `1px dashed ${isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0'}`,
-                    }}
-                  >
-                    <Group gap={6} align="center">
-                      <IconPhone size={14} color="#10B981" />
-                      <Text size="12px" c="dimmed">Phone</Text>
-                    </Group>
-                    <Text size="12.5px" fw={600}>{selectedLead.phone}</Text>
-                  </Group>
-                )}
-
-                {/* Email */}
-                {selectedLead.email && (
-                  <Group
-                    justify="space-between"
-                    align="center"
-                    py={4}
-                    style={{
-                      borderBottom: `1px dashed ${isDark ? 'rgba(255,255,255,0.07)' : '#E2E8F0'}`,
-                    }}
-                  >
-                    <Group gap={6} align="center">
-                      <IconMail size={14} color="#3B82F6" />
-                      <Text size="12px" c="dimmed">Email</Text>
-                    </Group>
-                    <Text size="12.5px" fw={600} style={{ wordBreak: 'break-all', textAlign: 'right', maxWidth: 200 }}>{selectedLead.email}</Text>
-                  </Group>
-                )}
-
-                {/* Assigned To */}
-                <Group
-                  justify="space-between"
-                  align="center"
-                  py={4}
-                >
-                  <Group gap={6} align="center">
-                    <IconUserCircle size={14} color={isDark ? '#A5B4FC' : '#6366F1'} />
-                    <Text size="12px" c="dimmed">Assigned To</Text>
-                  </Group>
-                  <Text size="12.5px" fw={600} style={{ color: isDark ? '#A5B4FC' : '#4F46E5' }}>
-                    {selectedLead.assignedToName || 'Unassigned'}
-                  </Text>
-                </Group>
-              </Stack>
-
-              <Button
-                variant="light"
-                color="oneassist"
-                radius="md"
-                size="xs"
-                fullWidth
-                mt="sm"
-                rightSection={<IconArrowRight size={13} />}
-                onClick={() => handleOpenLeadDealPage(selectedLead)}
-              >
-                Open Full Lead Pipeline
-              </Button>
+                  Open Full Lead Pipeline
+                </Button>
+              </Box>
             </Paper>
 
             {/* =============================================================
-                CARD 2: LEAD ACTIVITY SUMMARY
+                CARD 2: LEAD ACTIVITY SUMMARY (3x2 Micro Cards Grid)
                 ============================================================= */}
             <Paper
               p="sm"
               radius="lg"
               withBorder
               style={{
-                backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : CRM_COLORS.cardBg,
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : CRM_COLORS.border,
+                backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
+                borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
                 boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
                 flexShrink: 0,
+                overflow: 'hidden',
+                width: '100%',
               }}
             >
-              <Group justify="space-between" align="center" mb="xs">
-                <Text fw={700} size="14px">
+              <Group justify="space-between" align="center" mb="sm">
+                <Text fw={700} size="14.5px">
                   Lead Activity Summary
                 </Text>
-                <Badge size="xs" variant="filled" color="oneassist">
-                  {summary.meetings +
+                <Badge
+                  size="sm"
+                  radius="xl"
+                  variant="filled"
+                  style={{
+                    backgroundColor: '#2563EB',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                    fontSize: 11,
+                  }}
+                >
+                  {summary.total || (
+                    (summary.contacts || 0) +
+                    (summary.calls || 0) +
+                    (summary.qualifications || 0) +
+                    summary.meetings +
                     summary.proposals +
                     summary.negotiations +
                     summary.contracts +
                     summary.invoices +
                     summary.payments +
                     summary.progress +
-                    summary.closure}{' '}
+                    summary.closure
+                  )}{' '}
                   Total
                 </Badge>
               </Group>
 
-              <Stack gap={4}>
+              {/* Responsive 3-col micro-buttons with comfortable sizing */}
+              <Box
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: isTablet && !isMobile
+                    ? 'repeat(6, 1fr)'
+                    : 'repeat(3, 1fr)',
+                  gap: 8,
+                  width: '100%',
+                }}
+              >
                 {[
+                  {
+                    key: 'contact',
+                    label: 'Contacts',
+                    fullName: 'Contact Ingestion',
+                    count: summary.contacts || 0,
+                    icon: <IconUserPlus size={14} stroke={2.2} />,
+                    iconBg: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ECFDF5',
+                    iconColor: isDark ? '#34D399' : '#059669',
+                  },
+                  {
+                    key: 'call',
+                    label: 'Call Logs',
+                    fullName: 'Discovery & Client Calls',
+                    count: summary.calls || 0,
+                    icon: <IconPhone size={14} stroke={2.2} />,
+                    iconBg: isDark ? 'rgba(139, 92, 246, 0.2)' : '#F5F3FF',
+                    iconColor: isDark ? '#A78BFA' : '#7C3AED',
+                  },
+                  {
+                    key: 'qualification',
+                    label: 'Qualified',
+                    fullName: 'Lead Qualification Assessments',
+                    count: summary.qualifications || 0,
+                    icon: <IconCheck size={14} stroke={2.6} />,
+                    iconBg: isDark ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
+                    iconColor: isDark ? '#60A5FA' : '#2563EB',
+                  },
                   {
                     key: 'meeting',
                     label: 'Meetings',
-                    count: summary.meetings,
-                    icon: <IconCalendarEvent size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(20, 184, 166, 0.2)' : '#D1FAE5',
-                    iconColor: isDark ? '#2DD4BF' : '#059669',
+                    fullName: 'Scheduled & Completed Meetings',
+                    count: summary.meetings || 0,
+                    icon: <IconCalendarEvent size={14} stroke={2.2} />,
+                    iconBg: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ECFDF5',
+                    iconColor: isDark ? '#34D399' : '#059669',
                   },
                   {
                     key: 'proposal',
-                    label: 'Proposals / Quotations',
-                    count: summary.proposals,
-                    icon: <IconFileDescription size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(99, 102, 241, 0.2)' : '#EDE9FE',
-                    iconColor: isDark ? '#A5B4FC' : '#6366F1',
+                    label: 'Proposals',
+                    fullName: 'Proposals & Quotations',
+                    count: summary.proposals || 0,
+                    icon: <IconFileDescription size={14} stroke={2.2} />,
+                    iconBg: isDark ? 'rgba(139, 92, 246, 0.2)' : '#F5F3FF',
+                    iconColor: isDark ? '#A78BFA' : '#7C3AED',
                   },
                   {
                     key: 'negotiation',
                     label: 'Negotiations',
-                    count: summary.negotiations,
-                    icon: <IconScale size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(217, 119, 6, 0.2)' : '#FEF3C7',
-                    iconColor: isDark ? '#F59E0B' : '#D97706',
-                  },
-                  {
-                    key: 'contract',
-                    label: 'Contracts',
-                    count: summary.contracts,
-                    icon: <IconFileCheck size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(244, 63, 94, 0.2)' : '#FFE4E6',
-                    iconColor: isDark ? '#FB7185' : '#E11D48',
-                  },
-                  {
-                    key: 'invoice',
-                    label: 'Invoices',
-                    count: summary.invoices,
-                    icon: <IconReceiptTax size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7',
+                    fullName: 'Negotiations & Commercial Terms',
+                    count: summary.negotiations || 0,
+                    icon: <IconScale size={14} stroke={2.2} />,
+                    iconBg: isDark ? 'rgba(217, 119, 6, 0.2)' : '#FFFBEB',
                     iconColor: isDark ? '#FBBF24' : '#D97706',
                   },
-                  {
-                    key: 'payment',
-                    label: 'Payments',
-                    count: summary.payments,
-                    icon: <IconCreditCard size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7',
-                    iconColor: isDark ? '#34D399' : '#16A34A',
-                  },
-                  {
-                    key: 'progress',
-                    label: 'Progress / Handover',
-                    count: summary.progress,
-                    icon: <IconRocket size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(14, 165, 233, 0.2)' : '#E0F2FE',
-                    iconColor: isDark ? '#38BDF8' : '#0284C7',
-                  },
-                  {
-                    key: 'closure',
-                    label: 'Closure',
-                    count: summary.closure,
-                    icon: <IconFlag size={14} stroke={2} />,
-                    iconBg: isDark ? 'rgba(168, 85, 247, 0.2)' : '#F3E8FF',
-                    iconColor: isDark ? '#C084FC' : '#9333EA',
-                  },
-                ].map((cat) => {
-                  const isActive = activityType === cat.key;
+                ].map((item) => {
+                  const isActive = activityType === item.key;
                   return (
-                    <UnstyledButton
-                      key={cat.key}
-                      onClick={() => {
-                        setActivityType(cat.key === activityType ? 'all' : cat.key);
-                        setPage(1);
-                      }}
-                      style={{
-                        padding: '5px 8px',
-                        borderRadius: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        backgroundColor: isActive
-                          ? isDark
-                            ? 'rgba(99, 102, 241, 0.2)'
-                            : 'rgba(79, 70, 229, 0.08)'
-                          : 'transparent',
-                        transition: 'background-color 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = isDark
-                            ? 'rgba(255,255,255,0.04)'
-                            : '#F8FAFC';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                      }}
-                    >
-                      <Group gap={8} align="center">
-                        <Box
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: '50%',
-                            backgroundColor: cat.iconBg,
-                            color: cat.iconColor,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {cat.icon}
-                        </Box>
-                        <Text size="12px" fw={isActive ? 700 : 500}>
-                          {cat.label}
-                        </Text>
-                      </Group>
-                      <Text
-                        size="12.5px"
-                        fw={700}
+                    <Tooltip key={item.key} label={item.fullName} withArrow position="top" openDelay={400}>
+                      <UnstyledButton
+                        onClick={() => {
+                          setActivityType(item.key === activityType ? 'all' : item.key);
+                          setPage(1);
+                        }}
+                        p="9px 10px"
                         style={{
-                          color: isActive
-                            ? isDark
-                              ? '#A5B4FC'
-                              : '#4F46E5'
-                            : isDark
-                            ? '#E2E8F0'
-                            : '#1E293B',
+                          borderRadius: 12,
+                          backgroundColor: isActive
+                            ? isDark ? 'rgba(59, 130, 246, 0.18)' : '#EFF6FF'
+                            : isDark ? 'rgba(255, 255, 255, 0.03)' : '#F8FAFC',
+                          border: `1.5px solid ${
+                            isActive
+                              ? '#2563EB'
+                              : isDark ? 'rgba(255, 255, 255, 0.07)' : '#E2E8F0'
+                          }`,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: 72,
+                          width: '100%',
+                          boxSizing: 'border-box',
+                          cursor: 'pointer',
+                          transition: 'all 0.18s ease',
+                          boxShadow: isActive ? '0 2px 8px rgba(37, 99, 235, 0.12)' : 'none',
                         }}
                       >
-                        {cat.count}
-                      </Text>
-                    </UnstyledButton>
+                        <Group justify="space-between" align="center" wrap="nowrap" style={{ width: '100%' }}>
+                          <Box
+                            style={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: 8,
+                              backgroundColor: item.iconBg,
+                              color: item.iconColor,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {item.icon}
+                          </Box>
+                          <Text
+                            size="18px"
+                            fw={800}
+                            style={{
+                              color: isActive ? '#2563EB' : isDark ? '#FFFFFF' : '#0F172A',
+                              lineHeight: 1,
+                              fontFeatureSettings: '"tnum"',
+                            }}
+                          >
+                            {item.count}
+                          </Text>
+                        </Group>
+
+                        <Text
+                          size="11.5px"
+                          c={isActive ? (isDark ? '#60A5FA' : '#2563EB') : 'dimmed'}
+                          fw={600}
+                          mt={6}
+                          style={{
+                            lineHeight: 1.2,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {item.label}
+                        </Text>
+                      </UnstyledButton>
+                    </Tooltip>
                   );
                 })}
-              </Stack>
+              </Box>
             </Paper>
 
           </Stack>
         </Box>
 
         {/* -----------------------------------------------------------------
-            RIGHT COLUMN: TOUCHPOINTS / ACTIVITY TIMELINE
+            RIGHT COLUMN: ACTIVITY PIPELINE
             ----------------------------------------------------------------- */}
         <Box
           style={{
             flex: 1,
             minWidth: 0,
-            height: '100%',
-            minHeight: 0,
+            height: isTablet ? 'auto' : '100%',
+            minHeight: isTablet ? 550 : 0,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden',
+            overflow: isTablet ? 'visible' : 'hidden',
           }}
         >
           <Paper
-            p="md"
-            radius="xl"
+            p={isMobile ? 'xs' : 'md'}
+            radius={isMobile ? 'lg' : 'xl'}
             withBorder
             style={{
               height: '100%',
-              maxHeight: '100%',
+              maxHeight: isTablet ? 'none' : '100%',
               flex: 1,
-              minHeight: 0,
+              minHeight: isTablet ? 550 : 0,
               display: 'flex',
               flexDirection: 'column',
               backgroundColor: isDark ? 'var(--mantine-color-dark-8)' : '#F8FAFC',
@@ -1654,41 +1891,177 @@ export const ActivityTimelinePage: React.FC = () => {
               overflow: 'hidden',
             }}
           >
-            {/* Top Navigation / Tab Header (Touchpoints | Activity timeline) - PINNED */}
+            {/* Top Navigation / Header (Activity Pipeline) */}
             <Group
               justify="space-between"
               align="center"
               pb="xs"
               mb="xs"
+              wrap="nowrap"
+              gap="xs"
               style={{
                 flexShrink: 0,
                 borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
               }}
             >
-              <Group gap="md" align="center">
-                <Text fw={700} size="16px" style={{ letterSpacing: '-0.01em', color: isDark ? '#FFFFFF' : '#0F172A' }}>
-                  Touchpoints
-                </Text>
-                <Text fw={500} size="14px" c="dimmed">
-                  Activity timeline
-                </Text>
-                <Badge size="xs" variant="light" color="gray">
-                  {sortedActivities.length} activities
-                </Badge>
+              <Group gap="sm" align="center" wrap="nowrap">
+                <Box
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: '#2563EB',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: '0 2px 8px rgba(37, 99, 235, 0.2)',
+                  }}
+                >
+                  <IconUserCheck size={19} stroke={2.2} />
+                </Box>
+                <Group gap="xs" align="center">
+                  <Text fw={700} size="16px" style={{ letterSpacing: '-0.01em', color: isDark ? '#FFFFFF' : '#0F172A', lineHeight: 1.2 }}>
+                    Activity Pipeline
+                  </Text>
+                  {isStageFilterActive && (
+                    <Badge
+                      size="xs"
+                      variant="light"
+                      color="blue"
+                      radius="xl"
+                      style={{ cursor: 'pointer', textTransform: 'capitalize' }}
+                      onClick={() => setIsStageFilterActive(false)}
+                      rightSection={<IconX size={11} />}
+                    >
+                      {activeRibbonStage}
+                    </Badge>
+                  )}
+                </Group>
               </Group>
 
               {/* Toggle: Newest First vs Oldest First */}
               <SegmentedControl
                 size="xs"
-                radius="md"
+                radius="xl"
                 value={sortOrder}
                 onChange={(val) => setSortOrder(val as 'newest' | 'oldest')}
                 data={[
                   { label: 'Newest First', value: 'newest' },
                   { label: 'Oldest First', value: 'oldest' },
                 ]}
+                styles={{
+                  root: {
+                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.05)' : '#EFF6FF',
+                    padding: 3,
+                  },
+                  indicator: {
+                    backgroundColor: '#2563EB',
+                  },
+                  label: {
+                    fontWeight: 600,
+                    fontSize: 12,
+                  },
+                }}
               />
             </Group>
+
+            {/* Clean, Neat Pipeline Stages Stepper Bar */}
+            <Box
+              pb="xs"
+              mb="sm"
+              style={{
+                flexShrink: 0,
+                borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
+                width: '100%',
+              }}
+            >
+              <Group gap={6} wrap="nowrap" style={{ width: '100%' }}>
+                {[
+                  { id: 'discovery', label: 'Discovery', count: ribbonStageCounts.discovery },
+                  { id: 'qualification', label: 'Qualification', count: ribbonStageCounts.qualification },
+                  { id: 'engagement', label: 'Engagement', count: ribbonStageCounts.engagement },
+                  { id: 'proposal', label: 'Proposal', count: ribbonStageCounts.proposal },
+                  { id: 'negotiation', label: 'Negotiation', count: ribbonStageCounts.negotiation },
+                ].map((stg) => {
+                  const isActive = isStageFilterActive && activeRibbonStage === stg.id;
+                  const hasActivities = stg.count > 0;
+
+                  return (
+                    <UnstyledButton
+                      key={stg.id}
+                      onClick={() => {
+                        if (activeRibbonStage === stg.id && isStageFilterActive) {
+                          setIsStageFilterActive(false);
+                        } else {
+                          setActiveRibbonStage(stg.id);
+                          setIsStageFilterActive(true);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        padding: '8px 10px',
+                        borderRadius: 10,
+                        backgroundColor: isActive
+                          ? '#2563EB'
+                          : isDark
+                          ? hasActivities ? 'rgba(59, 130, 246, 0.12)' : 'rgba(255, 255, 255, 0.03)'
+                          : hasActivities ? '#EFF6FF' : '#F8FAFC',
+                        color: isActive
+                          ? '#FFFFFF'
+                          : isDark
+                          ? hasActivities ? '#93C5FD' : '#94A3B8'
+                          : hasActivities ? '#1D4ED8' : '#64748B',
+                        border: `1px solid ${
+                          isActive
+                            ? '#2563EB'
+                            : isDark
+                            ? hasActivities ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.06)'
+                            : hasActivities ? '#BFDBFE' : '#E2E8F0'
+                        }`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <Text
+                        fw={isActive || hasActivities ? 700 : 600}
+                        size="13px"
+                        style={{
+                          whiteSpace: 'nowrap',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {stg.label}
+                      </Text>
+
+                      {hasActivities && (
+                        <Box
+                          style={{
+                            padding: '2px 7px',
+                            borderRadius: 10,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                            backgroundColor: isActive
+                              ? 'rgba(255, 255, 255, 0.28)'
+                              : '#2563EB',
+                            color: '#FFFFFF',
+                          }}
+                        >
+                          {stg.count}
+                        </Box>
+                      )}
+                    </UnstyledButton>
+                  );
+                })}
+              </Group>
+            </Box>
 
             {/* Timeline Scrollable Container - SCROLLS INTERNALLY INSIDE THIS CARD */}
             <Box
@@ -1713,7 +2086,7 @@ export const ActivityTimelinePage: React.FC = () => {
                     position: 'absolute',
                     top: 14,
                     bottom: 24,
-                    left: 44,
+                    left: isMobile ? 22 : 44,
                     width: 2,
                     backgroundColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#CBD5E1',
                     zIndex: 1,
@@ -1722,44 +2095,31 @@ export const ActivityTimelinePage: React.FC = () => {
 
               {/* Loading State */}
               {loading ? (
-                <Stack gap="lg" py="xl" style={{ width: '100%', minWidth: 0 }}>
+                <Stack gap="md" py="xl" style={{ width: '100%', minWidth: 0 }}>
                   {[1, 2, 3].map((i) => (
                     <Box key={i} style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', width: '100%', minWidth: 0 }}>
                       <Box
                         style={{
                           position: 'absolute',
-                          left: 44,
+                          left: isMobile ? 22 : 44,
                           transform: 'translateX(-50%)',
-                          width: 14,
-                          height: 14,
+                          width: 11,
+                          height: 11,
                           borderRadius: '50%',
                           backgroundColor: isDark ? 'var(--mantine-color-dark-6)' : '#CBD5E1',
                         }}
                       />
-                      <Box
-                        style={{
-                          position: 'absolute',
-                          left: 44,
-                          width: 32,
-                          height: 2.5,
-                          backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
-                          zIndex: 1,
-                        }}
-                      />
                       <Paper
-                        px="lg"
-                        py="md"
-                        radius="xl"
+                        px={isMobile ? 'sm' : 'md'}
+                        py="xs"
+                        radius="lg"
                         withBorder
                         style={{
-                          marginLeft: 76,
-                          width: 'calc(100% - 88px)',
-                          maxWidth: 'calc(100% - 88px)',
+                          marginLeft: isMobile ? 40 : 68,
+                          width: isMobile ? 'calc(100% - 46px)' : 'calc(100% - 76px)',
+                          maxWidth: isMobile ? 'calc(100% - 46px)' : 'calc(100% - 76px)',
                           minWidth: 0,
-                          height: 86,
-                          minHeight: 86,
-                          maxHeight: 86,
-                          boxSizing: 'border-box',
+                          minHeight: 72,
                           display: 'flex',
                           alignItems: 'center',
                           backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
@@ -1767,262 +2127,232 @@ export const ActivityTimelinePage: React.FC = () => {
                         }}
                       >
                         <Center style={{ width: '100%' }}>
-                          <Loader size="sm" color="oneassist" />
+                          <Loader size="xs" color="oneassist" />
                         </Center>
                       </Paper>
                     </Box>
                   ))}
                 </Stack>
-              ) : sortedActivities.length === 0 ? (
+              ) : displayedActivities.length === 0 ? (
                 /* Empty State */
-                <Paper
-                  p="xl"
-                  radius="lg"
-                  withBorder
-                  style={{
-                    textAlign: 'center',
-                    background: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
-                    borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
-                    margin: '20px 0',
-                  }}
-                >
-                  <ThemeIcon size={56} radius="xl" color="gray" variant="light" style={{ margin: '0 auto 12px' }}>
-                    <IconClock size={32} />
-                  </ThemeIcon>
-                  <Text fw={700} size="md">
-                    No Activities Recorded For This Lead Yet
-                  </Text>
-                  <Text size="sm" c="dimmed" mt={4} mb="md" maw={420} mx="auto">
-                    There are no activities matching your filter criteria for {selectedLead.name}.
-                  </Text>
-                  <Button size="xs" variant="default" radius="md" onClick={handleResetTimelineFilters}>
-                    Clear Filters
-                  </Button>
-                </Paper>
+                <Center style={{ minHeight: 280, width: '100%', minWidth: 0 }}>
+                  <Stack align="center" gap="xs">
+                    <Box
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#94A3B8',
+                      }}
+                    >
+                      <IconCalendarEvent size={24} stroke={1.8} />
+                    </Box>
+                    <Text fw={600} size="15px" style={{ color: isDark ? '#FFFFFF' : '#0F172A' }}>
+                      No activities found
+                    </Text>
+                    <Text size="12.5px" c="dimmed">
+                      {isStageFilterActive
+                        ? 'No activities recorded in this stage yet. Click again to view all.'
+                        : 'No activities recorded in this lead yet.'}
+                    </Text>
+                    {isStageFilterActive && (
+                      <Button
+                        variant="light"
+                        size="xs"
+                        radius="md"
+                        mt="xs"
+                        onClick={() => setIsStageFilterActive(false)}
+                      >
+                        View All Activities
+                      </Button>
+                    )}
+                  </Stack>
+                </Center>
               ) : (
-                /* Date-Grouped Timeline Entries (Matching Reference) */
-                <Box style={{ width: '100%', minWidth: 0 }}>
-                  {groupedActivities.map((group, groupIdx) => (
-                    <Box key={`${group.dateKey}-${groupIdx}`} mb={18} style={{ width: '100%', minWidth: 0 }}>
-                      {/* Date Capsule Pill (Centered on the Left Vertical Track) */}
+                /* Activities Stream List */
+                <Stack gap={12} style={{ width: '100%', minWidth: 0, paddingTop: 4 }}>
+                  {displayedActivities.map((item, itemIdx) => {
+                    const isGlobalFirst = itemIdx === 0;
+                    const style = getActivityStyle(item.type);
+                    const statusCfg = getActivityStatusConfig(item.status || style.label, isGlobalFirst);
+
+                    return (
                       <Box
+                        key={item.id ? `${item.id}-${itemIdx}` : `item-${itemIdx}`}
                         style={{
                           position: 'relative',
                           zIndex: 2,
                           display: 'flex',
                           alignItems: 'center',
-                          margin: groupIdx === 0 ? '4px 0 14px' : '20px 0 14px',
+                          width: '100%',
+                          minWidth: 0,
                         }}
                       >
+                        {/* Node Bullet Dot on the Vertical Line */}
                         <Box
                           style={{
                             position: 'absolute',
-                            left: 44,
+                            left: isMobile ? 22 : 44,
                             transform: 'translateX(-50%)',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '3px 14px',
-                            borderRadius: 20,
-                            backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
-                            border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.12)' : '#E2E8F0'}`,
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                            fontSize: 11.5,
-                            fontWeight: 600,
-                            color: isDark ? '#E2E8F0' : '#475569',
-                            whiteSpace: 'nowrap',
+                            width: 11,
+                            height: 11,
+                            borderRadius: '50%',
+                            backgroundColor: '#2563EB',
+                            border: `2.5px solid ${isDark ? 'var(--mantine-color-dark-8)' : '#FFFFFF'}`,
+                            boxShadow: '0 0 0 2px rgba(37, 99, 235, 0.2)',
                             zIndex: 3,
+                            flexShrink: 0,
+                          }}
+                        />
+
+                        {/* Horizontal Branch Connector Line */}
+                        <Box
+                          style={{
+                            position: 'absolute',
+                            left: isMobile ? 22 : 44,
+                            width: isMobile ? 18 : 24,
+                            height: 2,
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#CBD5E1',
+                            zIndex: 1,
+                          }}
+                        />
+
+                        {/* Activity Card */}
+                        <Paper
+                          px={isMobile ? 'sm' : 'md'}
+                          py="xs"
+                          radius="lg"
+                          withBorder
+                          style={{
+                            marginLeft: isMobile ? 40 : 68,
+                            width: isMobile ? 'calc(100% - 46px)' : 'calc(100% - 76px)',
+                            maxWidth: isMobile ? 'calc(100% - 46px)' : 'calc(100% - 76px)',
+                            minWidth: 0,
+                            minHeight: isMobile ? 64 : 72,
+                            boxSizing: 'border-box',
+                            display: 'flex',
+                            alignItems: 'center',
+                            backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
+                            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+                            boxShadow: '0 1px 4px rgba(0, 0, 0, 0.02)',
+                            transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.boxShadow = isDark
+                              ? '0 6px 18px rgba(0, 0, 0, 0.35)'
+                              : '0 6px 16px rgba(0, 0, 0, 0.06)';
+                            e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1';
+                            e.currentTarget.style.transform = 'translateY(-1px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.02)';
+                            e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0';
+                            e.currentTarget.style.transform = 'none';
                           }}
                         >
-                          {group.dateLabel}
-                        </Box>
-                        {/* Vertical spacer so card below does not overlap pill */}
-                        <Box style={{ height: 22 }} />
-                      </Box>
-
-                      {/* Activities for this date */}
-                      <Stack gap={16} style={{ width: '100%', minWidth: 0 }}>
-                        {group.items.map((item, itemIdx) => {
-                          const isGlobalFirst = groupIdx === 0 && itemIdx === 0;
-                          const style = getActivityStyle(item.type);
-                          const statusCfg = getActivityStatusConfig(item.status || style.label, isGlobalFirst);
-
-                          return (
-                            <Box
-                              key={item.id ? `${item.id}-${itemIdx}` : `item-${groupIdx}-${itemIdx}`}
-                              style={{
-                                position: 'relative',
-                                zIndex: 2,
-                                display: 'flex',
-                                alignItems: 'center',
-                                width: '100%',
-                                minWidth: 0,
-                              }}
-                            >
-                              {/* Node Bullet Dot on the Vertical Line */}
+                          <Group
+                            justify="space-between"
+                            align={isMobile ? 'flex-start' : 'center'}
+                            wrap={isMobile ? 'wrap' : 'nowrap'}
+                            gap={isMobile ? 'xs' : 'md'}
+                            style={{ width: '100%', minWidth: 0 }}
+                          >
+                            {/* Left: Avatar/Icon Circle + Titles */}
+                            <Group gap={isMobile ? 'xs' : 'md'} align="center" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                              {/* Circle Icon Avatar */}
                               <Box
                                 style={{
-                                  position: 'absolute',
-                                  left: 44,
-                                  transform: 'translateX(-50%)',
-                                  width: 15,
-                                  height: 15,
+                                  width: isMobile ? 36 : 44,
+                                  height: isMobile ? 36 : 44,
                                   borderRadius: '50%',
-                                  backgroundColor: isGlobalFirst ? '#FF5722' : isDark ? '#64748B' : '#CBD5E1',
-                                  border: `2.5px solid ${isDark ? 'var(--mantine-color-dark-8)' : '#FFFFFF'}`,
-                                  boxShadow: isGlobalFirst ? '0 0 0 3px rgba(255, 87, 34, 0.22)' : 'none',
-                                  zIndex: 3,
-                                  flexShrink: 0,
-                                }}
-                              />
-
-                              {/* Horizontal Branch Connector Line */}
-                              <Box
-                                style={{
-                                  position: 'absolute',
-                                  left: 44,
-                                  width: 32,
-                                  height: 2.5,
-                                  backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
-                                  zIndex: 1,
-                                }}
-                              />
-
-                              {/* Activity Card */}
-                              <Paper
-                                px="lg"
-                                py="md"
-                                radius="xl"
-                                withBorder
-                                style={{
-                                  marginLeft: 76,
-                                  width: 'calc(100% - 88px)',
-                                  maxWidth: 'calc(100% - 88px)',
-                                  minWidth: 0,
-                                  minHeight: 86,
-                                  boxSizing: 'border-box',
+                                  backgroundColor: style.iconBg,
+                                  color: style.iconColor,
                                   display: 'flex',
                                   alignItems: 'center',
-                                  backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
-                                  borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
-                                  transition: 'transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.boxShadow = isDark
-                                    ? '0 6px 20px rgba(0, 0, 0, 0.35)'
-                                    : '0 6px 18px rgba(0, 0, 0, 0.06)';
-                                  e.currentTarget.style.borderColor = isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1';
-                                  e.currentTarget.style.transform = 'translateY(-1px)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.02)';
-                                  e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0';
-                                  e.currentTarget.style.transform = 'none';
+                                  justifyContent: 'center',
+                                  flexShrink: 0,
                                 }}
                               >
-                                <Group justify="space-between" align="center" wrap="nowrap" gap="md" style={{ width: '100%', minWidth: 0 }}>
-                                  {/* Left: Avatar/Icon Circle + Titles */}
-                                  <Group gap="md" align="center" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
-                                    {/* Circle Icon Avatar (50px) */}
-                                    <Box
-                                      style={{
-                                        width: 50,
-                                        height: 50,
-                                        borderRadius: '50%',
-                                        backgroundColor: style.iconBg,
-                                        color: style.iconColor,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {style.icon}
-                                    </Box>
+                                {style.icon}
+                              </Box>
 
-                                    {/* Titles & Details */}
-                                    <Box style={{ minWidth: 0, flex: 1 }}>
-                                      <Group gap="xs" align="center" wrap="wrap" style={{ minWidth: 0 }}>
-                                        <Text
-                                          fw={700}
-                                          size="15px"
-                                          style={{
-                                            letterSpacing: '-0.01em',
-                                            lineHeight: 1.35,
-                                            minWidth: 0,
-                                            wordBreak: 'break-word',
-                                          }}
-                                        >
-                                          {item.title}
-                                        </Text>
-                                        {item.activityTime && (
-                                          <Text size="12.5px" c="dimmed" fw={500} style={{ flexShrink: 0 }}>
-                                            {item.activityTime}
-                                          </Text>
-                                        )}
-                                      </Group>
+                              {/* Titles & Details */}
+                              <Box style={{ minWidth: 0, flex: 1 }}>
+                                <Text
+                                  fw={700}
+                                  size={isMobile ? '13.5px' : '14.5px'}
+                                  style={{
+                                    color: isDark ? '#FFFFFF' : '#0F172A',
+                                    letterSpacing: '-0.01em',
+                                    lineHeight: 1.3,
+                                    wordBreak: 'break-word',
+                                  }}
+                                >
+                                  {item.title}
+                                </Text>
+                                <Text
+                                  size={isMobile ? '11.5px' : '12.5px'}
+                                  c="dimmed"
+                                  mt={2}
+                                  style={{
+                                    lineHeight: 1.4,
+                                    wordBreak: 'break-word',
+                                    whiteSpace: 'pre-line',
+                                  }}
+                                >
+                                  {cleanActivityDescription(item.description, item.status)}
+                                </Text>
+                              </Box>
+                            </Group>
 
-                                      <Text
-                                        size="13px"
-                                        c="dimmed"
-                                        mt={4}
-                                        style={{
-                                          lineHeight: 1.45,
-                                          minWidth: 0,
-                                          wordBreak: 'break-word',
-                                          whiteSpace: 'pre-line',
-                                        }}
-                                      >
-                                        {item.description || ''}
-                                        {item.description && (item.customerName || item.performedBy) ? ' • ' : ''}
-                                        {item.customerName ? `Client: ${item.customerName}` : ''}
-                                        {item.performedBy ? ` (By ${item.performedBy})` : ''}
-                                      </Text>
-                                    </Box>
-                                  </Group>
-
-                                  {/* Right: Activity Status Pill Badge */}
-                                  <Badge
-                                    size="lg"
-                                    radius="xl"
-                                    variant="outline"
-                                    style={{
-                                      borderColor: statusCfg.border,
-                                      color: statusCfg.color,
-                                      backgroundColor: statusCfg.bg,
-                                      fontWeight: 600,
-                                      fontSize: 13,
-                                      textTransform: 'none',
-                                      padding: '0 16px',
-                                      height: 34,
-                                      flexShrink: 0,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      transition: 'all 0.2s ease',
-                                    }}
-                                    leftSection={
-                                      <Box
-                                        style={{
-                                          width: 7,
-                                          height: 7,
-                                          borderRadius: '50%',
-                                          backgroundColor: statusCfg.dotColor,
-                                        }}
-                                      />
-                                    }
-                                  >
-                                    {statusCfg.label}
-                                  </Badge>
-                                </Group>
-                              </Paper>
-                            </Box>
-                          );
-                        })}
-                      </Stack>
-                    </Box>
-                  ))}
-                </Box>
+                            {/* Right: Clock Icon + Time & Status Pill Badge */}
+                            <Group
+                              gap={isMobile ? 'xs' : 'md'}
+                              align="center"
+                              wrap="nowrap"
+                              justify={isMobile ? 'space-between' : 'flex-end'}
+                              style={{
+                                flexShrink: 0,
+                                width: isMobile ? '100%' : 'auto',
+                                marginTop: isMobile ? 2 : 0,
+                                paddingLeft: isMobile ? 44 : 0,
+                              }}
+                            >
+                              <Group gap={5} align="center">
+                                <IconClock size={13} stroke={1.8} color="#94A3B8" />
+                                <Text size={isMobile ? '11.5px' : '12.5px'} fw={500} c="dimmed">
+                                  {item.activityTime || '09:00 AM'}
+                                </Text>
+                              </Group>
+                              <Box
+                                style={{
+                                  padding: isMobile ? '3px 10px' : '4px 14px',
+                                  borderRadius: 20,
+                                  backgroundColor: statusCfg.bg,
+                                  color: statusCfg.color,
+                                  border: `1px solid ${statusCfg.border}`,
+                                  fontSize: isMobile ? 11.5 : 12.5,
+                                  fontWeight: 600,
+                                  lineHeight: 1.3,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {statusCfg.label}
+                              </Box>
+                            </Group>
+                          </Group>
+                        </Paper>
+                      </Box>
+                    );
+                  })}
+                </Stack>
               )}
               </Box>
             </Box>

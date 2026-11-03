@@ -887,9 +887,9 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
       radius="16px"
       style={{
         background: isDark ? '#111827' : '#FFFFFF',
-        border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+        border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
         overflow: 'hidden',
-        boxShadow: isDark ? '0 10px 30px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(0, 0, 0, 0.05)',
+        boxShadow: isDark ? '0 10px 30px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(0, 112, 243, 0.04)',
         marginTop: 16,
         width: '100%',
       }}

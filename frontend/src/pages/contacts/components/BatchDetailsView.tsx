@@ -233,7 +233,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
         mb="md"
         style={{
           backgroundColor: isDark ? '#111827' : '#FFFFFF',
-          border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
           boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0,0,0,0.03)',
         }}
       >
@@ -365,7 +365,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
             radius="16px"
             style={{
               backgroundColor: isDark ? '#111827' : '#FFFFFF',
-              border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
               boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 8px rgba(0,0,0,0.03)',
             }}
           >

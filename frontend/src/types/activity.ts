@@ -1,5 +1,7 @@
 export type ActivityType =
   | 'all'
+  | 'contact'
+  | 'call'
   | 'qualification'
   | 'meeting'
   | 'proposal'
@@ -40,6 +42,8 @@ export interface ActivityItem {
 
 export interface ActivitySummary {
   qualifications?: number;
+  contacts?: number;
+  calls?: number;
   meetings: number;
   proposals: number;
   contracts: number;

@@ -135,8 +135,8 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
           width: '100%',
           maxWidth: 480,
           background: '#FFFFFF',
-          border: 'none',
-          boxShadow: '0 24px 60px -12px rgba(0, 0, 0, 0.48), 0 0 50px rgba(0, 180, 255, 0.14)',
+          border: '1px solid rgba(226, 232, 240, 0.85)',
+          boxShadow: '0 20px 50px -10px rgba(0, 102, 255, 0.08), 0 10px 30px -5px rgba(15, 23, 42, 0.04), 0 0 1px rgba(0, 0, 0, 0.08)',
           padding: '36px 32px 28px',
           position: 'relative',
           transition: 'all 0.3s ease',
@@ -144,38 +144,26 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
       >
         {/* Brand Header */}
         <Box mb={24} style={{ textAlign: 'center' }}>
-          <Box
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 14,
-              background: 'linear-gradient(135deg, #00D2FF 0%, #2563EB 100%)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 18px rgba(0, 210, 255, 0.45)',
-              color: '#FFFFFF',
-              marginBottom: 12,
-            }}
-          >
-            <Text fw={900} size="22px" c="#FFFFFF" style={{ letterSpacing: '-0.04em', fontFamily: 'system-ui' }}>
-              a
-            </Text>
-          </Box>
           <Text
             fw={800}
-            size="24px"
+            size="26px"
             style={{
-              color: '#111827',
+              color: '#0F172A',
               letterSpacing: '-0.025em',
               lineHeight: 1.2,
             }}
           >
             Create Super Admin Account
           </Text>
-          <Text size="13px" mt={4} style={{ color: '#6B7280' }}>
-            Get started with your enterprise CRM workspace.
-          </Text>
+          <Box
+            style={{
+              width: 44,
+              height: 3.5,
+              borderRadius: 3,
+              background: 'linear-gradient(90deg, #00C6FF 0%, #0070F3 100%)',
+              margin: '8px auto 0',
+            }}
+          />
         </Box>
 
         {/* Error Alert Banner */}
@@ -363,16 +351,16 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
               type="submit"
               loading={loading}
               size="md"
-              radius="12px"
+              radius="14px"
               mt={8}
               rightSection={<IconArrowRight size={16} />}
               style={{
-                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
+                background: 'linear-gradient(90deg, #0055FF 0%, #0080FF 100%)',
                 color: '#FFFFFF',
                 fontWeight: 700,
                 fontSize: 15,
-                height: 44,
-                boxShadow: 'var(--crm-btn-shadow, 0 4px 14px rgba(37, 99, 235, 0.22))',
+                height: 48,
+                boxShadow: '0 10px 25px rgba(0, 85, 255, 0.38)',
                 transition: 'all 0.2s ease',
               }}
             >
@@ -382,13 +370,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
         </form>
 
         {/* Card Footer Switch to Login */}
-        <Box mt={22} pt={14} style={{ borderTop: '1px solid #F3F4F6', textAlign: 'center' }}>
-          <Text size="xs" style={{ color: '#6B7280' }}>
+        <Box mt={22} pt={14} style={{ borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>
+          <Text size="13px" style={{ color: '#64748B' }}>
             Already have an account?{' '}
             <Anchor
-              size="xs"
+              size="13px"
               fw={700}
-              style={{ color: '#1D4ED8', cursor: 'pointer' }}
+              style={{ color: '#0066FF', cursor: 'pointer' }}
               onClick={handleGoToLogin}
             >
               Login →

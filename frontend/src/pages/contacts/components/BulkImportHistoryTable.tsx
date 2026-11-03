@@ -139,18 +139,20 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
   return (
     <Box>
       <Paper
-        radius="lg"
+        radius="16px"
         style={{
           backgroundColor: isDark ? '#111827' : '#FFFFFF',
-          border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
-          boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 1px 3px rgba(0,0,0,0.03)',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+          boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 4px 20px rgba(0, 112, 243, 0.04)',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <Box style={{ overflowX: 'auto', width: '100%' }}>
+        <Box style={{ overflowX: 'auto', width: '100%', minHeight: 160 }}>
           <Table
-            verticalSpacing="xs"
-            horizontalSpacing="sm"
+            verticalSpacing="sm"
+            horizontalSpacing="md"
             highlightOnHover
             style={{
               minWidth: 750,
@@ -161,10 +163,10 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
             <Table.Thead
               style={{
                 background: isDark ? '#0F172A' : '#F8FAFC',
-                borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #F1F5F9',
+                borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
               }}
             >
-              <Table.Tr>
+              <Table.Tr style={{ height: 44 }}>
                 <Table.Th
                   style={{
                     color: isDark ? '#94A3B8' : '#64748B',
@@ -589,81 +591,79 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
             </Table.Tbody>
           </Table>
         </Box>
-      </Paper>
 
-      {/* Pagination Footer */}
-      <Paper
-        mt="md"
-        p="sm"
-        radius="lg"
-        style={{
-          backgroundColor: isDark ? '#111827' : '#FFFFFF',
-          border: isDark ? '2px solid rgba(255, 255, 255, 0.16)' : '2px solid #CBD5E1',
-        }}
-      >
-        <Group justify="space-between" align="center" wrap="wrap">
-          <Text size="13px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-            Showing {startRecord} to {endRecord} of {totalRecords} import batches
-          </Text>
-
-          <Group gap={6} align="center">
-            {/* Previous */}
-            <Button
-              variant="default"
-              size="xs"
-              radius="md"
-              disabled={pagination.page <= 1}
-              onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
-              leftSection={<IconChevronLeft size={13} />}
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              Previous
-            </Button>
-
-            {/* Page number pill */}
-            <Box
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 28,
-                height: 28,
-                padding: '0 6px',
-                borderRadius: 6,
-                border: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid #CBD5E1',
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                color: isDark ? '#F8FAFC' : '#0F172A',
-                fontWeight: 600,
-                fontSize: 12,
-              }}
-            >
-              {pagination.page}
-            </Box>
-
-            <Text size="12px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-              of {pagination.totalPages || 1}
+        {/* Integrated Pagination Footer docked at the bottom of the Card */}
+        <Box
+          p="sm"
+          style={{
+            borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #F1F5F9',
+            backgroundColor: isDark ? '#0F172A' : '#FAFCFF',
+          }}
+        >
+          <Group justify="space-between" align="center" wrap="wrap">
+            <Text size="13px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+              Showing {startRecord} to {endRecord} of {totalRecords} import batches
             </Text>
 
-            {/* Next */}
-            <Button
-              variant="default"
-              size="xs"
-              radius="md"
-              disabled={pagination.page >= (pagination.totalPages || 1)}
-              onClick={() => onPageChange(pagination.page + 1)}
-              rightSection={<IconChevronRight size={13} />}
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-              }}
-            >
-              Next
-            </Button>
+            <Group gap={6} align="center">
+              {/* Previous */}
+              <Button
+                variant="default"
+                size="xs"
+                radius="md"
+                disabled={pagination.page <= 1}
+                onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
+                leftSection={<IconChevronLeft size={13} />}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                Previous
+              </Button>
+
+              {/* Page number pill */}
+              <Box
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minWidth: 28,
+                  height: 28,
+                  padding: '0 6px',
+                  borderRadius: 6,
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid #CBD5E1',
+                  backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                  color: isDark ? '#F8FAFC' : '#0F172A',
+                  fontWeight: 600,
+                  fontSize: 12,
+                }}
+              >
+                {pagination.page}
+              </Box>
+
+              <Text size="12px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
+                of {pagination.totalPages || 1}
+              </Text>
+
+              {/* Next */}
+              <Button
+                variant="default"
+                size="xs"
+                radius="md"
+                disabled={pagination.page >= (pagination.totalPages || 1)}
+                onClick={() => onPageChange(pagination.page + 1)}
+                rightSection={<IconChevronRight size={13} />}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                }}
+              >
+                Next
+              </Button>
+            </Group>
           </Group>
-        </Group>
+        </Box>
       </Paper>
     </Box>
   );
