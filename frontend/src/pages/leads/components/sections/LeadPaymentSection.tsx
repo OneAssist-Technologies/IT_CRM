@@ -14,30 +14,32 @@ import {
   TextInput,
   NumberInput,
   Select,
-  ActionIcon,
-  Tooltip,
   Center,
   Loader,
   Divider,
+  ActionIcon,
 } from '@mantine/core';
 import {
   IconCreditCard,
   IconPlus,
-  IconCheck,
-  IconDownload,
   IconArrowRight,
   IconBuildingBank,
   IconQrcode,
   IconReceipt,
-  IconRefresh,
   IconCash,
-  IconFileInvoice,
   IconPrinter,
+  IconUser,
+  IconMail,
+  IconPhone,
+  IconFileText,
+  IconX,
+  IconNotes,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { Lead, LeadPaymentRecord, LeadInvoiceItem } from '../../../../types/lead';
+import { Lead, LeadPaymentRecord, LeadInvoiceItem, Contract } from '../../../../types/lead';
 import { Invoice, Payment } from '../../../../types/billing';
 import { billingService } from '../../../../services/billingService';
+import { leadService } from '../../../../services/leadService';
 import dayjs from 'dayjs';
 
 export interface LeadPaymentSectionProps {
@@ -45,6 +47,7 @@ export interface LeadPaymentSectionProps {
   isDark: boolean;
   payments?: LeadPaymentRecord[];
   invoices?: LeadInvoiceItem[];
+  contract?: any;
   onUpdatePayments?: (payments: LeadPaymentRecord[]) => void;
   onNavigateSection?: (section: any) => void;
 }
@@ -54,6 +57,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
   isDark,
   payments: initialPayments = [],
   invoices: initialInvoices = [],
+  contract: initialContract,
   onUpdatePayments,
   onNavigateSection,
 }) => {
@@ -62,6 +66,9 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [backendPayments, setBackendPayments] = useState<Payment[]>([]);
   const [backendInvoices, setBackendInvoices] = useState<Invoice[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+
+
 
   // Modal State
   const [modalOpened, setModalOpened] = useState<boolean>(false);
@@ -77,12 +84,13 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Fetch real invoices & payments from backend
+  // Fetch real invoices, payments, & contracts from backend
   const fetchBillingData = useCallback(async () => {
     try {
-      const [paymentsRes, invoicesRes] = await Promise.all([
+      const [paymentsRes, invoicesRes, contractsRes] = await Promise.all([
         billingService.getPayments().catch(() => []),
         billingService.getInvoices().catch(() => []),
+        leadService.getContracts({ leadId: lead?.id || undefined, limit: 100 }).catch(() => ({ data: [] })),
       ]);
 
       const leadNameLower = (lead.name || '').trim().toLowerCase();
@@ -113,8 +121,14 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
       const matchingInvoiceIds = new Set(matchingInvoices.map((inv) => inv.id));
       const matchingInvoiceNums = new Set(matchingInvoices.map((inv) => (inv.invoiceNumber || '').toLowerCase()));
 
+      const paymentList: Payment[] = Array.isArray(paymentsRes)
+        ? paymentsRes
+        : Array.isArray((paymentsRes as any)?.data)
+        ? (paymentsRes as any).data
+        : [];
+
       // Filter payments belonging to this lead or allocated to its invoices
-      const matchingPayments = (paymentsRes || []).filter((p) => {
+      const matchingPayments = paymentList.filter((p) => {
         if (p.contactId && (p.contactId === lead.id || p.contactId === lead.leadId)) {
           return true;
         }
@@ -137,8 +151,15 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
         return false;
       });
 
+      const loadedContracts: Contract[] = Array.isArray((contractsRes as any)?.data)
+        ? (contractsRes as any).data
+        : Array.isArray(contractsRes)
+        ? (contractsRes as any)
+        : [];
+
       setBackendPayments(matchingPayments);
       setBackendInvoices(matchingInvoices);
+      setContracts(loadedContracts);
     } catch (err: any) {
       console.error('Error fetching lead billing data:', err);
     } finally {
@@ -166,6 +187,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
         p.allocations?.[0]?.invoice?.invoiceNumber ||
         (p.allocations?.[0] as any)?.invoiceNumber ||
         'Advance / Unallocated',
+      invoiceId: p.allocations?.[0]?.invoiceId || (p.allocations?.[0] as any)?.invoice?.id,
       status: 'Confirmed',
       notes: p.notes || '',
     }));
@@ -205,6 +227,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
         referenceId: `SETTLE-${inv.invoiceNumber}`,
         bankName: inv.bankDetails?.bankName || 'HDFC Bank',
         invoiceNumber: inv.invoiceNumber,
+        invoiceId: inv.id,
         status: 'Confirmed',
         notes: `Settled payment for invoice ${inv.invoiceNumber}`,
       }));
@@ -229,6 +252,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
       referenceId: p.referenceId || '—',
       bankName: '',
       invoiceNumber: p.invoiceNumber || 'Advance / General',
+      invoiceId: undefined,
       status: p.status || 'Confirmed',
       notes: p.notes || '',
     }));
@@ -249,7 +273,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
       });
     }
 
-    // Fallback to dealData invoices (filtering dummy placeholder if appropriate)
+    // Fallback to dealData invoices
     return (initialInvoices || []).map((inv) => {
       const tot = Number(inv.totalAmount ?? 0);
       return {
@@ -261,10 +285,19 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
     });
   }, [backendInvoices, initialInvoices]);
 
-  // Balance calculation for pre-filling payment record
-  const totalReceived = useMemo(() => {
-    return unifiedPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
-  }, [unifiedPayments]);
+  // Financial metrics calculations
+  const totalContractAmount = useMemo(() => {
+    if (contracts.length > 0) {
+      return contracts.reduce((acc, curr) => acc + (Number(curr.finalContractAmount || curr.contractValue) || 0), 0);
+    }
+    if (initialContract) {
+      return Number(initialContract.finalContractAmount || initialContract.contractValue || (initialContract as any).totalAmount || 0);
+    }
+    if ((lead as any)?.dealValue) {
+      return Number((lead as any).dealValue);
+    }
+    return backendInvoices.reduce((acc, inv) => acc + (Number(inv.grandTotal) || 0), 0);
+  }, [contracts, initialContract, lead, backendInvoices]);
 
   const totalInvoiced = useMemo(() => {
     if (backendInvoices.length > 0) {
@@ -273,12 +306,73 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
     return (initialInvoices || []).reduce((acc, inv) => acc + (Number(inv.totalAmount) || 0), 0);
   }, [backendInvoices, initialInvoices]);
 
+  const totalReceived = useMemo(() => {
+    return unifiedPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+  }, [unifiedPayments]);
+
   const outstandingBalance = useMemo(() => {
     if (backendInvoices.length > 0) {
-      return backendInvoices.reduce((acc, inv) => acc + (Number(inv.outstandingBalance) || 0), 0);
+      const invBal = backendInvoices.reduce((acc, inv) => acc + (Number(inv.outstandingBalance) || 0), 0);
+      if (invBal > 0) return invBal;
     }
-    return Math.max(0, totalInvoiced - totalReceived);
-  }, [backendInvoices, totalInvoiced, totalReceived]);
+    const baseTarget = totalInvoiced > 0 ? totalInvoiced : totalContractAmount;
+    return Math.max(0, baseTarget - totalReceived);
+  }, [backendInvoices, totalInvoiced, totalContractAmount, totalReceived]);
+
+  // Helper to determine Contract Value for each payment row
+  const getPaymentContractValue = useCallback(
+    (p: (typeof unifiedPayments)[0]) => {
+      const inv = backendInvoices.find(
+        (i) =>
+          (p.invoiceId && i.id === p.invoiceId) ||
+          (i.invoiceNumber && p.invoiceNumber && i.invoiceNumber.toLowerCase() === p.invoiceNumber.toLowerCase())
+      );
+      if (inv && (inv as any).contractId) {
+        const matchedCnt = contracts.find(
+          (c) => c.id === (inv as any).contractId || c.contractId === (inv as any).contractId
+        );
+        if (matchedCnt) {
+          const val = Number(matchedCnt.finalContractAmount || matchedCnt.contractValue || (matchedCnt as any).totalAmount);
+          if (val > 0) return val;
+        }
+      }
+      if (contracts.length > 0) {
+        const val = Number(contracts[0].finalContractAmount || contracts[0].contractValue || (contracts[0] as any).totalAmount);
+        if (val > 0) return val;
+      }
+      if (initialContract) {
+        const val = Number(initialContract.finalContractAmount || initialContract.contractValue || (initialContract as any).totalAmount);
+        if (val > 0) return val;
+      }
+      if (totalContractAmount > 0) {
+        return totalContractAmount;
+      }
+      if (inv && Number(inv.grandTotal || (inv as any).totalAmount) > 0) {
+        return Number(inv.grandTotal || (inv as any).totalAmount);
+      }
+      return 0;
+    },
+    [backendInvoices, contracts, initialContract, totalContractAmount]
+  );
+
+  // Helper to determine Outstanding Amount for each payment row
+  const getPaymentOutstandingAmount = useCallback(
+    (p: (typeof unifiedPayments)[0], contractVal: number) => {
+      const inv = backendInvoices.find(
+        (i) =>
+          (p.invoiceId && i.id === p.invoiceId) ||
+          (i.invoiceNumber && p.invoiceNumber && i.invoiceNumber.toLowerCase() === p.invoiceNumber.toLowerCase())
+      );
+      if (inv && inv.outstandingBalance !== undefined && inv.outstandingBalance !== null) {
+        return Math.max(0, Number(inv.outstandingBalance));
+      }
+      if (contractVal > 0) {
+        return Math.max(0, contractVal - totalReceived);
+      }
+      return outstandingBalance;
+    },
+    [backendInvoices, totalReceived, outstandingBalance]
+  );
 
   // Handle Record Payment
   const handleRecordPayment = async () => {
@@ -333,7 +427,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
       // Re-fetch dynamic data from backend
       await fetchBillingData();
 
-      // Also trigger parent callback if available
+      // Parent callback if available
       if (onUpdatePayments) {
         const newLocalPayment: LeadPaymentRecord = {
           id: `pay-${Date.now()}`,
@@ -359,11 +453,43 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
     }
   };
 
-  // Open Receipt Modal
-  const handleOpenReceipt = (pay: any) => {
-    setSelectedReceipt(pay);
+  // Open Payment Details Modal
+  const handleOpenReceipt = (pay: any, contractVal?: number, outstandingVal?: number) => {
+    setSelectedReceipt({
+      ...pay,
+      contractVal: contractVal ?? pay.contractVal ?? 0,
+      outstandingVal: outstandingVal ?? pay.outstandingVal ?? 0,
+    });
     setReceiptModalOpened(true);
   };
+
+  const matchedInvoiceForReceipt = useMemo(() => {
+    if (!selectedReceipt) return null;
+    return (
+      backendInvoices.find(
+        (inv) =>
+          (selectedReceipt.invoiceId && inv.id === selectedReceipt.invoiceId) ||
+          (inv.invoiceNumber &&
+            selectedReceipt.invoiceNumber &&
+            inv.invoiceNumber.toLowerCase() === selectedReceipt.invoiceNumber.toLowerCase())
+      ) || null
+    );
+  }, [selectedReceipt, backendInvoices]);
+
+  const matchedContractForReceipt = useMemo(() => {
+    if (!selectedReceipt) return null;
+    if (matchedInvoiceForReceipt && (matchedInvoiceForReceipt as any).contractId) {
+      const c = contracts.find(
+        (cnt) =>
+          cnt.id === (matchedInvoiceForReceipt as any).contractId ||
+          cnt.contractId === (matchedInvoiceForReceipt as any).contractId
+      );
+      if (c) return c;
+    }
+    if (contracts.length > 0) return contracts[0];
+    if (initialContract) return initialContract;
+    return null;
+  }, [selectedReceipt, matchedInvoiceForReceipt, contracts, initialContract]);
 
   // Print Receipt
   const handlePrintReceipt = () => {
@@ -388,12 +514,14 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
                   Live Synced
                 </Badge>
               </Group>
+              <Text size="xs" c="dimmed">
+                All payment installments, contract values, and reconciliation records for this lead.
+              </Text>
             </div>
           </Group>
         </div>
 
         <Group gap="xs">
-
           <Button
             size="sm"
             leftSection={<IconPlus size={15} />}
@@ -426,8 +554,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
         </Group>
       </Group>
 
-
-      {/* Payment Records Table */}
+      {/* Payment Records Table (Clean, compact, no inline expansion) */}
       <Paper
         p="md"
         radius="16px"
@@ -439,12 +566,14 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
         }}
       >
         <Group justify="space-between" align="center" mb="sm">
-          <Text fw={750} size="sm" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
-            Transaction History & Bank References
-          </Text>
-          <Badge size="xs" variant="light" color="teal">
-            {unifiedPayments.length} Payment{unifiedPayments.length === 1 ? '' : 's'}
-          </Badge>
+          <Group gap="xs">
+            <Text fw={750} size="sm" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+              Transaction History & Bank References
+            </Text>
+            <Badge size="xs" variant="light" color="teal">
+              {unifiedPayments.length} Payment{unifiedPayments.length === 1 ? '' : 's'}
+            </Badge>
+          </Group>
         </Group>
 
         {loading ? (
@@ -476,7 +605,7 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
             </Stack>
           </Center>
         ) : (
-          <Table.ScrollContainer minWidth={700}>
+          <Table.ScrollContainer minWidth={880}>
             <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
               <Table.Thead>
                 <Table.Tr style={{ borderBottom: isDark ? '1px solid #334155' : '1px solid #E2E8F0' }}>
@@ -493,92 +622,117 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
                     INVOICE #
                   </Table.Th>
                   <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700 }}>
-                    AMOUNT PAID
+                    CONTRACT VALUE
                   </Table.Th>
                   <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700 }}>
-                    STATUS
+                    AMOUNT PAID
                   </Table.Th>
                   <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700, textAlign: 'right' }}>
-                    ACTION
+                    OUTSTANDING AMOUNT
                   </Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
-                {unifiedPayments.map((p) => (
-                  <Table.Tr key={p.id} style={{ borderBottom: isDark ? '1px solid #1E293B' : '1px solid #F1F5F9' }}>
-                    <Table.Td>
-                      <Group gap="xs" wrap="nowrap">
-                        <ThemeIcon size="sm" radius="xl" color="teal" variant="light">
-                          <IconReceipt size={12} />
-                        </ThemeIcon>
-                        <div>
-                          <Text fw={700} size="12px" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
-                            {p.receiptNumber}
-                          </Text>
-                          {p.referenceId && p.referenceId !== '—' && (
-                            <Text size="10px" ff="monospace" c="dimmed">
-                              Ref: {p.referenceId}
+                {unifiedPayments.map((p) => {
+                  const contractVal = getPaymentContractValue(p);
+                  const outstandingVal = getPaymentOutstandingAmount(p, contractVal);
+
+                  return (
+                    <Table.Tr
+                      key={p.id}
+                      onClick={() => handleOpenReceipt(p, contractVal, outstandingVal)}
+                      style={{
+                        cursor: 'pointer',
+                        borderBottom: isDark ? '1px solid #1E293B' : '1px solid #F1F5F9',
+                        transition: 'background-color 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.05)' : '#F8FAFC';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      {/* Receipt / Ref */}
+                      <Table.Td>
+                        <Group gap="xs" wrap="nowrap">
+                          <ThemeIcon size="sm" radius="xl" color="teal" variant="light">
+                            <IconReceipt size={12} />
+                          </ThemeIcon>
+                          <div>
+                            <Text fw={700} size="12px" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+                              {p.receiptNumber}
                             </Text>
-                          )}
-                        </div>
-                      </Group>
-                    </Table.Td>
+                            {p.referenceId && p.referenceId !== '—' && (
+                              <Text size="10px" ff="monospace" c="dimmed">
+                                Ref: {p.referenceId}
+                              </Text>
+                            )}
+                          </div>
+                        </Group>
+                      </Table.Td>
 
-                    <Table.Td>
-                      <Text size="12px" c="dimmed">
-                        {p.date}
-                      </Text>
-                    </Table.Td>
-
-                    <Table.Td>
-                      <Group gap={6} wrap="nowrap">
-                        {p.method.toLowerCase().includes('bank') ? (
-                          <IconBuildingBank size={14} color="#6366F1" />
-                        ) : p.method.toLowerCase().includes('upi') ? (
-                          <IconQrcode size={14} color="#10B981" />
-                        ) : p.method.toLowerCase().includes('cash') ? (
-                          <IconCash size={14} color="#10B981" />
-                        ) : (
-                          <IconCreditCard size={14} color="#F59E0B" />
-                        )}
-                        <Text size="12px" fw={600} style={{ color: isDark ? '#E2E8F0' : '#334155' }}>
-                          {p.method}
+                      {/* Date */}
+                      <Table.Td>
+                        <Text size="12px" c="dimmed">
+                          {p.date}
                         </Text>
-                      </Group>
-                    </Table.Td>
+                      </Table.Td>
 
-                    <Table.Td>
-                      <Badge size="xs" variant="light" color="blue">
-                        {p.invoiceNumber}
-                      </Badge>
-                    </Table.Td>
+                      {/* Method */}
+                      <Table.Td>
+                        <Group gap={6} wrap="nowrap">
+                          {p.method.toLowerCase().includes('bank') ? (
+                            <IconBuildingBank size={14} color="#6366F1" />
+                          ) : p.method.toLowerCase().includes('upi') ? (
+                            <IconQrcode size={14} color="#10B981" />
+                          ) : p.method.toLowerCase().includes('cash') ? (
+                            <IconCash size={14} color="#10B981" />
+                          ) : (
+                            <IconCreditCard size={14} color="#F59E0B" />
+                          )}
+                          <Text size="12px" fw={600} style={{ color: isDark ? '#E2E8F0' : '#334155' }}>
+                            {p.method}
+                          </Text>
+                        </Group>
+                      </Table.Td>
 
-                    <Table.Td>
-                      <Text fw={800} size="13px" style={{ color: '#10B981' }}>
-                        ₹{(Number(p.amount) || 0).toLocaleString('en-IN')}
-                      </Text>
-                    </Table.Td>
+                      {/* Invoice Number */}
+                      <Table.Td>
+                        <Badge size="xs" variant="light" color="blue">
+                          {p.invoiceNumber}
+                        </Badge>
+                      </Table.Td>
 
-                    <Table.Td>
-                      <Badge size="xs" color="teal" variant="filled">
-                        {p.status}
-                      </Badge>
-                    </Table.Td>
+                      {/* Contract Value */}
+                      <Table.Td>
+                        <Text fw={700} size="13px" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+                          {contractVal > 0 ? `₹${contractVal.toLocaleString('en-IN')}` : '—'}
+                        </Text>
+                      </Table.Td>
 
-                    <Table.Td style={{ textAlign: 'right' }}>
-                      <Tooltip label="View & Print Digital Receipt" withArrow>
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          color="indigo"
-                          onClick={() => handleOpenReceipt(p)}
+                      {/* Amount Paid */}
+                      <Table.Td>
+                        <Text fw={800} size="13px" style={{ color: '#10B981' }}>
+                          ₹{(Number(p.amount) || 0).toLocaleString('en-IN')}
+                        </Text>
+                      </Table.Td>
+
+                      {/* Outstanding Amount */}
+                      <Table.Td style={{ textAlign: 'right' }}>
+                        <Text
+                          fw={700}
+                          size="13px"
+                          style={{
+                            color: outstandingVal > 0 ? '#F59E0B' : '#10B981',
+                          }}
                         >
-                          <IconDownload size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
+                          ₹{outstandingVal.toLocaleString('en-IN')}
+                        </Text>
+                      </Table.Td>
+                    </Table.Tr>
+                  );
+                })}
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
@@ -683,139 +837,369 @@ export const LeadPaymentSection: React.FC<LeadPaymentSectionProps> = ({
         </Stack>
       </Modal>
 
-      {/* Modal: Digital Receipt View */}
+      {/* ========================================================================= */}
+      {/* MODAL: PAYMENT DETAILS POPUP                                             */}
+      {/* ========================================================================= */}
       <Modal
         opened={receiptModalOpened}
         onClose={() => setReceiptModalOpened(false)}
-        size="md"
-        radius="16px"
-        title={
-          <Group gap="xs">
-            <ThemeIcon color="teal" size="sm" radius="md">
-              <IconReceipt size={14} />
-            </ThemeIcon>
-            <Text fw={700} size="sm">
-              Official Payment Receipt — {selectedReceipt?.receiptNumber}
-            </Text>
-          </Group>
-        }
+        size="820px"
+        radius="lg"
+        centered
+        withCloseButton={false}
+        styles={{
+          content: {
+            backgroundColor: isDark ? '#111827' : '#FFFFFF',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #E2E8F0',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+            maxHeight: '92vh',
+            display: 'flex',
+            flexDirection: 'column',
+          },
+          body: {
+            padding: '24px 28px',
+            maxHeight: 'calc(92vh - 20px)',
+            overflowY: 'auto',
+          },
+        }}
       >
         {selectedReceipt && (
-          <Stack gap="sm">
+          <Stack gap="lg">
+            {/* Modal Header */}
+            <Group justify="space-between" align="flex-start">
+              <Group gap="sm">
+                <ThemeIcon size="xl" radius="md" color="teal" variant="light">
+                  <IconReceipt size={24} />
+                </ThemeIcon>
+                <div>
+                  <Group gap="xs" align="center">
+                    <Text fw={800} size="lg" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+                      Payment Details
+                    </Text>
+                    <Badge size="xs" color="teal" variant="filled">
+                      {selectedReceipt.status || 'Confirmed'}
+                    </Badge>
+                  </Group>
+                  <Text size="xs" c="dimmed" mt={2}>
+                    Receipt #{selectedReceipt.receiptNumber} • {selectedReceipt.date} • {lead.companyName || lead.name}
+                  </Text>
+                </div>
+              </Group>
+
+              <Group gap="xs" align="center">
+                <ActionIcon
+                  size="md"
+                  variant="subtle"
+                  color="gray"
+                  onClick={() => setReceiptModalOpened(false)}
+                >
+                  <IconX size={18} />
+                </ActionIcon>
+              </Group>
+            </Group>
+
+            <Divider color={isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'} />
+
+            {/* Financial Overview Highlight Cards */}
             <Paper
               p="md"
               radius="md"
               style={{
-                background: isDark ? '#0B0F17' : '#F8FAFC',
+                background: isDark ? '#1E293B' : '#F0FDF4',
+                border: isDark ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid #BBF7D0',
+              }}
+            >
+              <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="md">
+                <Box>
+                  <Text size="11px" fw={700} c="dimmed" style={{ textTransform: 'uppercase' }}>
+                    Contract Value
+                  </Text>
+                  <Text size="lg" fw={800} style={{ color: isDark ? '#F8FAFC' : '#0F172A' }} mt={2}>
+                    {selectedReceipt.contractVal > 0
+                      ? `₹${Number(selectedReceipt.contractVal).toLocaleString('en-IN')}`
+                      : '—'}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" fw={700} c="dimmed" style={{ textTransform: 'uppercase' }}>
+                    Amount Paid
+                  </Text>
+                  <Text size="lg" fw={900} style={{ color: '#10B981' }} mt={2}>
+                    ₹{(Number(selectedReceipt.amount) || 0).toLocaleString('en-IN')}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" fw={700} c="dimmed" style={{ textTransform: 'uppercase' }}>
+                    Outstanding Amount
+                  </Text>
+                  <Text
+                    size="lg"
+                    fw={800}
+                    style={{
+                      color: (selectedReceipt.outstandingVal || 0) > 0 ? '#F59E0B' : '#10B981',
+                    }}
+                    mt={2}
+                  >
+                    ₹{(Number(selectedReceipt.outstandingVal) || 0).toLocaleString('en-IN')}
+                  </Text>
+                </Box>
+              </SimpleGrid>
+            </Paper>
+
+            {/* A. Lead Information */}
+            <Paper
+              p="md"
+              radius="md"
+              style={{
+                background: isDark ? '#1F2937' : '#F8FAFC',
                 border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
               }}
             >
-              <Group justify="space-between" mb="xs">
-                <div>
-                  <Text fw={800} size="md">
-                    OneAssist Enterprise Operations
-                  </Text>
-                  <Text size="11px" c="dimmed">
-                    Banking Reconciliation & Official Tax Receipt
-                  </Text>
-                </div>
-                <Badge color="teal" variant="filled">
-                  CONFIRMED ✓
-                </Badge>
+              <Group gap="xs" mb="sm">
+                <ThemeIcon size="sm" radius="sm" color="blue" variant="light">
+                  <IconUser size={14} />
+                </ThemeIcon>
+                <Text fw={750} size="sm" style={{ color: isDark ? '#F1F5F9' : '#0F172A', letterSpacing: '0.3px' }}>
+                  A. Lead Information
+                </Text>
               </Group>
-
-              <Divider my="sm" />
-
-              <SimpleGrid cols={2} spacing="xs">
-                <div>
-                  <Text size="11px" c="dimmed">
-                    CLIENT / CONTACT
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Lead Name
                   </Text>
-                  <Text size="xs" fw={700}>
-                    {lead.name}
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {lead.name || '—'}
                   </Text>
-                  {lead.companyName && (
-                    <Text size="11px" c="dimmed">
-                      {lead.companyName}
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Company Name
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {lead.companyName || lead.displayCompany || '—'}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Contact Person
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {lead.name || (lead as any).contactPerson || '—'}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Email
+                  </Text>
+                  <Group gap={4} mt={2}>
+                    <IconMail size={13} color="#64748B" />
+                    <Text size="sm" fw={600} style={{ color: isDark ? '#60A5FA' : '#2563EB' }}>
+                      {lead.email || '—'}
                     </Text>
-                  )}
-                </div>
-
-                <div>
-                  <Text size="11px" c="dimmed">
-                    RECEIPT NUMBER
+                  </Group>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Phone Number
                   </Text>
-                  <Text size="xs" fw={700}>
-                    {selectedReceipt.receiptNumber}
-                  </Text>
-                </div>
-
-                <div>
-                  <Text size="11px" c="dimmed">
-                    PAYMENT DATE
-                  </Text>
-                  <Text size="xs" fw={600}>
-                    {selectedReceipt.date}
-                  </Text>
-                </div>
-
-                <div>
-                  <Text size="11px" c="dimmed">
-                    PAYMENT METHOD
-                  </Text>
-                  <Text size="xs" fw={600}>
-                    {selectedReceipt.method}
-                  </Text>
-                </div>
-
-                <div>
-                  <Text size="11px" c="dimmed">
-                    TRANSACTION REF / UTR
-                  </Text>
-                  <Text size="xs" ff="monospace" fw={600}>
-                    {selectedReceipt.referenceId || 'N/A'}
-                  </Text>
-                </div>
-
-                <div>
-                  <Text size="11px" c="dimmed">
-                    LINKED INVOICE
-                  </Text>
-                  <Text size="xs" fw={600}>
-                    {selectedReceipt.invoiceNumber}
-                  </Text>
-                </div>
+                  <Group gap={4} mt={2}>
+                    <IconPhone size={13} color="#64748B" />
+                    <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }}>
+                      {lead.phone || '—'}
+                    </Text>
+                  </Group>
+                </Box>
               </SimpleGrid>
-
-              <Divider my="sm" />
-
-              <Group justify="space-between" align="center">
-                <Text size="sm" fw={700}>
-                  AMOUNT RECEIVED
-                </Text>
-                <Text size="18px" fw={900} style={{ color: '#10B981' }}>
-                  ₹{(Number(selectedReceipt?.amount) || 0).toLocaleString('en-IN')}
-                </Text>
-              </Group>
-
-              {selectedReceipt.notes && (
-                <Text size="11px" c="dimmed" mt="xs" style={{ fontStyle: 'italic' }}>
-                  Note: {selectedReceipt.notes}
-                </Text>
-              )}
             </Paper>
 
-            <Group justify="flex-end" gap="xs">
+            {/* B. Transaction & Banking Information */}
+            <Paper
+              p="md"
+              radius="md"
+              style={{
+                background: isDark ? '#1F2937' : '#F8FAFC',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+              }}
+            >
+              <Group gap="xs" mb="sm">
+                <ThemeIcon size="sm" radius="sm" color="teal" variant="light">
+                  <IconBuildingBank size={14} />
+                </ThemeIcon>
+                <Text fw={750} size="sm" style={{ color: isDark ? '#F1F5F9' : '#0F172A', letterSpacing: '0.3px' }}>
+                  B. Payment & Banking Information
+                </Text>
+              </Group>
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Receipt / Payment Number
+                  </Text>
+                  <Text size="sm" fw={700} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {selectedReceipt.receiptNumber}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Payment Date
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {selectedReceipt.date}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Payment Method
+                  </Text>
+                  <Group gap={6} mt={2}>
+                    {selectedReceipt.method?.toLowerCase().includes('bank') ? (
+                      <IconBuildingBank size={14} color="#6366F1" />
+                    ) : selectedReceipt.method?.toLowerCase().includes('upi') ? (
+                      <IconQrcode size={14} color="#10B981" />
+                    ) : (
+                      <IconCreditCard size={14} color="#F59E0B" />
+                    )}
+                    <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }}>
+                      {selectedReceipt.method}
+                    </Text>
+                  </Group>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Bank Name
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {selectedReceipt.bankName ||
+                      matchedInvoiceForReceipt?.bankDetails?.bankName ||
+                      (selectedReceipt.method?.toLowerCase().includes('bank') ? 'HDFC Bank' : '—')}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Transaction Reference / UTR
+                  </Text>
+                  <Text size="sm" fw={600} ff="monospace" style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {selectedReceipt.referenceId && selectedReceipt.referenceId !== '—'
+                      ? selectedReceipt.referenceId
+                      : '—'}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Reconciliation Status
+                  </Text>
+                  <Badge size="xs" color="teal" variant="light" mt={4}>
+                    {selectedReceipt.status || 'Confirmed'}
+                  </Badge>
+                </Box>
+              </SimpleGrid>
+            </Paper>
+
+            {/* C. Invoice & Contract Information */}
+            <Paper
+              p="md"
+              radius="md"
+              style={{
+                background: isDark ? '#1F2937' : '#F8FAFC',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+              }}
+            >
+              <Group gap="xs" mb="sm">
+                <ThemeIcon size="sm" radius="sm" color="violet" variant="light">
+                  <IconFileText size={14} />
+                </ThemeIcon>
+                <Text fw={750} size="sm" style={{ color: isDark ? '#F1F5F9' : '#0F172A', letterSpacing: '0.3px' }}>
+                  C. Invoice & Contract Information
+                </Text>
+              </Group>
+              <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Linked Invoice #
+                  </Text>
+                  <Badge size="xs" color="blue" variant="light" mt={4}>
+                    {selectedReceipt.invoiceNumber}
+                  </Badge>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Invoice Total
+                  </Text>
+                  <Text size="sm" fw={700} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {matchedInvoiceForReceipt?.grandTotal
+                      ? `₹${Number(matchedInvoiceForReceipt.grandTotal).toLocaleString('en-IN')}`
+                      : selectedReceipt.contractVal > 0
+                      ? `₹${Number(selectedReceipt.contractVal).toLocaleString('en-IN')}`
+                      : '—'}
+                  </Text>
+                </Box>
+                <Box>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Contract ID
+                  </Text>
+                  <Badge size="xs" color="indigo" variant="light" style={{ fontFamily: 'monospace', marginTop: 4 }}>
+                    {matchedContractForReceipt?.contractId ||
+                      matchedContractForReceipt?.id ||
+                      (matchedInvoiceForReceipt as any)?.contractId ||
+                      'CNT-2026-001'}
+                  </Badge>
+                </Box>
+                <Box style={{ gridColumn: 'span 2' }}>
+                  <Text size="11px" c="dimmed" fw={600} style={{ textTransform: 'uppercase' }}>
+                    Payment Terms
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F8FAFC' : '#1E293B' }} mt={2}>
+                    {matchedContractForReceipt?.paymentDueTerms ||
+                      matchedContractForReceipt?.customPaymentDueTerms ||
+                      'Net 15 Days (Advance 30%, Milestone Delivery)'}
+                  </Text>
+                </Box>
+              </SimpleGrid>
+            </Paper>
+
+            {/* D. Payment Notes */}
+            <Paper
+              p="md"
+              radius="md"
+              style={{
+                background: isDark ? '#1F2937' : '#F8FAFC',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+              }}
+            >
+              <Group gap="xs" mb="xs">
+                <ThemeIcon size="sm" radius="sm" color="orange" variant="light">
+                  <IconNotes size={14} />
+                </ThemeIcon>
+                <Text fw={750} size="sm" style={{ color: isDark ? '#F1F5F9' : '#0F172A', letterSpacing: '0.3px' }}>
+                  D. Payment Notes & Remarks
+                </Text>
+              </Group>
+              <Text size="sm" style={{ color: isDark ? '#E2E8F0' : '#334155', fontStyle: selectedReceipt.notes ? 'normal' : 'italic' }}>
+                {selectedReceipt.notes || `Settlement payment logged for ${selectedReceipt.invoiceNumber}`}
+              </Text>
+            </Paper>
+
+            {/* Footer Actions */}
+            <Group justify="flex-end" gap="xs" mt="sm">
               <Button
                 variant="default"
-                size="xs"
-                leftSection={<IconPrinter size={13} />}
+                size="sm"
+                leftSection={<IconPrinter size={15} />}
                 onClick={handlePrintReceipt}
               >
                 Print Receipt
               </Button>
-              <Button size="xs" color="teal" onClick={() => setReceiptModalOpened(false)}>
-                Done
+              <Button
+                size="sm"
+                color="teal"
+                onClick={() => setReceiptModalOpened(false)}
+                style={{
+                  background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                  color: '#FFF',
+                  fontWeight: 700,
+                }}
+              >
+                Close
               </Button>
             </Group>
           </Stack>

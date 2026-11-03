@@ -1413,6 +1413,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           isDark={isDark}
           payments={dealData.payments}
           invoices={dealData.invoices}
+          contract={dealData.contract}
           onUpdatePayments={handleUpdatePayments}
           onNavigateSection={handleProceedToSection}
         />
@@ -1424,7 +1425,9 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           lead={activeLead}
           isDark={isDark}
           progress={dealData.progress}
+          handover={dealData.handover}
           onUpdateProgress={handleUpdateProgress}
+          onUpdateHandover={handleUpdateHandover}
           onNavigateSection={handleProceedToSection}
         />
       )}

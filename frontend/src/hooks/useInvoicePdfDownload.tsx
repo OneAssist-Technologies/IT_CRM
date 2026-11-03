@@ -92,12 +92,13 @@ export const useInvoicePdfDownload = () => {
       aria-hidden="true"
       style={{
         position: 'fixed',
-        left: -9999,
+        left: 0,
         top: 0,
-        width: 860,
-        opacity: 0,
-        pointerEvents: 'none',
+        width: 920,
         zIndex: -9999,
+        pointerEvents: 'none',
+        opacity: downloadingInvoice ? 0.01 : 0,
+        background: '#FFFFFF',
       }}
     >
       {downloadingInvoice && (

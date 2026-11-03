@@ -10,6 +10,7 @@ import {
   SimpleGrid,
   ThemeIcon,
   Modal,
+  Menu,
   TextInput,
   Textarea,
   NumberInput,
@@ -92,6 +93,17 @@ import {
   DEFAULT_DATE_FILTER,
   isDateMatchingFilter,
 } from '../../../components/common/DateFilterControl';
+
+export const CONTRACT_STATUS_OPTIONS = [
+  { value: 'Draft', label: 'Draft', color: '#64748B' },
+  { value: 'Pending Approval', label: 'Pending Approval', color: '#3B82F6' },
+  { value: 'Approved', label: 'Approved', color: '#06B6D4' },
+  { value: 'Pending Signature', label: 'Pending Signature', color: '#6366F1' },
+  { value: 'Active', label: 'Active', color: '#10B981' },
+  { value: 'Completed', label: 'Completed', color: '#059669' },
+  { value: 'On Hold', label: 'On Hold', color: '#F59E0B' },
+  { value: 'Terminated', label: 'Terminated', color: '#EF4444' },
+];
 
 type ActiveContractTabType =
   | 'ALL'
@@ -1250,6 +1262,80 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
     }
   };
 
+  // Status Update Handler with dropdown options
+  const handleStatusChange = async (cnt: Contract, newStatus: string) => {
+    try {
+      setLoading(true);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const patchData: Partial<ContractFormData> = {
+        status: newStatus as ContractStatus,
+      };
+
+      if (newStatus === 'Active' || newStatus === 'Completed') {
+        patchData.status = newStatus as ContractStatus;
+        patchData.approvalStatus = 'Approved';
+        patchData.signatureStatus = 'Signed';
+        patchData.signedDate = cnt.signedDate || todayStr;
+        patchData.clientSignatoryName = (cnt.clientSignatoryName && cnt.clientSignatoryName.trim()) || cnt.clientName || lead?.name || 'Authorized Client';
+        patchData.clientSignatoryEmail = (cnt.clientSignatoryEmail && cnt.clientSignatoryEmail.trim()) || (cnt as any).clientEmail || lead?.email || 'client@example.com';
+        patchData.companySignatoryName = (cnt.companySignatoryName && cnt.companySignatoryName.trim()) || cnt.assignedToName || 'OneAssist Representative';
+        patchData.companySignatoryEmail = (cnt.companySignatoryEmail && cnt.companySignatoryEmail.trim()) || 'contracts@oneassist.tech';
+      } else if (newStatus === 'Pending Signature') {
+        patchData.status = 'Pending Signature';
+        patchData.approvalStatus = 'Approved';
+        patchData.signatureStatus = 'Pending';
+      } else if (newStatus === 'Pending Approval') {
+        patchData.status = 'Pending Approval';
+        patchData.approvalStatus = 'Pending Approval';
+        patchData.isApprovalSubmission = true;
+      } else if (newStatus === 'Approved') {
+        patchData.status = 'Approved';
+        patchData.approvalStatus = 'Approved';
+        patchData.isApprovalAction = true;
+      } else if (newStatus === 'Draft') {
+        patchData.status = 'Draft';
+        patchData.approvalStatus = 'Draft';
+        patchData.signatureStatus = 'Pending';
+      } else {
+        patchData.status = newStatus as ContractStatus;
+      }
+
+      // Optimistic update so UI reflects immediately
+      setContracts((prev) =>
+        prev.map((c) => (c.id === cnt.id ? { ...c, ...patchData } : c))
+      );
+
+      const updated = await leadService.updateContract(cnt.id, patchData);
+
+      if (updated) {
+        setContracts((prev) =>
+          prev.map((c) => (c.id === cnt.id ? { ...c, ...updated } : c))
+        );
+      }
+
+      notifications.show({
+        title: 'Contract Status Updated',
+        message: `Contract ${cnt.contractId || cnt.title} status changed to ${newStatus}.`,
+        color: 'teal',
+        icon: <IconCheck size={16} />,
+      });
+
+      await loadData();
+      if (onUpdateContract) {
+        onUpdateContract({ ...cnt, ...patchData, ...(updated || {}) } as Contract);
+      }
+    } catch (err: any) {
+      notifications.show({
+        title: 'Update Failed',
+        message: err.message || 'Could not update contract status.',
+        color: 'red',
+      });
+      await loadData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Quick Sign toggle
   const handleQuickSign = async (cnt: Contract) => {
     const isNowSigned = cnt.signatureStatus !== 'Signed';
@@ -1548,8 +1634,45 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
                   </Table.Td>
 
                   {/* Lifecycle Status */}
-                  <Table.Td style={{ padding: '16px 16px' }}>
-                    {renderStatusBadge(cnt.status || 'Draft')}
+                  <Table.Td style={{ padding: '16px 16px' }} onClick={(e) => e.stopPropagation()}>
+                    <Menu shadow="md" width={190} position="bottom-start" withinPortal radius="md">
+                      <Menu.Target>
+                        <Tooltip label="Click to update status" withArrow>
+                          <Box style={{ display: 'inline-block', cursor: 'pointer' }}>
+                            {renderStatusBadge(cnt.status || 'Draft')}
+                          </Box>
+                        </Tooltip>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Label>Update Contract Status</Menu.Label>
+                        {CONTRACT_STATUS_OPTIONS.map((opt) => {
+                          const isSelected = (cnt.status || '').toLowerCase() === opt.value.toLowerCase();
+                          return (
+                            <Menu.Item
+                              key={opt.value}
+                              leftSection={
+                                <Box
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: '50%',
+                                    backgroundColor: opt.color,
+                                  }}
+                                />
+                              }
+                              rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                              onClick={() => handleStatusChange(cnt, opt.value)}
+                              style={{
+                                fontWeight: isSelected ? 700 : 500,
+                                backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                              }}
+                            >
+                              {opt.label}
+                            </Menu.Item>
+                          );
+                        })}
+                      </Menu.Dropdown>
+                    </Menu>
                   </Table.Td>
 
                   {/* Actions */}
@@ -1578,18 +1701,50 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
                         </Tooltip>
                       )}
 
-                      {/* Quick Sign Toggle */}
-                      <Tooltip label={cnt.signatureStatus === 'Signed' ? 'Reset Signature' : 'Mark as Signed'} withArrow>
-                        <ActionIcon
-                          size="md"
-                          radius="md"
-                          variant="light"
-                          color={cnt.signatureStatus === 'Signed' ? 'green' : 'gray'}
-                          onClick={() => handleQuickSign(cnt)}
-                        >
-                          <IconShieldCheck size={17} />
-                        </ActionIcon>
-                      </Tooltip>
+                      {/* Update Status Button with Options Dropdown */}
+                      <Menu shadow="md" width={190} position="bottom-end" withinPortal radius="md">
+                        <Menu.Target>
+                          <Tooltip label="Update Status" withArrow>
+                            <ActionIcon
+                              size="md"
+                              radius="md"
+                              variant="light"
+                              color="teal"
+                            >
+                              <IconRefresh size={17} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Label>Update Status</Menu.Label>
+                          {CONTRACT_STATUS_OPTIONS.map((opt) => {
+                            const isSelected = (cnt.status || '').toLowerCase() === opt.value.toLowerCase();
+                            return (
+                              <Menu.Item
+                                key={opt.value}
+                                leftSection={
+                                  <Box
+                                    style={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: '50%',
+                                      backgroundColor: opt.color,
+                                    }}
+                                  />
+                                }
+                                rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                onClick={() => handleStatusChange(cnt, opt.value)}
+                                style={{
+                                  fontWeight: isSelected ? 700 : 500,
+                                  backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                                }}
+                              >
+                                {opt.label}
+                              </Menu.Item>
+                            );
+                          })}
+                        </Menu.Dropdown>
+                      </Menu>
 
                       {canDelete && (
                         <Tooltip label="Delete Contract" withArrow>

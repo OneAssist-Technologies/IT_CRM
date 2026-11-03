@@ -183,7 +183,7 @@ export interface BillingMilestone {
   updatedAt?: string;
 }
 
-export type InvoiceStatus = 'Draft' | 'Sent' | 'Issued' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled';
+export type InvoiceStatus = 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Void' | string;
 export type PaymentStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled';
 export type TaxType = 'INTRA_STATE' | 'INTER_STATE' | 'EXPORT_NON_GST';
 export type InvoiceType = 'One-Time' | 'Recurring';

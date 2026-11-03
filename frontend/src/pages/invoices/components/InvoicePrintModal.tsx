@@ -185,8 +185,36 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             </Box>
           </Group>
 
-          {/* Right: Close Action */}
-          <Group gap="xs" align="center">
+          {/* Right: Download PDF, Print, Close Actions */}
+          <Group gap="sm" align="center">
+            <Button
+              variant="light"
+              color="indigo"
+              size="sm"
+              leftSection={<IconDownload size={16} />}
+              loading={downloading}
+              onClick={handleDownloadPDF}
+              style={{ fontWeight: 600, borderRadius: 8 }}
+            >
+              Download PDF
+            </Button>
+
+            <Button
+              variant="filled"
+              color="blue"
+              size="sm"
+              leftSection={<IconPrinter size={16} />}
+              onClick={handlePrint}
+              style={{
+                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                fontWeight: 600,
+                borderRadius: 8,
+                boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+              }}
+            >
+              Print Tax Invoice
+            </Button>
+
             <Tooltip label="Close (Esc)">
               <ActionIcon
                 variant="subtle"
@@ -214,7 +242,7 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
           alignItems: 'flex-start',
         }}
       >
-        <Box style={{ width: '100%', maxWidth: 880, boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
+        <Box style={{ width: '100%', maxWidth: 940, boxShadow: '0 10px 30px rgba(0,0,0,0.08)' }}>
           <InvoiceDocument innerRef={printRef} invoice={invoice} settings={settings} />
         </Box>
       </Box>

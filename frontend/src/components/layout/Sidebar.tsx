@@ -446,7 +446,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
             {can('scheduled_meetings', 'view') &&
               renderNavItem(
                 'scheduled-meetings',
-                'Scheduled Meetings',
+                'Meetings',
                 <IconCalendarEvent size={18} stroke={2} />,
                 activeNav === 'scheduled-meetings' || activeNav === 'meetings'
               )}
@@ -454,7 +454,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
             {can('call_logs', 'view') &&
               renderNavItem(
                 'call-logs',
-                'Call Logs',
+                'Activity Logs',
                 <IconPhoneCall size={18} stroke={2} />,
                 activeNav === 'call-logs' || activeNav === 'calls' || activeNav === 'activity-logs'
               )}
