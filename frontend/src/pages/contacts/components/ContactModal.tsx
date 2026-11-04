@@ -71,7 +71,15 @@ const isLeadIdentifier = (idStr: any): boolean => {
   ) {
     return false;
   }
-  if (s.startsWith('LDN-') || s.startsWith('lead-')) return true;
+  if (
+    s.startsWith('LED-') ||
+    s.startsWith('LDN-') ||
+    s.startsWith('LD-') ||
+    s.startsWith('LEAD-') ||
+    s.startsWith('lead-')
+  ) {
+    return true;
+  }
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return true;
   return false;
 };
@@ -81,14 +89,13 @@ const mapStatusToLeadStatus = (statusStr: string): string => {
   if (s.includes('not interested') || s.includes('not-interested') || s.includes('disqual') || s.includes('lost') || s.includes('cancel')) {
     return 'Lost';
   }
-  if (s.includes('qualif')) return 'New';
-  if (s.includes('interest')) return 'Interested';
-  if (s.includes('follow')) return 'Follow-up';
-  if (s.includes('proposal')) return 'Proposal Sent';
-  if (s.includes('won') || s.includes('complete')) return 'Complete';
-  if (s.includes('progress') || s.includes('contact') || s.includes('busy') || s.includes('sent') || s.includes('connected')) return 'In Progress';
-  if (s.includes('new') || s.includes('init')) return 'New';
-  return statusStr || 'In Progress';
+  if (s.includes('won') || s.includes('complete')) {
+    return 'Completed';
+  }
+  if (s.includes('qualif') || s.includes('new') || s.includes('init')) {
+    return 'New';
+  }
+  return 'In Progress';
 };
 
 const parseTimeToMinutes = (timeStr: string): { minutes: number; isAM: boolean; isPM: boolean; rawHours: number } | null => {
@@ -682,7 +689,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             duration: callDuration?.trim() || '01:00',
             status: (callStatus as any) || 'Completed',
             callDate: callDate || getTodayDateStr(),
-            callTime: callFromTime || '10:00 AM',
+            callTime: callFromTime || getCurrentTimeStr(),
             description: formData.description?.trim() || undefined,
             nextFollowDate: callStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
           } as any);

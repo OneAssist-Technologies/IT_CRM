@@ -716,6 +716,7 @@ export async function updateMeetingService(id, body) {
 
   // Synchronize corresponding activity in timeline
   try {
+    const todayStr = new Date().toISOString().slice(0, 10);
     await prisma.activity.updateMany({
       where: {
         OR: [
@@ -727,10 +728,11 @@ export async function updateMeetingService(id, body) {
         status: updated.status || 'Scheduled',
         title: updated.title && updated.title !== 'Client Discussion' ? updated.title : 'Meeting Scheduled',
         description: updated.purpose ? `${updated.purpose}${updated.notes ? ` - ${updated.notes}` : ''}` : 'Meeting with client - Requirement discussion',
-        activityDate: updated.meetingDate || updated.date,
+        activityDate: todayStr,
         activityTime: updated.startTime || updated.time,
         customerName: updated.clientName,
         performedBy: updated.employeeName || 'Staff',
+        updatedAt: new Date(),
         ...(body.nextFollowDate || body.followUpDate
           ? {
               metadata: {
@@ -740,6 +742,24 @@ export async function updateMeetingService(id, body) {
           : {}),
       },
     });
+
+    if (body.status !== undefined || body.meetingStatus !== undefined || body.meeting_status !== undefined) {
+      await recordActivity({
+        type: 'meeting',
+        title: `Meeting: ${updated.status || 'Scheduled'}`,
+        description: `Meeting "${updated.title || 'Meeting'}" status updated to ${updated.status}.${updated.notes ? ` Notes: ${updated.notes}` : ''}`,
+        leadId: updated.leadId || updated.lead_id,
+        leadCode: updated.leadId || updated.lead_id,
+        leadName: updated.clientName,
+        customerName: updated.clientName,
+        entityId: updated.id,
+        entityType: 'Meeting',
+        entityNumber: updated.id,
+        status: updated.status,
+        performedBy: updated.employeeName || 'Staff',
+        activityDate: todayStr,
+      }).catch(() => {});
+    }
   } catch (actErr) {
     console.warn('Note: Activity update error:', actErr.message);
   }

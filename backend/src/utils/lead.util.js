@@ -41,7 +41,7 @@ export function buildLeadFilterQuery(queryParams = {}) {
     const s = status.trim();
     if (s.toLowerCase() === 'in progress' || s.toLowerCase() === 'in_progress') {
       andConditions.push({
-        status: { in: ['In Progress', 'Contacted', 'Qualified', 'Active'] },
+        status: { in: ['In Progress', 'Contacted', 'Qualified', 'Active', 'Follow-up', 'Interested', 'Proposal Sent'] },
       });
     } else if (
       s.toLowerCase() === 'completed' ||
@@ -50,6 +50,10 @@ export function buildLeadFilterQuery(queryParams = {}) {
     ) {
       andConditions.push({
         status: { in: ['Completed', 'Complete', 'Won', 'Closed Won'] },
+      });
+    } else if (s.toLowerCase() === 'lost' || s.toLowerCase() === 'lose') {
+      andConditions.push({
+        status: { in: ['Lost', 'Disqualified', 'Unqualified', 'Cancelled'] },
       });
     } else {
       andConditions.push({ status: { equals: s, mode: 'insensitive' } });

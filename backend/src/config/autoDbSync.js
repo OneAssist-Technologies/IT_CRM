@@ -139,6 +139,25 @@ export async function syncExistingContactLeadMeetings() {
         AND (c."status" = 'Qualified' OR c."qualificationStatus" = 'Qualified')
         AND (l."status" = 'Qualified' OR l."stage" = 'Qualification');
     `).catch(() => {});
+
+    // 8. Standardize all lead statuses to the 4 official statuses: New, In Progress, Completed, Lost
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead"
+      SET "status" = 'Completed', "updatedAt" = NOW()
+      WHERE "status" IN ('Won', 'Closed Won', 'Complete');
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead"
+      SET "status" = 'Lost', "updatedAt" = NOW()
+      WHERE "status" IN ('Disqualified', 'Unqualified', 'Cancelled');
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead"
+      SET "status" = 'In Progress', "updatedAt" = NOW()
+      WHERE "status" IN ('Contacted', 'Active', 'Follow-up', 'Interested', 'Proposal Sent', 'In Negotiation');
+    `).catch(() => {});
   } catch (err) {
     console.warn('[syncExistingContactLeadMeetings Notice]:', err.message || err);
   }

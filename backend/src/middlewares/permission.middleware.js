@@ -62,6 +62,8 @@ export async function getUserPermissions(user) {
         'access_control',
         'settings',
         'activity_timeline',
+        'support_tickets',
+        'tickets',
         'activities',
       ];
       allModules.forEach((mod) => {

@@ -4,6 +4,7 @@ import app from './src/app.js';
 import { env } from './src/config/env.js';
 import { setIO } from './src/utils/socket.js';
 import { autoSyncDatabase } from './src/config/autoDbSync.js';
+import { initTicketDatabase } from './src/config/ticketDbInit.js';
 
 // 1. Create HTTP server instance with Express app
 const server = http.createServer(app);
@@ -31,6 +32,7 @@ server.listen(PORT, async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`⚡ Redis: Active | 🗄️ PostgreSQL: Connected | 🔌 Socket.IO: Ready`);
   await autoSyncDatabase();
+  await initTicketDatabase().catch((e) => console.error('[Server] Ticket DB init error:', e));
 });
 
 // 5. Graceful Process Shutdown

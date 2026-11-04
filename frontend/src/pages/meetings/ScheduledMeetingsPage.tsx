@@ -655,6 +655,8 @@ const inferDuration = (start?: string, end?: string): string => {
       setModalOpen(false);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
       }
       await loadData();
     } catch (err: any) {
@@ -682,6 +684,8 @@ const inferDuration = (start?: string, end?: string): string => {
       setDeleteTarget(null);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
       }
       await loadData();
     } catch (err: any) {

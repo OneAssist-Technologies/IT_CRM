@@ -39,7 +39,7 @@ interface ParsedTimeResult {
   formatted: string; // "HH:MM AM"
 }
 
-const parseFlexibleTime = (str: string, currentPeriod = 'AM'): ParsedTimeResult | null => {
+const parseFlexibleTime = (str: string, currentPeriod = (new Date().getHours() >= 12 ? 'PM' : 'AM')): ParsedTimeResult | null => {
   if (!str) return null;
   const trimmed = str.trim().toLowerCase();
 
@@ -128,7 +128,7 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
   const [inputText, setInputText] = useState<string>(value || '');
   const [hours, setHours] = useState('10');
   const [minutes, setMinutes] = useState('00');
-  const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
+  const [period, setPeriod] = useState<'AM' | 'PM'>(() => (new Date().getHours() >= 12 ? 'PM' : 'AM'));
 
   const hourListRef = useRef<HTMLDivElement>(null);
   const minuteListRef = useRef<HTMLDivElement>(null);

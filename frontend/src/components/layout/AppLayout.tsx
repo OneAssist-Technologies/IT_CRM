@@ -23,6 +23,7 @@ import { Invoice } from '../../types/billing';
 import { LeadNegotiationSection, LeadContractSection } from '../../pages/leads/components/LeadDealSections';
 import { AuthPage, SignupPage, LoginPage, ResetPasswordPage } from '../../pages/auth';
 import { ActivityTimelinePage } from '../../pages/activity-timeline';
+import { TicketsPage, TicketDetailsPage } from '../../pages/support-tickets';
 import { useContact } from '../../context/ContactContext';
 import { useLead } from '../../context/LeadContext';
 import { useProject } from '../../context/ProjectContext';
@@ -69,6 +70,7 @@ export const AppLayout: React.FC = () => {
   const { selectedCustomer, setSelectedCustomer, customers, deleteCustomer: deleteCust } = useCustomer();
   const [selectedInvoice, setSelectedInvoice] = React.useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = React.useState<Invoice | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(null);
 
   const findFirstAllowedNav = React.useCallback((): string => {
     const candidateModules: { nav: string; id: string }[] = [
@@ -80,6 +82,7 @@ export const AppLayout: React.FC = () => {
       { nav: 'call-logs', id: 'call_logs' },
       { nav: 'customers', id: 'customers' },
       { nav: 'projects', id: 'projects' },
+      { nav: 'support-tickets', id: 'support_tickets' },
       { nav: 'negotiations', id: 'negotiations' },
       { nav: 'invoices', id: 'invoices' },
       { nav: 'activity-timeline', id: 'activity_timeline' },
@@ -736,6 +739,55 @@ export const AppLayout: React.FC = () => {
           );
         }
         return <BillingPage />;
+            case 'support-tickets':
+      case 'tickets':
+      case 'support':
+        return (
+          <TicketsPage
+            onViewTicket={(ticket) => {
+              setSelectedTicketId(ticket.id);
+              if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_ticket_id', ticket.id);
+              setActiveNav('ticket-details');
+            }}
+          />
+        );
+
+      case 'ticket-details': {
+        let viewId = selectedTicketId;
+        if (!viewId && typeof window !== 'undefined') {
+          viewId = sessionStorage.getItem('crm_selected_ticket_id');
+        }
+        if (viewId) {
+          return (
+            <TicketDetailsPage
+              ticketId={viewId}
+              onBack={() => {
+                if (typeof window !== 'undefined') sessionStorage.removeItem('crm_selected_ticket_id');
+                setSelectedTicketId(null);
+                setActiveNav('support-tickets');
+              }}
+              onNavigateToCustomer={(cust) => {
+                if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_customer', JSON.stringify({ id: cust }));
+                setActiveNav('customer-details');
+              }}
+              onNavigateToProject={(proj) => {
+                if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_project', JSON.stringify({ id: proj }));
+                setActiveNav('project-details');
+              }}
+            />
+          );
+        }
+        return (
+          <TicketsPage
+            onViewTicket={(ticket) => {
+              setSelectedTicketId(ticket.id);
+              if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_ticket_id', ticket.id);
+              setActiveNav('ticket-details');
+            }}
+          />
+        );
+      }
+
       case 'activity-timeline':
       case 'activities':
       case 'activity':

@@ -326,7 +326,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
     return SUBMODULE_STAGES[1]; // Meetings
   };
 
-  const STATUS_OPTIONS = ['New', 'In Progress', 'Follow-up', 'Interested', 'Qualified', 'Proposal Sent', 'Complete', 'Lost'];
+  const STATUS_OPTIONS = ['New', 'In Progress', 'Completed', 'Lost'];
 
   const getStatusDotColor = (statusVal?: string | null) => {
     const s = (statusVal || '').toLowerCase();
@@ -519,8 +519,9 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
       }
     }
 
-    if (timeStr && timeStr.trim()) {
-      return `${dayLabel} • ${timeStr.trim()}`;
+    const finalTime = (timeStr && timeStr.trim()) || (isoStr ? new Date(isoStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+    if (finalTime) {
+      return `${dayLabel} • ${finalTime}`;
     }
     return dayLabel;
   };
@@ -646,7 +647,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
 
     const { icon, color, bg } = getActivityTypeDetails(act.type);
     const displayTitle = formatLastActivityTitle(act);
-    const timeDisplay = formatActivityTimestamp(act.date, act.time, act.createdAt);
+    const timeDisplay = formatActivityTimestamp(act.date, act.time, act.updatedAt || act.createdAt);
     const isMeeting = (act.type || '').toLowerCase() === 'meeting';
     const isFollowUp = /follow/i.test(act.status || '') || /follow/i.test(displayTitle);
     const effectiveFollowUpDate = act.followUpDate || act.nextFollowDate || (act as any).metadata?.nextFollowDate || (lead as any).nextFollowDate;
@@ -757,47 +758,47 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
     );
   };
 
-  // Sleek Modern STATUS Badge matching Contacts design
+  // Sleek Modern STATUS Badge strictly displaying New, In Progress, Completed, or Lost
   const renderStatusBadge = (statusVal?: string | null, stageVal?: string | null) => {
     let raw = (statusVal || stageVal || 'New').trim();
-    if (raw.toLowerCase() === 'qualified' && (!stageVal || stageVal.toLowerCase() === 'qualification' || stageVal.toLowerCase() === 'initialization')) {
-      raw = 'New';
-    } else if (raw.toLowerCase() === 'contacted') {
-      raw = 'In Progress';
-    } else if (raw.toLowerCase() === 'won' || raw.toLowerCase() === 'closed won' || raw.toLowerCase() === 'completed') {
-      raw = 'Complete';
+    const sLow = raw.toLowerCase();
+    let normalized = 'New';
+    if (sLow.includes('lost') || sLow.includes('disqual') || sLow.includes('unqual') || sLow.includes('cancel')) {
+      normalized = 'Lost';
+    } else if (sLow.includes('complete') || sLow.includes('won') || sLow.includes('closed won')) {
+      normalized = 'Completed';
+    } else if (
+      sLow.includes('progress') ||
+      sLow.includes('follow') ||
+      sLow.includes('interest') ||
+      sLow.includes('proposal') ||
+      sLow.includes('negotiat') ||
+      sLow.includes('contact') ||
+      sLow.includes('active')
+    ) {
+      normalized = 'In Progress';
+    } else {
+      normalized = 'New';
     }
-    const st = raw;
-    const sLow = st.toLowerCase();
+
     let bg = isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF';
     let color = isDark ? '#93C5FD' : '#1D4ED8';
     let border = isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE';
 
-    if (sLow.includes('unqual') || sLow.includes('disqual') || sLow.includes('lost') || sLow.includes('cancel')) {
+    if (normalized === 'Lost') {
       bg = isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEF2F2';
       color = isDark ? '#FCA5A5' : '#DC2626';
       border = isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA';
-    } else if (sLow.includes('qualif') || sLow.includes('won') || sLow.includes('complete')) {
+    } else if (normalized === 'Completed') {
       bg = isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5';
       color = isDark ? '#6EE7B7' : '#047857';
       border = isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0';
-    } else if (sLow.includes('follow')) {
-      bg = isDark ? 'rgba(245, 158, 11, 0.16)' : '#FFFBEB';
-      color = isDark ? '#FCD34D' : '#D97706';
-      border = isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A';
-    } else if (sLow.includes('interest')) {
-      bg = isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5';
-      color = isDark ? '#6EE7B7' : '#047857';
-      border = isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0';
-    } else if (sLow.includes('progress') || sLow.includes('contact')) {
+    } else if (normalized === 'In Progress') {
       bg = isDark ? 'rgba(14, 165, 233, 0.16)' : '#F0F9FF';
       color = isDark ? '#7DD3FC' : '#0284C7';
       border = isDark ? 'rgba(14, 165, 233, 0.35)' : '#BAE6FD';
-    } else if (sLow.includes('proposal') || sLow.includes('negotiat')) {
-      bg = isDark ? 'rgba(147, 51, 234, 0.14)' : '#FAF5FF';
-      color = isDark ? '#D8B4FE' : '#7E22CE';
-      border = isDark ? 'rgba(147, 51, 234, 0.25)' : '#E9D5FF';
-    } else if (sLow.includes('new') || sLow.includes('init')) {
+    } else {
+      // New
       bg = isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF';
       color = isDark ? '#93C5FD' : '#1D4ED8';
       border = isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE';
@@ -820,7 +821,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
           whiteSpace: 'nowrap',
         }}
       >
-        {st}
+        {normalized}
       </Box>
     );
   };
@@ -1260,7 +1261,12 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                       <Menu.Dropdown p="xs">
                         <Menu.Label>Change Status</Menu.Label>
                         {STATUS_OPTIONS.map((statusOpt) => {
-                          const isCurrent = (lead.status || 'New').toLowerCase() === statusOpt.toLowerCase();
+                          const sL = (lead.status || 'New').toLowerCase();
+                          let curNorm = 'New';
+                          if (sL.includes('lost') || sL.includes('disqual') || sL.includes('cancel')) curNorm = 'Lost';
+                          else if (sL.includes('complete') || sL.includes('won')) curNorm = 'Completed';
+                          else if (sL.includes('progress') || sL.includes('follow') || sL.includes('interest') || sL.includes('proposal') || sL.includes('contact') || sL.includes('active')) curNorm = 'In Progress';
+                          const isCurrent = curNorm === statusOpt;
                           return (
                             <Menu.Item
                               key={statusOpt}
@@ -1396,7 +1402,12 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                   <Menu.Dropdown p="xs">
                     <Menu.Label>Change Status</Menu.Label>
                     {STATUS_OPTIONS.map((statusOpt) => {
-                      const isCurrent = (lead.status || 'New').toLowerCase() === statusOpt.toLowerCase();
+                      const sL = (lead.status || 'New').toLowerCase();
+                      let curNorm = 'New';
+                      if (sL.includes('lost') || sL.includes('disqual') || sL.includes('cancel')) curNorm = 'Lost';
+                      else if (sL.includes('complete') || sL.includes('won')) curNorm = 'Completed';
+                      else if (sL.includes('progress') || sL.includes('follow') || sL.includes('interest') || sL.includes('proposal') || sL.includes('contact') || sL.includes('active')) curNorm = 'In Progress';
+                      const isCurrent = curNorm === statusOpt;
                       return (
                         <Menu.Item
                           key={statusOpt}

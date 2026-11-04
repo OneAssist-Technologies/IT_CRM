@@ -113,8 +113,16 @@ export const LeadsPage: React.FC = () => {
       fetchStats();
     };
     window.addEventListener('crm_leads_updated', handleUpdated);
+    window.addEventListener('crm_meetings_updated', handleUpdated);
+    window.addEventListener('crm:meeting-updated', handleUpdated);
+    window.addEventListener('crm_activities_updated', handleUpdated);
+    window.addEventListener('crm_call_logs_updated', handleUpdated);
     return () => {
       window.removeEventListener('crm_leads_updated', handleUpdated);
+      window.removeEventListener('crm_meetings_updated', handleUpdated);
+      window.removeEventListener('crm:meeting-updated', handleUpdated);
+      window.removeEventListener('crm_activities_updated', handleUpdated);
+      window.removeEventListener('crm_call_logs_updated', handleUpdated);
     };
   }, [fetchLeads, fetchStats]);
   const [modalOpened, setModalOpened] = useState<boolean>(false);

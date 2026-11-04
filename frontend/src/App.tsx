@@ -10,6 +10,7 @@ import { LeadProvider } from './context/LeadContext';
 import { ProjectProvider } from './context/ProjectContext';
 import { CustomerProvider } from './context/CustomerContext';
 import { AccessControlProvider } from './context/AccessControlContext';
+import { SupportTicketProvider } from './context/SupportTicketContext';
 import { AppLayout } from './components/layout/AppLayout';
 
 export const App: React.FC = () => {
@@ -34,7 +35,9 @@ export const App: React.FC = () => {
                 <LeadProvider>
                   <ProjectProvider>
                     <CustomerProvider>
-                      <AppLayout />
+                      <SupportTicketProvider>
+                        <AppLayout />
+                      </SupportTicketProvider>
                     </CustomerProvider>
                   </ProjectProvider>
                 </LeadProvider>

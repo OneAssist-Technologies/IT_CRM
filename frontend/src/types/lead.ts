@@ -39,6 +39,7 @@ export interface LeadActivity {
   time?: string | null;
   performedBy?: string | null;
   createdAt: string;
+  updatedAt?: string | null;
 }
 
 export interface Lead {
