@@ -18,6 +18,7 @@ export const isMeetingForLead = (m: ScheduledMeeting, lead: Lead): boolean => {
   if (m.leadId && lead.leadId && String(m.leadId) === String(lead.leadId)) return true;
   if (m.contactId && (lead as any).contactId && String(m.contactId) === String((lead as any).contactId)) return true;
   if (m.contactId && (lead as any).internalReference && String(m.contactId) === String((lead as any).internalReference)) return true;
+  if ((m as any).customerId && (String((m as any).customerId) === String(lead.id) || String((m as any).customerId) === String(lead.leadId))) return true;
 
   // 2. Direct Phone or Email Match (for converted Contact -> Lead synchronization)
   const cleanLeadPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
@@ -28,21 +29,36 @@ export const isMeetingForLead = (m: ScheduledMeeting, lead: Lead): boolean => {
   const cleanMeetingEmail = (m.leadEmail || (m as any).email) ? String(m.leadEmail || (m as any).email).toLowerCase().trim() : '';
   if (cleanLeadEmail && cleanMeetingEmail && cleanLeadEmail === cleanMeetingEmail) return true;
 
-  // 3. Name matching fallback
+  // 3. Company match (e.g. for Support Ticket customers or corporate clients)
+  const rawLeadCo = (lead.companyName || '').trim().toLowerCase();
+  const rawMeetingCo = (m.companyName || '').trim().toLowerCase();
+  if (rawLeadCo && rawMeetingCo && rawLeadCo === rawMeetingCo) return true;
+
+  // 4. Name matching fallback
   const rawClientName = (m.clientName || m.leadName || '').trim().toLowerCase();
   const rawLeadName = (lead.name || '').trim().toLowerCase();
-  if (!rawClientName || !rawLeadName) return false;
+  if (!rawClientName) return false;
 
-  if (rawClientName === rawLeadName) return true;
+  if (rawLeadName && (rawClientName === rawLeadName || rawClientName.startsWith(rawLeadName))) return true;
 
-  // In case clientName is stored with company: e.g. "athi (Athi tech)" or "athi"
+  // In case clientName is stored with company: e.g. "john (JJ industries)"
   const clientNameWithoutCompany = rawClientName.split('(')[0].trim();
-  return clientNameWithoutCompany === rawLeadName;
+  if (rawLeadName && (clientNameWithoutCompany === rawLeadName || rawLeadName === clientNameWithoutCompany)) return true;
+
+  const companyInParens = rawClientName.includes('(')
+    ? rawClientName.split('(')[1].replace(')', '').trim()
+    : '';
+  if (companyInParens) {
+    if (rawLeadCo && companyInParens === rawLeadCo) return true;
+    if (rawLeadName && companyInParens === rawLeadName) return true;
+  }
+
+  return false;
 };
 
 /**
  * Finds the matching lead for a scheduled meeting from a list of leads.
- * Uses strict ID matching first. Then phone/email, and finally matches by exact clientName.
+ * Uses strict ID matching first. Then phone/email, and finally matches by company and clientName.
  */
 export const findLeadForMeeting = (m: ScheduledMeeting, leads: Lead[]): Lead | undefined => {
   if (!m || !leads || leads.length === 0) return undefined;
@@ -57,6 +73,7 @@ export const findLeadForMeeting = (m: ScheduledMeeting, leads: Lead[]): Lead | u
     if (m.leadId && lead.leadId && String(m.leadId) === String(lead.leadId)) return true;
     if (m.contactId && (lead as any).contactId && String(m.contactId) === String((lead as any).contactId)) return true;
     if (m.contactId && (lead as any).internalReference && String(m.contactId) === String((lead as any).internalReference)) return true;
+    if ((m as any).customerId && (String((m as any).customerId) === String(lead.id) || String((m as any).customerId) === String(lead.leadId))) return true;
     return false;
   });
   if (matchedById) return matchedById;
@@ -74,15 +91,36 @@ export const findLeadForMeeting = (m: ScheduledMeeting, leads: Lead[]): Lead | u
     if (matchedByContactInfo) return matchedByContactInfo;
   }
 
-  // 3. Name matching fallback
+  // 3. Company match
+  const rawMeetingCo = (m.companyName || '').trim().toLowerCase();
   const rawClientName = (m.clientName || m.leadName || '').trim().toLowerCase();
-  if (!rawClientName) return undefined;
+  const companyInParens = rawClientName.includes('(')
+    ? rawClientName.split('(')[1].replace(')', '').trim()
+    : '';
 
+  if (rawMeetingCo || companyInParens) {
+    const matchedByCompany = leads.find((lead) => {
+      const rawLeadCo = (lead.companyName || '').trim().toLowerCase();
+      const rawLeadName = (lead.name || '').trim().toLowerCase();
+      if (rawMeetingCo && rawLeadCo && rawLeadCo === rawMeetingCo) return true;
+      if (companyInParens && rawLeadCo && rawLeadCo === companyInParens) return true;
+      if (companyInParens && rawLeadName && rawLeadName === companyInParens) return true;
+      return false;
+    });
+    if (matchedByCompany) return matchedByCompany;
+  }
+
+  // 4. Name matching fallback
+  if (!rawClientName) return undefined;
   const clientNameWithoutCompany = rawClientName.split('(')[0].trim();
 
   return leads.find((lead) => {
     const rawLeadName = (lead.name || '').trim().toLowerCase();
     if (!rawLeadName) return false;
-    return rawLeadName === rawClientName || rawLeadName === clientNameWithoutCompany;
+    return (
+      rawLeadName === rawClientName ||
+      rawLeadName === clientNameWithoutCompany ||
+      rawClientName.startsWith(rawLeadName)
+    );
   });
 };

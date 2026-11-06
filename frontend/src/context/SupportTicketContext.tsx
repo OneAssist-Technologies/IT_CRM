@@ -33,7 +33,7 @@ interface SupportTicketContextType {
   limit: number;
   setLimit: (l: number) => void;
   metadata: TicketDropdownMetadata | null;
-  stats: { all: number; my: number; unassigned: number };
+  stats: { all: number; my: number; unassigned: number; new?: number; inProgress?: number; complete?: number };
   fetchStats: () => Promise<void>;
   activeTab: 'all' | 'my' | 'unassigned';
   setActiveTab: (tab: 'all' | 'my' | 'unassigned') => void;
@@ -43,7 +43,7 @@ interface SupportTicketContextType {
   selectedTicket: SupportTicket | null;
   setSelectedTicket: (ticket: SupportTicket | null) => void;
   fetchTickets: (customFilters?: TicketFilters, targetPage?: number) => Promise<void>;
-  fetchTicketById: (id: string) => Promise<SupportTicket>;
+  fetchTicketById: (id: string) => Promise<SupportTicket | null>;
   createTicket: (data: Partial<SupportTicket>, attachments?: File[]) => Promise<SupportTicket>;
   updateTicket: (id: string, data: Partial<SupportTicket>) => Promise<SupportTicket>;
   deleteTicket: (id: string) => Promise<SupportTicket>;
@@ -51,7 +51,7 @@ interface SupportTicketContextType {
   reassignTicket: (id: string, assignmentData: any) => Promise<SupportTicket>;
   addComment: (id: string, data: { type: 'public_reply' | 'internal_note'; message: string; attachments?: any[] }) => Promise<TicketComment>;
   uploadAttachments: (id: string, files: File[]) => Promise<TicketAttachment[]>;
-  resolveTicket: (id: string, payload: { resolution_description: string; root_cause?: string; workaround?: string }) => Promise<SupportTicket>;
+  resolveTicket: (id: string, payload: { resolution_description: string; root_cause?: string; workaround?: string; skipTaskCheck?: boolean; [key: string]: any }) => Promise<SupportTicket>;
   reopenTicket: (id: string, payload: { reason: string }) => Promise<SupportTicket>;
 }
 
@@ -142,10 +142,16 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
   }, [fetchTickets]);
 
   // Single ticket fetcher
-  const fetchTicketById = async (id: string): Promise<SupportTicket> => {
-    const ticket = await fetchTicketByIdApi(id);
-    setSelectedTicket(ticket);
-    return ticket;
+  const fetchTicketById = async (id: string): Promise<SupportTicket | null> => {
+    try {
+      const ticket = await fetchTicketByIdApi(id);
+      setSelectedTicket(ticket);
+      return ticket;
+    } catch (err: any) {
+      console.warn('Failed to fetch ticket by ID:', id, err?.message);
+      setSelectedTicket(null);
+      return null;
+    }
   };
 
   // Create ticket
@@ -345,7 +351,7 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
   // Resolve Ticket
   const resolveTicket = async (
     id: string,
-    payload: { resolution_description: string; root_cause?: string; workaround?: string }
+    payload: { resolution_description: string; root_cause?: string; workaround?: string; skipTaskCheck?: boolean; [key: string]: any }
   ): Promise<SupportTicket> => {
     try {
       const updated = await resolveTicketApi(id, payload);
@@ -433,10 +439,42 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
   );
 };
 
+const defaultSupportTicketContext: SupportTicketContextType = {
+  tickets: [],
+  totalTickets: 0,
+  loading: false,
+  page: 1,
+  setPage: () => {},
+  limit: 20,
+  setLimit: () => {},
+  metadata: null,
+  stats: { all: 0, my: 0, unassigned: 0 },
+  fetchStats: async () => {},
+  activeTab: 'all',
+  setActiveTab: () => {},
+  filters: initialFilters,
+  setFilters: () => {},
+  resetFilters: () => {},
+  selectedTicket: null,
+  setSelectedTicket: () => {},
+  fetchTickets: async () => {},
+  fetchTicketById: async () => null,
+  createTicket: async () => ({} as any),
+  updateTicket: async () => ({} as any),
+  deleteTicket: async () => ({} as any),
+  changeStatus: async () => ({} as any),
+  reassignTicket: async () => ({} as any),
+  addComment: async () => ({} as any),
+  uploadAttachments: async () => [],
+  resolveTicket: async () => ({} as any),
+  reopenTicket: async () => ({} as any),
+};
+
 export const useSupportTicket = (): SupportTicketContextType => {
   const context = useContext(SupportTicketContext);
   if (!context) {
-    throw new Error('useSupportTicket must be used within a SupportTicketProvider');
+    console.warn('useSupportTicket was called outside SupportTicketProvider, using safe fallback context');
+    return defaultSupportTicketContext;
   }
   return context;
 };

@@ -35,7 +35,7 @@ export const ALLOWED_STATUS_TRANSITIONS = {
   'In Progress': ['Pending Customer', 'On Hold', 'Resolved'],
   'Pending Customer': ['In Progress'],
   'On Hold': ['In Progress'],
-  Resolved: ['Reopened', 'Closed'],
+  Resolved: ['In Progress', 'Reopened', 'Closed'],
   Reopened: ['In Progress'],
   Closed: [],
   Cancelled: [],

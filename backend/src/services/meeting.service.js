@@ -34,15 +34,15 @@ function getScheduledMeetingSelectQuery(whereClause = 'WHERE 1=1') {
         m."employeeName" AS "assignedTo",
         m."employeeEmail",
         m."employeeDesignation",
-        COALESCE(l.name, c.name, b.name, m."clientName") AS "leadName",
-        COALESCE(m."clientName", l.name, c.name, b.name) AS "clientName",
-        COALESCE(l."companyName", c."companyName", b."companyName") AS "companyName",
-        COALESCE(l.email, c.email, b.email) AS "leadEmail",
-        COALESCE(l.phone, c.phone, b.phone) AS "leadPhone",
-        COALESCE(l."leadId", c."contactId", b."bulkId") AS "leadCode",
-        COALESCE(l.id, c.id, b.id) AS "leadDbId",
-        COALESCE(l.stage, c.stage) AS "leadStage",
-        COALESCE(l.status, c.status, b.status) AS "leadStatus",
+        COALESCE(l.name, c.name, cust."contactPerson", b.name, m."clientName") AS "leadName",
+        COALESCE(m."clientName", cust."companyName", l.name, c.name, b.name) AS "clientName",
+        COALESCE(l."companyName", c."companyName", cust."companyName", b."companyName") AS "companyName",
+        COALESCE(l.email, c.email, cust.email, b.email) AS "leadEmail",
+        COALESCE(l.phone, c.phone, cust.phone, b.phone) AS "leadPhone",
+        COALESCE(l."leadId", c."contactId", cust."customerId", b."bulkId") AS "leadCode",
+        COALESCE(l.id, c.id, cust.id, b.id) AS "leadDbId",
+        COALESCE(l.stage, c.stage, 'Customer') AS "leadStage",
+        COALESCE(l.status, c.status, cust.status, b.status) AS "leadStatus",
         m.status,
         m.status AS "meetingStatus",
         m.notes,
@@ -74,6 +74,13 @@ function getScheduledMeetingSelectQuery(whereClause = 'WHERE 1=1') {
         m."lead_id" = c."contactId" OR
         (l."leadId" IS NOT NULL AND c."internalReference" = l."leadId") OR
         (l.phone IS NOT NULL AND l.phone != '' AND c.phone = l.phone)
+      )
+      LEFT JOIN "Customer" cust ON (
+        m."contactId" = cust.id OR
+        m."contactId" = cust."customerId" OR
+        m."lead_id" = cust.id OR
+        m."lead_id" = cust."customerId" OR
+        (m."clientName" IS NOT NULL AND (cust."companyName" = m."clientName" OR cust."contactPerson" = m."clientName"))
       )
       LEFT JOIN "BulkUploadContact" b ON (
         m."contactId" = b.id OR
@@ -330,9 +337,10 @@ export async function createMeetingService(body) {
 
   const targetLeadIdentifier = lead_id || leadId || contactId;
 
-  // Resolve lead from Lead table if identifier provided, or Contact/BulkUploadContact
+  // Resolve lead from Lead table if identifier provided, or Contact/BulkUploadContact/Customer
   let resolvedLead = null;
   let resolvedContact = null;
+  let resolvedCustomer = null;
 
   const candidateIdentifiers = [lead_id, leadId, contactId, targetLeadIdentifier].filter(Boolean);
 
@@ -362,6 +370,17 @@ export async function createMeetingService(body) {
           resolvedContact = bulkContacts[0];
         }
       }
+    }
+    if (!resolvedCustomer && !resolvedLead && !resolvedContact) {
+      try {
+        const customers = await prisma.$queryRawUnsafe(
+          `SELECT id, "customerId", "companyName", "contactPerson", phone, email FROM "Customer" WHERE id = $1 OR "customerId" = $1 LIMIT 1`,
+          ident
+        );
+        if (customers && customers.length > 0) {
+          resolvedCustomer = customers[0];
+        }
+      } catch (_) {}
     }
   }
 
@@ -427,6 +446,8 @@ export async function createMeetingService(body) {
       finalClientName = resolvedLead.companyName ? `${resolvedLead.name} (${resolvedLead.companyName})` : resolvedLead.name;
     } else if (resolvedContact) {
       finalClientName = resolvedContact.companyName ? `${resolvedContact.name} (${resolvedContact.companyName})` : resolvedContact.name;
+    } else if (resolvedCustomer) {
+      finalClientName = resolvedCustomer.companyName ? `${resolvedCustomer.contactPerson || 'Client'} (${resolvedCustomer.companyName})` : (resolvedCustomer.contactPerson || resolvedCustomer.companyName);
     }
   }
   finalClientName = (finalClientName || 'Client Discussion').trim();

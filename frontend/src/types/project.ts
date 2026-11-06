@@ -34,6 +34,10 @@ export interface ProjectModuleItem {
   price?: number | string;
   createdAt?: string;
   updatedAt?: string;
+  ticketId?: string;
+  ticketNumber?: string;
+  taskRefNumber?: string;
+  taskId?: string;
 }
 
 export interface Project {

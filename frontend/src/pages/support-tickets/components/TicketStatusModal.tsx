@@ -18,6 +18,7 @@ interface TicketStatusModalProps {
   opened: boolean;
   onClose: () => void;
   ticket: SupportTicket | null;
+  onSuccess?: () => void;
 }
 
 const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
@@ -26,7 +27,7 @@ const ALLOWED_TRANSITIONS: Record<TicketStatus, TicketStatus[]> = {
   'In Progress': ['Pending Customer', 'On Hold', 'Resolved'],
   'Pending Customer': ['In Progress'],
   'On Hold': ['In Progress'],
-  Resolved: ['Reopened', 'Closed'],
+  Resolved: ['In Progress', 'Reopened', 'Closed'],
   Reopened: ['In Progress'],
   Closed: [],
   Cancelled: [],
@@ -36,6 +37,7 @@ export const TicketStatusModal: React.FC<TicketStatusModalProps> = ({
   opened,
   onClose,
   ticket,
+  onSuccess,
 }) => {
   const { changeStatus } = useSupportTicket();
 
@@ -71,6 +73,26 @@ export const TicketStatusModal: React.FC<TicketStatusModalProps> = ({
     }
 
     if (targetStatus === 'Resolved') {
+      try {
+        const saved =
+          localStorage.getItem(`crm_ticket_tasks_${ticket.id}`) ||
+          (ticket.ticketNumber ? localStorage.getItem(`crm_ticket_tasks_${ticket.ticketNumber}`) : null);
+        if (saved) {
+          const tasks = JSON.parse(saved);
+          if (Array.isArray(tasks) && tasks.length > 0) {
+            const incomplete = tasks.filter(
+              (t: any) => t.status !== 'Completed' && t.status !== 'Resolved'
+            );
+            if (incomplete.length > 0) {
+              setErrorMsg(
+                `Cannot resolve ticket: ${incomplete.length} task(s) in Work in Progress are still not completed.`
+              );
+              return;
+            }
+          }
+        }
+      } catch (_) {}
+
       if (!resolutionDescription.trim()) {
         setErrorMsg('Resolution Description is required to mark a ticket as Resolved');
         return;
@@ -91,6 +113,7 @@ export const TicketStatusModal: React.FC<TicketStatusModalProps> = ({
       }
 
       await changeStatus(ticket.id, targetStatus, payload);
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Status transition rejected');
@@ -144,7 +167,7 @@ export const TicketStatusModal: React.FC<TicketStatusModalProps> = ({
                   Resolving a ticket requires providing resolution details and root cause.
                 </Alert>
                 <Textarea
-                  label="Resolution Description"
+                  label="Fixed Details"
                   placeholder="Explain how this issue was resolved..."
                   rows={3}
                   value={resolutionDescription}

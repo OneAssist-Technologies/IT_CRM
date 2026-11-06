@@ -33,19 +33,24 @@ interface CreateTicketModalProps {
   opened: boolean;
   onClose: () => void;
   ticket?: SupportTicket | null;
+  initialData?: SupportTicket | null;
+  isEdit?: boolean;
   onSuccess?: (ticketId: string) => void;
 }
 
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   opened,
   onClose,
-  ticket,
+  ticket: propTicket,
+  initialData,
+  isEdit: propIsEdit,
   onSuccess,
 }) => {
   const { metadata, createTicket, updateTicket, uploadAttachments, totalTickets } = useSupportTicket();
   const { currentUser } = useCRM();
 
-  const isEdit = Boolean(ticket);
+  const ticket = propTicket || initialData || null;
+  const isEdit = propIsEdit !== undefined ? propIsEdit : Boolean(ticket);
 
   // Form states
   const [subject, setSubject] = useState<string>('');
@@ -243,6 +248,14 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
       );
       if (custProjects.length === 1) {
         setProjectId(custProjects[0].id);
+      }
+
+      // Auto-select contract if there's a matching contract for this customer/client
+      const custContracts = (metadata?.contracts || []).filter(
+        (k) => k.clientName && k.clientName.toLowerCase().trim() === companyName
+      );
+      if (custContracts.length > 0 && !contractId) {
+        setContractId(custContracts[0].id);
       }
     }
   };
@@ -463,7 +476,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
           <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
             <TextInput
               label="Handover ID (Optional)"
-              placeholder="e.g. HND-2026-001"
+              placeholder="e.g. HND-001"
               value={handoverId}
               onChange={(e) => setHandoverId(e.currentTarget.value)}
             />

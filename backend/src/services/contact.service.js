@@ -852,7 +852,7 @@ export async function syncContactToLead(contact, user = null) {
       recordActivity({
         type: 'qualification',
         title: 'BANT Qualification Assessment',
-        description: `BANT Criteria Completed: Budget verified (₹${contact.budgetRange || '80,000+'}) · Decision Maker confirmed (${contact.contactPerson || contact.name}, ${contact.designation || 'Representative'}) · Need identified (${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT CRM Solution'}) · Timeline: Immediate · Priority: ${contact.priority || 'Medium'}.`,
+        description: `BANT Criteria Completed: Budget verified (â‚¹${contact.budgetRange || '80,000+'}) Â· Decision Maker confirmed (${contact.contactPerson || contact.name}, ${contact.designation || 'Representative'}) Â· Need identified (${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT CRM Solution'}) Â· Timeline: Immediate Â· Priority: ${contact.priority || 'Medium'}.`,
         leadId: updatedLead.id,
         leadCode: updatedLead.leadId,
         leadName: updatedLead.name,
@@ -1031,7 +1031,7 @@ export async function syncContactToLead(contact, user = null) {
       recordActivity({
         type: 'qualification',
         title: 'BANT Qualification Assessment',
-        description: `BANT Criteria Completed: Budget verified (₹${contact.budgetRange || '80,000+'}) · Decision Maker confirmed (${contact.contactPerson || contact.name}, ${contact.designation || 'Representative'}) · Need identified (${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT CRM Solution'}) · Timeline: Immediate · Priority: ${contact.priority || 'Medium'}.`,
+        description: `BANT Criteria Completed: Budget verified (â‚¹${contact.budgetRange || '80,000+'}) Â· Decision Maker confirmed (${contact.contactPerson || contact.name}, ${contact.designation || 'Representative'}) Â· Need identified (${contact.interestedService || (contact.productList && contact.productList[0]) || 'IT CRM Solution'}) Â· Timeline: Immediate Â· Priority: ${contact.priority || 'Medium'}.`,
         leadId: newLead.id,
         leadCode: newLead.leadId,
         leadName: newLead.name,
@@ -1352,6 +1352,63 @@ export async function updateContactService(id, body, user) {
     }
 
     if (!existing) {
+      // 3. Try matching Customer by cleanId, phone, or email
+      const matchedCustomer = await prisma.customer.findFirst({
+        where: {
+          OR: [
+            { id: cleanId },
+            { customerId: cleanId },
+            ...(body.phone ? [{ phone: String(body.phone).replace(/\D/g, '') }] : []),
+            ...(body.email ? [{ email: { equals: String(body.email).toLowerCase().trim(), mode: 'insensitive' } }] : []),
+            ...(body.companyName ? [{ companyName: { equals: String(body.companyName).trim(), mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+
+      if (matchedCustomer) {
+        const custPhone = matchedCustomer.phone ? String(matchedCustomer.phone).replace(/\D/g, '') : '';
+        const custEmail = matchedCustomer.email ? String(matchedCustomer.email).toLowerCase().trim() : '';
+        const custComp = matchedCustomer.companyName ? String(matchedCustomer.companyName).trim() : '';
+
+        if (custPhone || custEmail || custComp) {
+          existing = await prisma.contact.findFirst({
+            where: {
+              OR: [
+                ...(custPhone ? [{ phone: custPhone }] : []),
+                ...(custEmail ? [{ email: { equals: custEmail, mode: 'insensitive' } }] : []),
+                ...(custComp ? [{ companyName: { equals: custComp, mode: 'insensitive' } }] : []),
+              ],
+            },
+          });
+        }
+
+        if (!existing) {
+          const newContactId = await getNextContactId();
+          existing = await prisma.contact.create({
+            data: {
+              contactId: newContactId,
+              name: (body.name || matchedCustomer.contactPerson || matchedCustomer.companyName || 'Contact').trim(),
+              email: body.email || matchedCustomer.email || null,
+              phone: (body.phone ? String(body.phone).replace(/\D/g, '') : '') || custPhone || '0000000000',
+              companyName: body.companyName || matchedCustomer.companyName || null,
+              contactPerson: body.contactPerson || matchedCustomer.contactPerson || null,
+              contactType: body.contactType || 'Company Representative',
+              designation: body.designation || null,
+              address: body.address || matchedCustomer.address || null,
+              source: body.source || 'Customer Portal',
+              category: body.category || 'Service',
+              status: body.status || 'Qualified',
+              stage: body.stage || 'Qualification',
+              internalReference: matchedCustomer.customerId,
+              assignedTo: body.assignedTo || null,
+              assignedToName: body.assignedToName || null,
+            },
+          });
+        }
+      }
+    }
+
+    if (!existing) {
       const error = new Error('Contact not found');
       error.status = 404;
       throw error;
@@ -1561,7 +1618,6 @@ export async function updateContactService(id, body, user) {
     const leadUpdateData = {
       ...(mappedLeadStatus && { status: mappedLeadStatus }),
       ...(isContactQualified ? { stage: 'Initialization' } : (updated.stage && { stage: updated.stage })),
-      ...(updated.notes && { notes: updated.notes }),
       ...(updated.priority && { priority: updated.priority }),
       ...(updated.designation !== undefined && { designation: updated.designation }),
       ...(updated.profession !== undefined && { profession: updated.profession }),
@@ -1957,8 +2013,8 @@ export async function bulkImportContactsService(body, user) {
       failedRows.push({
         row: rowNum,
         name: resolvedName,
-        phone: rawPhone || '—',
-        email: email || '—',
+        phone: rawPhone || 'â€”',
+        email: email || 'â€”',
         reason: 'Both Phone number and Email are missing',
       });
       continue;

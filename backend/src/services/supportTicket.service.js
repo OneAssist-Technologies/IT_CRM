@@ -210,8 +210,26 @@ export class SupportTicketService {
 
     const updateFields = { status: targetStatus };
 
-    // Enforcement: Resolving requires resolution details
-    if (targetStatus === 'Resolved') {
+    // Enforcement: Resolving requires resolution details & all tasks completed
+    if (targetStatus === 'Resolved' && !payload.skipTaskCheck) {
+      try {
+        const existingTasks = await SupportTicketModel.getTasks(ticket.id);
+        if (Array.isArray(existingTasks) && existingTasks.length > 0) {
+          const incomplete = existingTasks.filter(
+            (t) => t.status !== 'Completed' && t.status !== 'Resolved'
+          );
+          if (incomplete.length > 0) {
+            const err = new Error(
+              `Cannot resolve ticket: ${incomplete.length} task(s) in Work in Progress are still not completed`
+            );
+            err.status = 400;
+            throw err;
+          }
+        }
+      } catch (taskErr) {
+        if (taskErr.status === 400) throw taskErr;
+      }
+
       const resolutionDesc = payload.resolution_description || payload.resolutionDescription;
       if (!resolutionDesc || !String(resolutionDesc).trim()) {
         const err = new Error('Resolution description is required when resolving a ticket');
@@ -459,6 +477,51 @@ export class SupportTicketService {
     return deleted;
   }
 
+  /**
+   * 14. Tasks Management for Support Ticket
+   */
+  static async getTicketTasks(id) {
+    const ticket = await SupportTicketModel.findById(id);
+    if (!ticket) {
+      const err = new Error('Ticket not found');
+      err.status = 404;
+      throw err;
+    }
+    return await SupportTicketModel.getTasks(ticket.id);
+  }
+
+  static async createTicketTask(id, taskData, user) {
+    const ticket = await SupportTicketModel.findById(id);
+    if (!ticket) {
+      const err = new Error('Ticket not found');
+      err.status = 404;
+      throw err;
+    }
+    const created = await SupportTicketModel.createTask(ticket.id, taskData);
+    return created;
+  }
+
+  static async updateTicketTask(id, taskId, taskData, user) {
+    const updated = await SupportTicketModel.updateTask(id, taskId, taskData);
+    return updated;
+  }
+
+  static async deleteTicketTask(id, taskId, user) {
+    const deleted = await SupportTicketModel.deleteTask(id, taskId);
+    return deleted;
+  }
+
+  static async syncTicketTasks(id, tasks = [], user) {
+    const ticket = await SupportTicketModel.findById(id);
+    if (!ticket) {
+      const err = new Error('Ticket not found');
+      err.status = 404;
+      throw err;
+    }
+    const synced = await SupportTicketModel.syncTasks(ticket.id, tasks);
+    return synced;
+  }
+
   static getAllowedTransitions(currentStatus) {
     const map = {
       New: ['Assigned', 'Cancelled'],
@@ -466,7 +529,7 @@ export class SupportTicketService {
       'In Progress': ['Pending Customer', 'On Hold', 'Resolved'],
       'Pending Customer': ['In Progress'],
       'On Hold': ['In Progress'],
-      Resolved: ['Reopened', 'Closed'],
+      Resolved: ['In Progress', 'Reopened', 'Closed'],
       Reopened: ['In Progress'],
       Closed: [],
       Cancelled: [],

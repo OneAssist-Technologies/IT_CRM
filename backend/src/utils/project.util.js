@@ -84,14 +84,30 @@ export function buildProjectFilterQuery(queryParams = {}) {
  */
 export function formatProjectResponse(project) {
   if (!project) return null;
+  const modules = Array.isArray(project.modules) ? project.modules : [];
+  let computedStatus = project.status;
+  if (modules.length > 0) {
+    const allModulesCompleted = modules.every((m) => {
+      const isStatusDone = m.status === 'Completed';
+      const isProgDone = parseInt(m.progress, 10) === 100;
+      return isStatusDone || isProgDone;
+    });
+    if (allModulesCompleted) {
+      computedStatus = 'Completed';
+    } else {
+      computedStatus = 'In Progress';
+    }
+  }
+
   return {
     ...project,
+    status: computedStatus,
     progressPercent: `${project.progress || 0}%`,
     isOverdue: Boolean(
       project.targetEndDate &&
       new Date(project.targetEndDate) < new Date() &&
-      project.status !== 'Completed' &&
-      project.status !== 'Cancelled'
+      computedStatus !== 'Completed' &&
+      computedStatus !== 'Cancelled'
     ),
   };
 }

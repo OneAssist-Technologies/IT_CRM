@@ -57,8 +57,12 @@ export class SupportTicketModel {
       conditions.push(`t.assigned_team = $${params.length}`);
     }
     if (assignedTo && assignedTo !== 'All') {
-      params.push(assignedTo);
-      conditions.push(`t.assigned_to = $${params.length}`);
+      if (assignedTo === 'Unassigned') {
+        conditions.push("(t.assigned_to IS NULL OR t.assigned_to = '')");
+      } else {
+        params.push(assignedTo);
+        conditions.push(`t.assigned_to = $${params.length}`);
+      }
     }
     if (customerId) {
       params.push(customerId);
@@ -117,10 +121,34 @@ export class SupportTicketModel {
         p.name AS project_name,
         p.status AS project_status,
         p."projectManagerName" AS project_manager_name,
-        k.title AS contract_title,
-        k."contractType" AS contract_type,
-        k."slaTerms" AS sla_terms,
-        k."warrantyTerms" AS warranty_terms,
+        COALESCE(k.title, (
+          SELECT k2.title 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS contract_title,
+        COALESCE(k."contractType", (
+          SELECT k2."contractType" 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS contract_type,
+        COALESCE(k."slaTerms", (
+          SELECT k2."slaTerms" 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS sla_terms,
+        COALESCE(k."warrantyTerms", (
+          SELECT k2."warrantyTerms" 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS warranty_terms,
         emp.name AS assigned_to_name,
         emp.email AS assigned_to_email,
         lead_emp.name AS team_lead_name,
@@ -180,10 +208,34 @@ export class SupportTicketModel {
         p.name AS project_name,
         p.status AS project_status,
         p."projectManagerName" AS project_manager_name,
-        k.title AS contract_title,
-        k."contractType" AS contract_type,
-        k."slaTerms" AS sla_terms,
-        k."warrantyTerms" AS warranty_terms,
+        COALESCE(k.title, (
+          SELECT k2.title 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS contract_title,
+        COALESCE(k."contractType", (
+          SELECT k2."contractType" 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS contract_type,
+        COALESCE(k."slaTerms", (
+          SELECT k2."slaTerms" 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS sla_terms,
+        COALESCE(k."warrantyTerms", (
+          SELECT k2."warrantyTerms" 
+          FROM contracts k2 
+          WHERE (k2."clientName" ILIKE c."companyName" OR k2."customerId" = t.customer_id)
+          ORDER BY k2."createdAt" DESC 
+          LIMIT 1
+        )) AS warranty_terms,
         emp.name AS assigned_to_name,
         emp.email AS assigned_to_email,
         lead_emp.name AS team_lead_name,
@@ -225,7 +277,6 @@ export class SupportTicketModel {
       'status',
       'assigned_team',
       'assigned_to',
-      'reported_by',
       'team_lead_id',
       'qa_assigned_to',
       'reported_by',
@@ -601,7 +652,10 @@ export class SupportTicketModel {
       SELECT
         COUNT(*) AS total,
         COUNT(*) FILTER (WHERE assigned_to = $1) AS my_count,
-        COUNT(*) FILTER (WHERE assigned_to IS NULL OR assigned_to = '') AS unassigned_count
+        COUNT(*) FILTER (WHERE assigned_to IS NULL OR assigned_to = '') AS unassigned_count,
+        COUNT(*) FILTER (WHERE status = 'New' OR status = 'Assigned') AS new_count,
+        COUNT(*) FILTER (WHERE status = 'In Progress') AS in_progress_count,
+        COUNT(*) FILTER (WHERE status = 'Resolved' OR status = 'Closed') AS complete_count
       FROM support_tickets;
     `, [userId || null]);
     const row = res.rows[0] || {};
@@ -609,6 +663,9 @@ export class SupportTicketModel {
       all: parseInt(row.total || '0', 10),
       my: parseInt(row.my_count || '0', 10),
       unassigned: parseInt(row.unassigned_count || '0', 10),
+      new: parseInt(row.new_count || '0', 10),
+      inProgress: parseInt(row.in_progress_count || '0', 10),
+      complete: parseInt(row.complete_count || '0', 10),
     };
   }
 
@@ -618,6 +675,156 @@ export class SupportTicketModel {
   static async delete(id) {
     const res = await query('DELETE FROM support_tickets WHERE id::text = $1 OR ticket_number = $1 RETURNING *;', [id]);
     return res.rows[0] ? formatTicketRow(res.rows[0]) : null;
+  }
+
+  /**
+   * Tasks CRUD for Work in Progress / Progression (support_ticket_tasks table)
+   */
+  static async getTasks(ticketId) {
+    const sql = `
+      SELECT id, ticket_id as "ticketId", ref_number as "refNumber", task_name as "taskName",
+             assigned_to as "assignedTo", assigned_to_id as "assignedToId",
+             target_date as "targetDate", priority, status, notes,
+             created_at as "createdAt", updated_at as "updatedAt"
+      FROM support_ticket_tasks
+      WHERE ticket_id::text = $1
+         OR ticket_id IN (SELECT id FROM support_tickets WHERE ticket_number = $1 OR id::text = $1)
+      ORDER BY ref_number ASC, created_at ASC;
+    `;
+    const res = await query(sql, [ticketId]);
+    return res.rows;
+  }
+
+  static async createTask(ticketId, data) {
+    let resolvedTicketId = ticketId;
+    const tRes = await query('SELECT id FROM support_tickets WHERE id::text = $1 OR ticket_number = $1 LIMIT 1;', [ticketId]);
+    if (tRes.rows.length > 0) {
+      resolvedTicketId = tRes.rows[0].id;
+    }
+
+    const sql = `
+      INSERT INTO support_ticket_tasks (
+        ticket_id, ref_number, task_name, assigned_to, assigned_to_id, target_date, priority, status, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, ticket_id as "ticketId", ref_number as "refNumber", task_name as "taskName",
+                assigned_to as "assignedTo", assigned_to_id as "assignedToId",
+                target_date as "targetDate", priority, status, notes,
+                created_at as "createdAt", updated_at as "updatedAt";
+    `;
+    const params = [
+      resolvedTicketId,
+      data.refNumber || 'TSK-01',
+      data.taskName || 'Untitled Task',
+      data.assignedTo || null,
+      data.assignedToId || null,
+      data.targetDate || null,
+      data.priority || 'Medium',
+      data.status || 'Pending',
+      data.notes || null,
+    ];
+    const res = await query(sql, params);
+    return res.rows[0];
+  }
+
+  static async updateTask(ticketId, taskId, data) {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (data.taskName !== undefined) {
+      fields.push(`task_name = $${idx++}`);
+      values.push(data.taskName);
+    }
+    if (data.assignedTo !== undefined) {
+      fields.push(`assigned_to = $${idx++}`);
+      values.push(data.assignedTo);
+    }
+    if (data.assignedToId !== undefined) {
+      fields.push(`assigned_to_id = $${idx++}`);
+      values.push(data.assignedToId);
+    }
+    if (data.targetDate !== undefined) {
+      fields.push(`target_date = $${idx++}`);
+      values.push(data.targetDate);
+    }
+    if (data.priority !== undefined) {
+      fields.push(`priority = $${idx++}`);
+      values.push(data.priority);
+    }
+    if (data.status !== undefined) {
+      fields.push(`status = $${idx++}`);
+      values.push(data.status);
+    }
+    if (data.notes !== undefined) {
+      fields.push(`notes = $${idx++}`);
+      values.push(data.notes);
+    }
+    fields.push(`updated_at = NOW()`);
+
+    let sql = '';
+    if (ticketId) {
+      values.push(ticketId);
+      const ticketIdx = idx++;
+      values.push(taskId);
+      const taskIdx = idx++;
+      sql = `
+        UPDATE support_ticket_tasks
+        SET ${fields.join(', ')}
+        WHERE (ticket_id::text = $${ticketIdx} OR ticket_id IN (SELECT id FROM support_tickets WHERE ticket_number = $${ticketIdx} OR id::text = $${ticketIdx}))
+          AND (id::text = $${taskIdx} OR ref_number = $${taskIdx})
+        RETURNING id, ticket_id as "ticketId", ref_number as "refNumber", task_name as "taskName",
+                  assigned_to as "assignedTo", assigned_to_id as "assignedToId",
+                  target_date as "targetDate", priority, status, notes,
+                  created_at as "createdAt", updated_at as "updatedAt";
+      `;
+    } else {
+      values.push(taskId);
+      sql = `
+        UPDATE support_ticket_tasks
+        SET ${fields.join(', ')}
+        WHERE id::text = $${idx} OR ref_number = $${idx}
+        RETURNING id, ticket_id as "ticketId", ref_number as "refNumber", task_name as "taskName",
+                  assigned_to as "assignedTo", assigned_to_id as "assignedToId",
+                  target_date as "targetDate", priority, status, notes,
+                  created_at as "createdAt", updated_at as "updatedAt";
+      `;
+    }
+    const res = await query(sql, values);
+    return res.rows[0];
+  }
+
+  static async deleteTask(ticketId, taskId) {
+    if (ticketId) {
+      const sql = `
+        DELETE FROM support_ticket_tasks 
+        WHERE (ticket_id::text = $1 OR ticket_id IN (SELECT id FROM support_tickets WHERE ticket_number = $1 OR id::text = $1))
+          AND (id::text = $2 OR ref_number = $2)
+        RETURNING *;
+      `;
+      const res = await query(sql, [ticketId, taskId]);
+      return res.rows[0];
+    }
+    const sql = `DELETE FROM support_ticket_tasks WHERE id::text = $1 OR ref_number = $1 RETURNING *;`;
+    const res = await query(sql, [taskId]);
+    return res.rows[0];
+  }
+
+  static async syncTasks(ticketId, tasks = []) {
+    let resolvedTicketId = ticketId;
+    const tRes = await query('SELECT id FROM support_tickets WHERE id::text = $1 OR ticket_number = $1 LIMIT 1;', [ticketId]);
+    if (tRes.rows.length > 0) {
+      resolvedTicketId = tRes.rows[0].id;
+    }
+
+    await query('DELETE FROM support_ticket_tasks WHERE ticket_id::text = $1;', [resolvedTicketId]);
+    if (!Array.isArray(tasks) || tasks.length === 0) return [];
+
+    const inserted = [];
+    for (const t of tasks) {
+      const res = await SupportTicketModel.createTask(resolvedTicketId, t);
+      inserted.push(res);
+    }
+    return inserted;
   }
 }
 

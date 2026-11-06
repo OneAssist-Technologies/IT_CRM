@@ -24,6 +24,7 @@ import { LeadNegotiationSection, LeadContractSection } from '../../pages/leads/c
 import { AuthPage, SignupPage, LoginPage, ResetPasswordPage } from '../../pages/auth';
 import { ActivityTimelinePage } from '../../pages/activity-timeline';
 import { TicketsPage, TicketDetailsPage } from '../../pages/support-tickets';
+import { SupportTicketProvider } from '../../context/SupportTicketContext';
 import { useContact } from '../../context/ContactContext';
 import { useLead } from '../../context/LeadContext';
 import { useProject } from '../../context/ProjectContext';
@@ -759,22 +760,24 @@ export const AppLayout: React.FC = () => {
         }
         if (viewId) {
           return (
-            <TicketDetailsPage
-              ticketId={viewId}
-              onBack={() => {
-                if (typeof window !== 'undefined') sessionStorage.removeItem('crm_selected_ticket_id');
-                setSelectedTicketId(null);
-                setActiveNav('support-tickets');
-              }}
-              onNavigateToCustomer={(cust) => {
-                if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_customer', JSON.stringify({ id: cust }));
-                setActiveNav('customer-details');
-              }}
-              onNavigateToProject={(proj) => {
-                if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_project', JSON.stringify({ id: proj }));
-                setActiveNav('project-details');
-              }}
-            />
+            <SupportTicketProvider>
+              <TicketDetailsPage
+                ticketId={viewId}
+                onBack={() => {
+                  if (typeof window !== 'undefined') sessionStorage.removeItem('crm_selected_ticket_id');
+                  setSelectedTicketId(null);
+                  setActiveNav('support-tickets');
+                }}
+                onNavigateToCustomer={(cust) => {
+                  if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_customer', JSON.stringify({ id: cust }));
+                  setActiveNav('customer-details');
+                }}
+                onNavigateToProject={(proj) => {
+                  if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_project', JSON.stringify({ id: proj }));
+                  setActiveNav('project-details');
+                }}
+              />
+            </SupportTicketProvider>
           );
         }
         return (

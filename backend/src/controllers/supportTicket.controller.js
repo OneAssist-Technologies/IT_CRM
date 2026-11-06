@@ -233,6 +233,77 @@ export class SupportTicketController {
       return sendError(res, error.message || 'Failed to delete ticket', error.status || 500);
     }
   }
+
+  /**
+   * GET /api/support-tickets/:id/tasks
+   */
+  static async getTasks(req, res) {
+    try {
+      const { id } = req.params;
+      const tasks = await SupportTicketService.getTicketTasks(id);
+      return sendSuccess(res, tasks, 'Ticket tasks fetched successfully');
+    } catch (error) {
+      console.error('[SupportTicketController.getTasks] Error:', error);
+      return sendError(res, error.message || 'Failed to fetch ticket tasks', error.status || 500);
+    }
+  }
+
+  /**
+   * POST /api/support-tickets/:id/tasks
+   */
+  static async createTask(req, res) {
+    try {
+      const { id } = req.params;
+      const created = await SupportTicketService.createTicketTask(id, req.body, req.user);
+      return sendSuccess(res, created, 'Ticket task created successfully', 201);
+    } catch (error) {
+      console.error('[SupportTicketController.createTask] Error:', error);
+      return sendError(res, error.message || 'Failed to create ticket task', error.status || 500);
+    }
+  }
+
+  /**
+   * PUT /api/support-tickets/:id/tasks/sync
+   */
+  static async syncTasks(req, res) {
+    try {
+      const { id } = req.params;
+      const tasks = Array.isArray(req.body) ? req.body : req.body.tasks || [];
+      const synced = await SupportTicketService.syncTicketTasks(id, tasks, req.user);
+      return sendSuccess(res, synced, 'Ticket tasks synchronized successfully');
+    } catch (error) {
+      console.error('[SupportTicketController.syncTasks] Error:', error);
+      return sendError(res, error.message || 'Failed to synchronize ticket tasks', error.status || 500);
+    }
+  }
+
+  /**
+   * PUT /api/support-tickets/:id/tasks/:taskId
+   */
+  static async updateTask(req, res) {
+    try {
+      const { id, taskId } = req.params;
+      const updated = await SupportTicketService.updateTicketTask(id, taskId, req.body, req.user);
+      return sendSuccess(res, updated, 'Ticket task updated successfully');
+    } catch (error) {
+      console.error('[SupportTicketController.updateTask] Error:', error);
+      return sendError(res, error.message || 'Failed to update ticket task', error.status || 500);
+    }
+  }
+
+  /**
+   * DELETE /api/support-tickets/:id/tasks/:taskId
+   */
+  static async deleteTask(req, res) {
+    try {
+      const { id, taskId } = req.params;
+      const deleted = await SupportTicketService.deleteTicketTask(id, taskId, req.user);
+      return sendSuccess(res, deleted, 'Ticket task deleted successfully');
+    } catch (error) {
+      console.error('[SupportTicketController.deleteTask] Error:', error);
+      return sendError(res, error.message || 'Failed to delete ticket task', error.status || 500);
+    }
+  }
 }
 
 export default SupportTicketController;

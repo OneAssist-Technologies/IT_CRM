@@ -25,6 +25,13 @@ router.delete('/:id', SupportTicketController.deleteTicket);
 router.patch('/:id/status', SupportTicketController.changeStatus);
 router.patch('/:id/assignment', SupportTicketController.reassignTicket);
 
+// Tasks Management (support_ticket_tasks table)
+router.get('/:id/tasks', SupportTicketController.getTasks);
+router.post('/:id/tasks', SupportTicketController.createTask);
+router.put('/:id/tasks/sync', SupportTicketController.syncTasks);
+router.put('/:id/tasks/:taskId', SupportTicketController.updateTask);
+router.delete('/:id/tasks/:taskId', SupportTicketController.deleteTask);
+
 // Conversation & Comments
 router.post('/:id/comments', SupportTicketController.addComment);
 router.post('/:id/replies', (req, res, next) => {

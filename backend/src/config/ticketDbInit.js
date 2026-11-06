@@ -117,7 +117,25 @@ export async function initTicketDatabase() {
       );
     `);
 
-    // 6. Helpful performance Indexes
+    // 6. Support Ticket Tasks (Work in Progress / Progression Tasks)
+    await query(`
+      CREATE TABLE IF NOT EXISTS support_ticket_tasks (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        ticket_id UUID NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+        ref_number VARCHAR(32) NOT NULL DEFAULT 'TSK-01',
+        task_name VARCHAR(255) NOT NULL,
+        assigned_to VARCHAR(128),
+        assigned_to_id VARCHAR(64),
+        target_date VARCHAR(32),
+        priority VARCHAR(32) NOT NULL DEFAULT 'Medium',
+        status VARCHAR(32) NOT NULL DEFAULT 'Pending',
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    // 7. Helpful performance Indexes
     await query(`
       CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
       CREATE INDEX IF NOT EXISTS idx_support_tickets_priority ON support_tickets(priority);
@@ -129,6 +147,7 @@ export async function initTicketDatabase() {
       CREATE INDEX IF NOT EXISTS idx_ticket_attachments_ticket_id ON support_ticket_attachments(ticket_id);
       CREATE INDEX IF NOT EXISTS idx_ticket_history_ticket_id ON support_ticket_history(ticket_id);
       CREATE INDEX IF NOT EXISTS idx_ticket_assignments_ticket_id ON support_ticket_assignments(ticket_id);
+      CREATE INDEX IF NOT EXISTS idx_support_ticket_tasks_ticket_id ON support_ticket_tasks(ticket_id);
     `);
 
     console.log('[TicketDB] Support Ticket database tables initialized successfully.');

@@ -153,30 +153,39 @@ export async function deleteTicketApi(id: string): Promise<SupportTicket> {
 export async function changeTicketStatusApi(
   id: string,
   status: string,
-  payload: Record<string, any> = {}
+  extra: { reason?: string; resolution_description?: string; root_cause?: string; workaround?: string } = {}
 ): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status, ...payload }),
+    body: JSON.stringify({ status, ...extra }),
     credentials: 'include',
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `Failed to change status (${res.status})`);
+    throw new Error(err.message || `Failed to change ticket status (${res.status})`);
   }
   const json = await res.json();
   return json.data;
 }
 
 /**
- * Reassign ticket to employee or team
+ * Reassign ticket to team or agent
  */
-export async function reassignTicketApi(id: string, assignmentData: any): Promise<SupportTicket> {
+export async function reassignTicketApi(
+  id: string,
+  payload: {
+    assigned_team?: string;
+    assigned_to?: string;
+    team_lead_id?: string;
+    qa_assigned_to?: string;
+    reason?: string;
+  }
+): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}/assignment`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(assignmentData),
+    body: JSON.stringify(payload),
     credentials: 'include',
   });
   if (!res.ok) {
@@ -188,11 +197,11 @@ export async function reassignTicketApi(id: string, assignmentData: any): Promis
 }
 
 /**
- * Add comment or internal note
+ * Add comment to ticket (public reply or internal note)
  */
 export async function addTicketCommentApi(
   id: string,
-  payload: { type: 'public_reply' | 'internal_note'; message: string; attachments?: any[] }
+  payload: { type?: 'public_reply' | 'internal_note'; message: string; attachments?: any[] }
 ): Promise<TicketComment> {
   const res = await fetch(`${API_BASE}/${id}/comments`, {
     method: 'POST',
@@ -262,4 +271,73 @@ export async function reopenTicketApi(id: string, payload: { reason: string }): 
   }
   const json = await res.json();
   return json.data;
+}
+
+/**
+ * Tasks API for Support Ticket (stored in DB table support_ticket_tasks)
+ */
+export async function fetchTicketTasksApi(ticketId: string): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/${ticketId}/tasks`, { credentials: 'include' });
+  if (!res.ok) {
+    return [];
+  }
+  const json = await res.json();
+  return json.data || [];
+}
+
+export async function createTicketTaskApi(ticketId: string, taskData: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/${ticketId}/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(taskData),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to create task in DB');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+export async function updateTicketTaskApi(ticketId: string, taskId: string, taskData: any): Promise<any> {
+  const res = await fetch(`${API_BASE}/${ticketId}/tasks/${taskId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(taskData),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to update task in DB');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+export async function deleteTicketTaskApi(ticketId: string, taskId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/${ticketId}/tasks/${taskId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Failed to delete task in DB');
+  }
+  const json = await res.json();
+  return json.data;
+}
+
+export async function syncTicketTasksApi(ticketId: string, tasks: any[]): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/${ticketId}/tasks/sync`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tasks),
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    return [];
+  }
+  const json = await res.json();
+  return json.data || [];
 }

@@ -169,20 +169,14 @@ export async function syncExistingContactLeadMeetings() {
  */
 export async function autoSyncDatabase() {
   try {
-    console.log('🔄 [Auto-Sync] Checking and creating PostgreSQL SQL tables...');
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
-      cwd: backendDir,
-      stdio: 'pipe',
-      timeout: 30000,
-    });
-    console.log('✅ [Auto-Sync] All PostgreSQL SQL tables verified and synced!');
+    console.log('🔄 [Auto-Sync] Verifying database synchronization...');
     await ensureSystemRolesService();
     console.log('🛡️ [Auto-Sync] Default system roles verified and active!');
     await syncExistingContactLeadMeetings();
     console.log('🤝 [Auto-Sync] Contact, Lead, and Meeting synchronization verified!');
   } catch (error) {
     console.warn('⚠️ [Auto-Sync Notice]:', error.message || error);
-    // Still run meetings sync in case db push was skipped
+    // Still run meetings sync in case
     await syncExistingContactLeadMeetings();
   }
 }

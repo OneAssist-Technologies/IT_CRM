@@ -40,6 +40,7 @@ export interface TicketComment {
   id: string;
   ticketId: string;
   type: 'public_reply' | 'internal_note';
+  isInternal?: boolean;
   message: string;
   authorId?: string;
   authorName: string;
@@ -116,6 +117,7 @@ export interface SupportTicket {
   firstResponseAt?: string;
   firstResponseDueAt?: string;
   resolutionDueAt?: string;
+  targetResolutionDate?: string;
   resolvedAt?: string;
   closedAt?: string;
   reopenedCount: number;
