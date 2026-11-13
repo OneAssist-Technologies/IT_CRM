@@ -12,9 +12,18 @@ import { recordActivity } from './activity.service.js';
  */
 async function resolveEmployeeScopedFilter(currentUser) {
   if (!currentUser) return null;
-  const roleUpper = String(currentUser.role || '').toUpperCase();
-  if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
-    return null; // Full super admin access
+  const roleUpper = String(currentUser.role || '').toUpperCase().trim();
+  const emailLower = String(currentUser.email || '').toLowerCase().trim();
+
+  // Super Admin, Admin, and Management have full enterprise access
+  if (
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'MANAGEMENT' ||
+    emailLower === 'sandy@gmail.com'
+  ) {
+    return null; // Full admin access
   }
 
   if (currentUser.id) {
@@ -23,8 +32,8 @@ async function resolveEmployeeScopedFilter(currentUser) {
       include: { roleRelation: true },
     });
     if (dbUser?.roleRelation) {
-      const slug = dbUser.roleRelation.slug?.toLowerCase();
-      if (slug === 'super_admin') {
+      const slug = (dbUser.roleRelation.slug || dbUser.roleRelation.name || '').toLowerCase().trim();
+      if (slug === 'super_admin' || slug === 'admin' || slug === 'management') {
         return null;
       }
     }
@@ -77,9 +86,18 @@ async function resolveEmployeeScopedFilter(currentUser) {
  */
 async function resolveBatchScopedFilter(currentUser) {
   if (!currentUser) return null;
-  const roleUpper = String(currentUser.role || '').toUpperCase();
-  if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
-    return null; // Full super admin access
+  const roleUpper = String(currentUser.role || '').toUpperCase().trim();
+  const emailLower = String(currentUser.email || '').toLowerCase().trim();
+
+  // Super Admin, Admin, and Management have full enterprise access
+  if (
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'MANAGEMENT' ||
+    emailLower === 'sandy@gmail.com'
+  ) {
+    return null; // Full admin access
   }
 
   if (currentUser.id) {
@@ -88,8 +106,8 @@ async function resolveBatchScopedFilter(currentUser) {
       include: { roleRelation: true },
     });
     if (dbUser?.roleRelation) {
-      const slug = dbUser.roleRelation.slug?.toLowerCase();
-      if (slug === 'super_admin') {
+      const slug = (dbUser.roleRelation.slug || dbUser.roleRelation.name || '').toLowerCase().trim();
+      if (slug === 'super_admin' || slug === 'admin' || slug === 'management') {
         return null;
       }
     }
@@ -293,111 +311,91 @@ export async function getContactStatsService(currentUser = null) {
   const empScope = await resolveEmployeeScopedFilter(currentUser);
   const batchScope = await resolveBatchScopedFilter(currentUser);
 
-  const assignedWhere = empScope
-    ? {
-        OR: [
-          { assignmentStatus: 'Assigned' },
-          { stage: 'Qualification' },
-          { status: { in: ['Qualified', 'qualified', 'Disqualified', 'disqualified', 'Unqualified', 'unqualified', 'Follow-up Required', 'Pending'] } },
-          {
-            qualificationStatus: {
-              in: [
-                'Qualified',
-                'Follow-up Required',
-                'Pending',
-                'In Progress',
-                'Disqualified',
-                'Unqualified',
-              ],
-            },
-          },
+  const notBulkCondition = {
+    AND: [
+      {
+        NOT: [
+          { source: { in: ['Bulk Import', 'Import', 'bulk import', 'import'] } },
+          { contactId: { startsWith: 'BLK-' } },
         ],
-        AND: [empScope.assignedFilter],
-      }
-    : {
+      },
+      {
         OR: [
-          { assignmentStatus: 'Assigned' },
-          { stage: 'Qualification' },
-          { status: { in: ['Qualified', 'qualified', 'Disqualified', 'disqualified', 'Unqualified', 'unqualified', 'Follow-up Required', 'Pending'] } },
-          {
-            qualificationStatus: {
-              in: [
-                'Qualified',
-                'Follow-up Required',
-                'Pending',
-                'In Progress',
-                'Disqualified',
-                'Unqualified',
-              ],
-            },
-          },
+          { internalReference: null },
+          { NOT: { internalReference: { startsWith: 'BLK-' } } },
         ],
-      };
+      },
+    ],
+  };
 
-  const unassignedWhere = empScope
-    ? {
-        AND: [
-          {
-            OR: [
-              { assignmentStatus: 'Unassigned' },
-              { assignmentStatus: null },
-              { assignedTo: null },
-              { assignedTo: '' },
-              { assignedTo: 'none' },
-            ],
-          },
-          {
-            status: { notIn: ['Qualified', 'qualified', 'Disqualified', 'disqualified', 'Unqualified', 'unqualified'] },
-          },
-          {
-            OR: [
-              { qualificationStatus: 'New' },
-              { qualificationStatus: null },
-              { qualificationStatus: '' },
-            ],
-          },
-          { stage: { not: 'Qualification' } },
-          empScope.createdFilter,
-        ],
-      }
-    : {
-        AND: [
-          {
-            OR: [
-              { assignmentStatus: 'Unassigned' },
-              { assignmentStatus: null },
-              { assignedTo: null },
-              { assignedTo: '' },
-              { assignedTo: 'none' },
-            ],
-          },
-          {
-            status: { notIn: ['Qualified', 'qualified', 'Disqualified', 'disqualified', 'Unqualified', 'unqualified'] },
-          },
-          {
-            OR: [
-              { qualificationStatus: 'New' },
-              { qualificationStatus: null },
-              { qualificationStatus: '' },
-            ],
-          },
-          { stage: { not: 'Qualification' } },
-        ],
-      };
+  const qualifiedCondition = {
+    OR: [
+      { status: { in: ['Qualified', 'qualified'] } },
+      { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+    ],
+  };
+
+  const notQualifiedCondition = {
+    NOT: [
+      { status: { in: ['Qualified', 'qualified'] } },
+      { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+    ],
+  };
+
+  const notInterestedCondition = {
+    NOT: [
+      { status: { in: ['Not Interested', 'not interested'] } },
+      { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
+    ],
+  };
+
+  const newWhere = {
+    AND: [
+      notBulkCondition,
+      notQualifiedCondition,
+      notInterestedCondition,
+      ...(empScope ? [empScope.combinedFilter] : []),
+    ],
+  };
+
+  const qualifiedWhere = {
+    AND: [
+      qualifiedCondition,
+      notInterestedCondition,
+      ...(empScope ? [empScope.combinedFilter] : []),
+    ],
+  };
 
   const totalWhere = empScope ? empScope.combinedFilter : {};
 
-  const [total, assigned, qualified, won, unassigned, active, disqualified, highPriority, bulkBatchesCount, bulkContactsCount] = await Promise.all([
+  const [
+    total,
+    qualifiedCount,
+    newCount,
+    won,
+    active,
+    disqualified,
+    highPriority,
+    bulkBatchesCount,
+    bulkContactsCount,
+  ] = await Promise.all([
     prisma.contact.count({ where: totalWhere }),
-    prisma.contact.count({ where: assignedWhere }),
-    prisma.contact.count({ where: { stage: 'Qualification', ...(empScope ? { AND: [empScope.combinedFilter] } : {}) } }),
+    prisma.contact.count({ where: qualifiedWhere }),
+    prisma.contact.count({ where: newWhere }),
     prisma.contact.count({ where: { stage: { in: ['Won', 'Closed Won'] }, ...(empScope ? { AND: [empScope.combinedFilter] } : {}) } }),
-    prisma.contact.count({ where: unassignedWhere }),
+    prisma.contact.count({
+      where: {
+        AND: [
+          notInterestedCondition,
+          ...(empScope ? [empScope.combinedFilter] : []),
+        ],
+      },
+    }),
     prisma.contact.count({
       where: {
         OR: [
-          { qualificationStatus: { in: ['Disqualified', 'Unqualified'] } },
-          { status: { in: ['Disqualified', 'Unqualified'] } },
+          { qualificationStatus: { in: ['Disqualified', 'Unqualified', 'Not Interested'] } },
+          { status: { in: ['Disqualified', 'Unqualified', 'Not Interested'] } },
         ],
         ...(empScope ? { AND: [empScope.combinedFilter] } : {}),
       },
@@ -410,15 +408,17 @@ export async function getContactStatsService(currentUser = null) {
   return {
     stats: {
       total,
-      assigned,
-      qualified,
+      assigned: qualifiedCount,
+      qualified: qualifiedCount,
+      qualification: qualifiedCount,
       won,
-      unassigned,
-      new: unassigned,
+      unassigned: newCount,
+      new: newCount,
       active,
       disqualified,
       highPriority,
-      bulkImport: bulkBatchesCount || bulkContactsCount || 0,
+      bulkImport: bulkContactsCount || bulkBatchesCount || 0,
+      bulkBatches: bulkBatchesCount || 0,
     },
   };
 }

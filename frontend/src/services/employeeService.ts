@@ -1,6 +1,7 @@
 import { Employee, EmployeeStats } from '../types/employee';
+import { API_BASE_URL } from '../config/env';
 
-const API_BASE = 'http://localhost:5000/api/employees';
+const API_BASE = `${API_BASE_URL}/employees`;
 
 /**
  * Safe Response Parser (prevents JSON parse errors on HTML 404/500 pages)
@@ -52,6 +53,9 @@ export async function fetchEmployeesApi(filters?: {
     });
 
     if (!res.ok) {
+      if (res.status === 403 || res.status === 401) {
+        return { data: [], count: 0 };
+      }
       throw new Error(`Failed to fetch employees: ${res.statusText}`);
     }
 

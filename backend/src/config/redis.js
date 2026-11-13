@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { env } from './env.js';
 
 // In-Memory fallback store if Redis server is offline or unreachable
 class MemoryCacheFallback {
@@ -43,7 +44,7 @@ const memoryFallback = new MemoryCacheFallback();
 let isRedisConnected = false;
 let redisClient = null;
 
-const REDIS_URL = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+const REDIS_URL = env.REDIS_URL;
 
 try {
   redisClient = new Redis(REDIS_URL, {

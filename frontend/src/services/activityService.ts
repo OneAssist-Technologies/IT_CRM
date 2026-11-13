@@ -5,7 +5,9 @@ import {
   ActivityItem,
 } from '../types/activity';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/activities';
+import { API_BASE_URL } from '../config/env';
+
+const API_BASE = `${API_BASE_URL}/activities`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;

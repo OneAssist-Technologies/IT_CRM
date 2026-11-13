@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../../config/env';
 import {
   Paper,
   PasswordInput,
@@ -68,7 +69,7 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
           res = await crmApi.validateResetToken(urlToken);
         } else {
           const r = await fetch(
-            `http://localhost:5000/api/auth/validate-reset-token?token=${encodeURIComponent(urlToken)}`
+            `${API_BASE_URL}/auth/validate-reset-token?token=${encodeURIComponent(urlToken)}`
           );
           res = await r.json();
         }
@@ -128,7 +129,7 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({
           confirmPassword,
         });
       } else {
-        const r = await fetch('http://localhost:5000/api/auth/reset-password', {
+        const r = await fetch(`${API_BASE_URL}/auth/reset-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ token, email, newPassword, confirmPassword }),

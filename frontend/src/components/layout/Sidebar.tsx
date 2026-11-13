@@ -427,6 +427,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 'Contacts',
                 <IconAddressBook size={18} stroke={2} />,
                 activeNav === 'contacts' ||
+                  activeNav === 'contact' ||
                   activeNav === 'add-contact' ||
                   activeNav === 'contact-details' ||
                   activeNav === 'contact-qualification' ||

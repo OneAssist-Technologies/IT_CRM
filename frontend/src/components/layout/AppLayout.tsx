@@ -215,6 +215,7 @@ export const AppLayout: React.FC = () => {
         );
       }
       case 'contacts':
+      case 'contact':
         if (!can('contacts', 'view')) {
           return (
             <AccessRestrictedView
@@ -266,6 +267,7 @@ export const AppLayout: React.FC = () => {
         );
       }
       case 'add-contact':
+      case 'contact/add':
       case 'contacts/add': {
         let editData = null;
         try {
@@ -283,7 +285,9 @@ export const AppLayout: React.FC = () => {
           />
         );
       }
-      case 'contact-details': {
+      case 'contact-details':
+      case 'contact/details':
+      case 'contacts/details': {
         let activeContact = selectedContact;
         if (!activeContact && typeof window !== 'undefined') {
           try {
@@ -318,6 +322,8 @@ export const AppLayout: React.FC = () => {
         return <ContactsPage />;
       }
       case 'contact-qualification':
+      case 'contact/qualification':
+      case 'contact/qualify':
       case 'contacts/qualification':
       case 'contacts/qualify':
       case 'qualification': {
@@ -753,6 +759,7 @@ export const AppLayout: React.FC = () => {
           />
         );
 
+      case 'support-tickets/details':
       case 'ticket-details': {
         let viewId = selectedTicketId;
         if (!viewId && typeof window !== 'undefined') {

@@ -6,7 +6,9 @@ import {
   TicketAttachment,
 } from '../types/supportTicket';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/support-tickets';
+import { API_BASE_URL } from '../config/env';
+
+const API_BASE = `${API_BASE_URL}/support-tickets`;
 
 /**
  * Fetch paginated tickets with filters

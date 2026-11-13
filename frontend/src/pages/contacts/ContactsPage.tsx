@@ -31,6 +31,7 @@ import {
 } from '@tabler/icons-react';
 import { useContact } from '../../context/ContactContext';
 import { useCRM } from '../../context/CRMContext';
+import { usePermissions } from '../../context/AccessControlContext';
 import { Contact, ImportBatch } from '../../types/contact';
 import { ContactTableView } from './components/ContactTableView';
 import { ContactModal } from './components/ContactModal';
@@ -54,8 +55,19 @@ export const ContactsPage: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
   const { setActiveNav, currentUser } = useCRM();
-  const isSuperAdmin = currentUser?.role?.toUpperCase() === 'SUPER_ADMIN' || currentUser?.role?.toUpperCase() === 'SUPER ADMIN';
-  const isAdmin = isSuperAdmin;
+  const { isSuperAdmin: permIsSuperAdmin, can } = usePermissions();
+
+  const roleUpper = (currentUser?.role || '').toUpperCase().trim();
+  const emailLower = (currentUser?.email || '').toLowerCase().trim();
+  const isSuperAdmin =
+    permIsSuperAdmin ||
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    emailLower === 'sandy@gmail.com';
+  const isAdmin =
+    isSuperAdmin ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'MANAGEMENT';
 
   const {
     contacts,
@@ -200,23 +212,27 @@ export const ContactsPage: React.FC = () => {
             (myEmail && (creator === myEmail || assignedId === myEmail)) ||
             (myId && (creator === myId || assignedId === myId));
           if (!isMine) return false;
-        } else if (activeTab === 'NEW' || c.assignmentStatus === 'Unassigned') {
-          // Employee sees unassigned contacts created by themselves
+        } else if (activeTab === 'NEW') {
+          // Employee sees direct contacts assigned to them OR created by themselves
           const creator = (c.createdBy || '').toLowerCase().trim();
-          const isMine =
-            (myName && creator === myName) ||
-            (myEmail && creator === myEmail) ||
-            (myId && creator === myId);
-          if (!isMine) return false;
-        } else if (activeTab === 'ASSIGNED' || c.assignmentStatus === 'Assigned') {
-          // Employee sees contacts assigned to them
           const assignedName = (c.assignedToName || '').toLowerCase().trim();
           const assignedId = (c.assignedTo || '').toLowerCase().trim();
-          const isAssignedToMe =
-            (myName && assignedName && (assignedName === myName || assignedName.includes(myName) || myName.includes(assignedName))) ||
-            (myId && assignedId === myId) ||
-            (myEmail && assignedId === myEmail);
-          if (!isAssignedToMe) return false;
+          const isMine =
+            (myName && (creator === myName || assignedName === myName || assignedName.includes(myName) || myName.includes(assignedName))) ||
+            (myEmail && (creator === myEmail || assignedId === myEmail)) ||
+            (myId && (creator === myId || assignedId === myId));
+          if (!isMine) return false;
+        } else if (activeTab === 'ASSIGNED') {
+          // Employee sees qualified contacts assigned to them OR created/qualified by them
+          const assignedName = (c.assignedToName || '').toLowerCase().trim();
+          const assignedId = (c.assignedTo || '').toLowerCase().trim();
+          const creator = (c.createdBy || '').toLowerCase().trim();
+          const qualifiedBy = ((c as any).qualifiedBy || '').toLowerCase().trim();
+          const isMine =
+            (myName && (assignedName === myName || assignedName.includes(myName) || myName.includes(assignedName) || creator === myName || qualifiedBy === myName)) ||
+            (myId && (assignedId === myId || creator === myId)) ||
+            (myEmail && (assignedId === myEmail || creator === myEmail));
+          if (!isMine) return false;
         }
       }
 
@@ -231,28 +247,29 @@ export const ContactsPage: React.FC = () => {
 
       const isQualified =
         !isNotInterested &&
-        (contactStatus === 'qualified' ||
-         qualStatus === 'qualified' ||
-         (c.stage === 'Qualification' && qualStatus !== 'new'));
+        (contactStatus === 'qualified' || qualStatus === 'qualified');
 
       const src = (c.source || '').toLowerCase().trim();
-      const isBulk = (c as any).isBulkRecord || src === 'bulk import' || src === 'import';
+      const isBulk =
+        Boolean((c as any).isBulkRecord) ||
+        Boolean((c as any).isBulkImport) ||
+        src === 'bulk import' ||
+        src === 'import' ||
+        Boolean(c.bulkId) ||
+        Boolean((c as any).batchId) ||
+        Boolean(c.id && String(c.id).startsWith('BLK-')) ||
+        Boolean(c.contactId && String(c.contactId).startsWith('BLK-'));
 
       if (activeTab === 'BULK_IMPORT') {
         // Bulk import contacts list: show all bulk contacts including Qualified!
         if (!isBulk) return false;
       } else if (activeTab === 'NEW') {
-        // New contacts list: show all unassigned contacts
-        if (c.assignmentStatus === 'Assigned' && !isQualified) return false;
+        // New contacts list: direct/manual contacts that are NOT bulk and NOT qualified!
+        if (isBulk) return false;
+        if (isQualified) return false;
       } else if (activeTab === 'ASSIGNED') {
-        // Qualification section contact list: Qualified status or assigned contacts show here!
-        if (isNotInterested) return false;
-        const isAssignedOrQualified =
-          isQualified ||
-          c.assignmentStatus === 'Assigned' ||
-          Boolean(c.assignedTo) ||
-          (Boolean(c.qualificationStatus) && qualStatus !== 'new');
-        if (!isAssignedOrQualified) return false;
+        // Qualification section contact list: ONLY show contacts that have been Qualified!
+        if (!isQualified) return false;
       }
 
       // Status filter matching (checks both status and qualificationStatus)
@@ -336,11 +353,11 @@ export const ContactsPage: React.FC = () => {
       prevTabRef.current = activeTab;
       if (activeTab === 'ASSIGNED') {
         const assignedTarget = !isAdmin && currentUser?.name ? currentUser.name : 'All';
-        setFilters({ assignmentStatus: 'Assigned', status: 'All', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
+        setFilters({ tab: 'ASSIGNED', assignmentStatus: 'All', status: 'Qualified', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
       } else if (activeTab === 'BULK_IMPORT') {
-        setFilters({ source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+        setFilters({ tab: 'BULK_IMPORT', source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
       } else {
-        setFilters({ assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+        setFilters({ tab: 'NEW', assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
       }
     }
   }, [activeTab, isAdmin, currentUser?.name]);
@@ -392,12 +409,12 @@ export const ContactsPage: React.FC = () => {
     }
     if (tab === 'ASSIGNED') {
       const assignedTarget = !isAdmin && currentUser?.name ? currentUser.name : 'All';
-      setFilters({ assignmentStatus: 'Assigned', status: 'All', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
+      setFilters({ tab: 'ASSIGNED', assignmentStatus: 'All', status: 'Qualified', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
     } else if (tab === 'BULK_IMPORT') {
-      setFilters({ source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+      setFilters({ tab: 'BULK_IMPORT', source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
       fetchImportBatches(1);
     } else {
-      setFilters({ assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
+      setFilters({ tab: 'NEW', assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
     }
   };
 
@@ -439,9 +456,15 @@ export const ContactsPage: React.FC = () => {
 
   const statusOptions = useMemo(() => {
     const isQualSection = activeTab === 'ASSIGNED';
+    if (isQualSection) {
+      return [
+        { value: 'Qualified', label: 'All Qualified' },
+        { value: 'All', label: 'All Qualified' },
+      ];
+    }
     const rawOptions = [
       { value: 'All', label: 'All Statuses' },
-      ...(isQualSection ? [{ value: 'Qualified', label: 'Qualified' }] : [{ value: 'Not Connected', label: 'Not Connected' }]),
+      { value: 'Not Connected', label: 'Not Connected' },
       { value: 'Interested', label: 'Interested' },
       { value: 'Not Interested', label: 'Not Interested' },
       { value: 'Follow-up Required', label: 'Follow-up Required' },
@@ -450,7 +473,6 @@ export const ContactsPage: React.FC = () => {
       ...(metadata?.statuses && metadata.statuses.length > 0
         ? metadata.statuses
             .filter((s) => !['All', 'Not Connected', 'Qualified', 'In Progress', 'Follow-up Required', 'Disqualified'].includes(s))
-            .filter((s) => isQualSection || s.toLowerCase() !== 'qualified')
             .map((s) => ({ value: s, label: s }))
         : [
             { value: 'New', label: 'New' },
@@ -516,86 +538,29 @@ export const ContactsPage: React.FC = () => {
     });
   }, [isAdmin, currentUser, metadata?.employees]);
 
-  const totalCount = stats?.total ?? contacts.length;
-  const bulkImportCount = useMemo(() => {
-    const qualifiedBulkCount = contacts.filter((c) => {
-      const src = (c.source || '').toLowerCase().trim();
-      const isBulk = (c as any).isBulkRecord || src === 'bulk import' || src === 'import';
-      const status = (c.status || '').toLowerCase().trim();
-      const qual = (c.qualificationStatus || '').toLowerCase().trim();
-      const isNotInterested =
-        status === 'not interested' ||
-        status === 'not-interested' ||
-        (c as any).callStatus === 'Not Interested' ||
-        (c as any).whatsappStatus === 'Not Interested' ||
-        (c as any).emailStatus === 'Not Interested';
-      if (isNotInterested) return false;
-      return isBulk && (status === 'qualified' || qual === 'qualified' || (c.stage === 'Qualification' && qual !== 'new'));
-    }).length;
+  const totalCount = stats?.total ?? pagination.total ?? contacts.length;
+  const bulkImportCount = stats?.bulkImport ?? 0;
+  const newCount = stats?.new !== undefined ? stats.new : filteredContacts.length;
+  const assignedCount = stats?.qualified ?? stats?.qualification ?? stats?.assigned ?? 0;
 
-    const base = stats?.bulkImport ?? contacts.filter((c) => {
-      const src = (c.source || '').toLowerCase().trim();
-      return src === 'bulk import' || src === 'import';
-    }).length;
-    return base;
-  }, [stats?.bulkImport, contacts]);
+  const hasLocalSearchOrFilter = Boolean(
+    (filters.search && filters.search.trim()) ||
+    (filters.status && filters.status !== 'All' && filters.status !== 'Qualified') ||
+    (filters.source && filters.source !== 'All' && filters.source !== 'Bulk Import') ||
+    (filters.assignedTo && filters.assignedTo !== 'All') ||
+    (dateFilter.type && dateFilter.type !== 'ALL') ||
+    activeTab === 'NEW' ||
+    activeTab === 'ASSIGNED'
+  );
 
-  const newCount = useMemo(() => {
-    const unassignedQualifiedCount = contacts.filter((c) => {
-      const status = (c.status || '').toLowerCase().trim();
-      const qual = (c.qualificationStatus || '').toLowerCase().trim();
-      return (status === 'qualified' || qual === 'qualified' || c.stage === 'Qualification') && (c.assignmentStatus === 'Unassigned' || !c.assignedTo);
-    }).length;
-
-    let base = 0;
-    if (isAdmin) {
-      base = stats?.unassigned ?? stats?.new ?? 0;
-    } else if (stats?.unassigned !== undefined) {
-      base = stats.unassigned;
-    } else {
-      const myName = currentUser?.name?.toLowerCase().trim();
-      const myEmail = currentUser?.email?.toLowerCase().trim();
-      const myId = currentUser?.id?.toLowerCase().trim();
-      base = contacts.filter((c) => {
-        const status = (c.status || '').toLowerCase().trim();
-        const qual = (c.qualificationStatus || '').toLowerCase().trim();
-        if (status === 'qualified' || qual === 'qualified' || c.stage === 'Qualification') return false;
-        return (
-          c.assignmentStatus === 'Unassigned' &&
-          (((c.createdBy || '').toLowerCase().trim() === myName) ||
-           ((c.createdBy || '').toLowerCase().trim() === myEmail) ||
-           ((c.createdBy || '').toLowerCase().trim() === myId))
-        );
-      }).length;
-    }
-    return base;
-  }, [isAdmin, stats?.unassigned, stats?.new, contacts, currentUser]);
-
-  const assignedCount = useMemo(() => {
-    const count = contacts.filter((c) => {
-      const status = (c.status || '').toLowerCase().trim();
-      const qual = (c.qualificationStatus || '').toLowerCase().trim();
-      const src = (c.source || '').toLowerCase().trim();
-      const isBulk = (c as any).isBulkRecord || src === 'bulk import' || src === 'import';
-      const isNotInterested =
-        status === 'not interested' ||
-        status === 'not-interested' ||
-        (c as any).callStatus === 'Not Interested' ||
-        (c as any).whatsappStatus === 'Not Interested' ||
-        (c as any).emailStatus === 'Not Interested';
-      if (isNotInterested) return false;
-      const isQualified =
-        status === 'qualified' ||
-        qual === 'qualified' ||
-        (c.stage === 'Qualification' && qual !== 'new');
-      return isQualified || (!isBulk && c.assignmentStatus === 'Assigned') || (Boolean(c.qualificationStatus) && qual !== 'new');
-    }).length;
-    return count;
-  }, [contacts]);
-
-  const totalRecords = pagination.total ?? filteredContacts.length ?? 0;
-  const startRecord = totalRecords === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
-  const endRecord = Math.min(pagination.page * pagination.limit, totalRecords);
+  const totalRecords = hasLocalSearchOrFilter
+    ? filteredContacts.length
+    : (pagination.total ?? filteredContacts.length ?? 0);
+  const totalPages = hasLocalSearchOrFilter
+    ? Math.max(1, Math.ceil(totalRecords / (pagination.limit || 10)))
+    : (pagination.totalPages || Math.max(1, Math.ceil(totalRecords / (pagination.limit || 10))));
+  const startRecord = totalRecords === 0 ? 0 : hasLocalSearchOrFilter ? 1 : (pagination.page - 1) * pagination.limit + 1;
+  const endRecord = hasLocalSearchOrFilter ? filteredContacts.length : Math.min(pagination.page * pagination.limit, totalRecords);
 
   return (
     <Box p={{ base: 'xs', sm: 'sm' }} style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
@@ -1167,14 +1132,14 @@ export const ContactsPage: React.FC = () => {
                 </Box>
 
                 <Text size="12px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                  of {pagination.totalPages || 1}
+                  of {totalPages}
                 </Text>
 
                 <Button
                   variant="default"
                   size="xs"
                   radius="md"
-                  disabled={pagination.page >= (pagination.totalPages || 1)}
+                  disabled={pagination.page >= totalPages}
                   onClick={() => setPage(pagination.page + 1)}
                   rightSection={<IconChevronRight size={13} />}
                   style={{

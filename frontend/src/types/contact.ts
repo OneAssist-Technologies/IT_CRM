@@ -338,6 +338,8 @@ export interface ContactFormData {
 }
 
 export interface ContactFilter {
+  tab?: string;
+  section?: string;
   search?: string;
   companyName?: string;
   contactType?: string;
@@ -369,11 +371,13 @@ export interface ContactStats {
   new: number;
   active: number;
   qualified: number;
+  qualification?: number;
   disqualified: number;
   assigned: number;
   unassigned: number;
   highPriority: number;
   bulkImport?: number;
+  bulkBatches?: number;
 }
 
 export interface ContactMetadata {

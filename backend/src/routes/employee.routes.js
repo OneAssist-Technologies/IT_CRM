@@ -14,13 +14,13 @@ import {
 const router = Router();
 
 // Employee Statistics & KPI Metrics (<1ms Redis Cached)
-router.get('/stats', requireAuth, authorizePermission('employee_management', 'view'), getEmployeeStats);
+router.get('/stats', requireAuth, getEmployeeStats);
 
-// Employee List & Search
-router.get('/', requireAuth, authorizePermission('employee_management', 'view'), getEmployees);
+// Employee List & Search (Available to all authenticated CRM users for dropdowns & assignments)
+router.get('/', requireAuth, getEmployees);
 
 // Single Employee Profile by ID
-router.get('/:id', requireAuth, authorizePermission('employee_management', 'view'), getEmployeeById);
+router.get('/:id', requireAuth, getEmployeeById);
 
 // 4. Onboard / Create New Employee
 router.post(

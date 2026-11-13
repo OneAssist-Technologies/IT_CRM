@@ -9,7 +9,9 @@ import {
   ActivityLogSection,
 } from '../types/callLog';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/call-logs';
+import { API_BASE_URL } from '../config/env';
+
+const API_BASE = `${API_BASE_URL}/call-logs`;
 
 export async function fetchCallLogsApi(filters?: CallLogFilters): Promise<{
   calls: CallLog[];
