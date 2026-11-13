@@ -27673,6 +27673,7 @@ export namespace Prisma {
     documentSize: string | null
     notes: string | null
     terms: string | null
+    rejectionReason: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -27704,6 +27705,7 @@ export namespace Prisma {
     documentSize: string | null
     notes: string | null
     terms: string | null
+    rejectionReason: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -27735,6 +27737,7 @@ export namespace Prisma {
     documentSize: number
     notes: number
     terms: number
+    rejectionReason: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -27784,6 +27787,7 @@ export namespace Prisma {
     documentSize?: true
     notes?: true
     terms?: true
+    rejectionReason?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -27815,6 +27819,7 @@ export namespace Prisma {
     documentSize?: true
     notes?: true
     terms?: true
+    rejectionReason?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -27846,6 +27851,7 @@ export namespace Prisma {
     documentSize?: true
     notes?: true
     terms?: true
+    rejectionReason?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -27964,6 +27970,7 @@ export namespace Prisma {
     documentSize: string | null
     notes: string | null
     terms: string | null
+    rejectionReason: string | null
     createdAt: Date
     updatedAt: Date
     _count: ProposalCountAggregateOutputType | null
@@ -28014,6 +28021,7 @@ export namespace Prisma {
     documentSize?: boolean
     notes?: boolean
     terms?: boolean
+    rejectionReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     items?: boolean | Proposal$itemsArgs<ExtArgs>
@@ -28047,6 +28055,7 @@ export namespace Prisma {
     documentSize?: boolean
     notes?: boolean
     terms?: boolean
+    rejectionReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["proposal"]>
@@ -28078,6 +28087,7 @@ export namespace Prisma {
     documentSize?: boolean
     notes?: boolean
     terms?: boolean
+    rejectionReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["proposal"]>
@@ -28109,11 +28119,12 @@ export namespace Prisma {
     documentSize?: boolean
     notes?: boolean
     terms?: boolean
+    rejectionReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type ProposalOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "proposalNumber" | "leadId" | "contactId" | "contactName" | "contactEmail" | "contactPhone" | "companyName" | "clientGst" | "clientAddress" | "title" | "proposalDate" | "validUntil" | "status" | "currency" | "subtotal" | "totalAmount" | "grandTotal" | "discountPercent" | "taxPercent" | "paymentTerms" | "documentName" | "documentUrl" | "documentSize" | "notes" | "terms" | "createdAt" | "updatedAt", ExtArgs["result"]["proposal"]>
+  export type ProposalOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "proposalNumber" | "leadId" | "contactId" | "contactName" | "contactEmail" | "contactPhone" | "companyName" | "clientGst" | "clientAddress" | "title" | "proposalDate" | "validUntil" | "status" | "currency" | "subtotal" | "totalAmount" | "grandTotal" | "discountPercent" | "taxPercent" | "paymentTerms" | "documentName" | "documentUrl" | "documentSize" | "notes" | "terms" | "rejectionReason" | "createdAt" | "updatedAt", ExtArgs["result"]["proposal"]>
   export type ProposalInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     items?: boolean | Proposal$itemsArgs<ExtArgs>
     _count?: boolean | ProposalCountOutputTypeDefaultArgs<ExtArgs>
@@ -28153,6 +28164,7 @@ export namespace Prisma {
       documentSize: string | null
       notes: string | null
       terms: string | null
+      rejectionReason: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["proposal"]>
@@ -28605,6 +28617,7 @@ export namespace Prisma {
     readonly documentSize: FieldRef<"Proposal", 'String'>
     readonly notes: FieldRef<"Proposal", 'String'>
     readonly terms: FieldRef<"Proposal", 'String'>
+    readonly rejectionReason: FieldRef<"Proposal", 'String'>
     readonly createdAt: FieldRef<"Proposal", 'DateTime'>
     readonly updatedAt: FieldRef<"Proposal", 'DateTime'>
   }
@@ -46732,6 +46745,7 @@ export namespace Prisma {
     documentSize: 'documentSize',
     notes: 'notes',
     terms: 'terms',
+    rejectionReason: 'rejectionReason',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -49824,6 +49838,7 @@ export namespace Prisma {
     documentSize?: StringNullableFilter<"Proposal"> | string | null
     notes?: StringNullableFilter<"Proposal"> | string | null
     terms?: StringNullableFilter<"Proposal"> | string | null
+    rejectionReason?: StringNullableFilter<"Proposal"> | string | null
     createdAt?: DateTimeFilter<"Proposal"> | Date | string
     updatedAt?: DateTimeFilter<"Proposal"> | Date | string
     items?: ProposalItemListRelationFilter
@@ -49856,6 +49871,7 @@ export namespace Prisma {
     documentSize?: SortOrderInput | SortOrder
     notes?: SortOrderInput | SortOrder
     terms?: SortOrderInput | SortOrder
+    rejectionReason?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     items?: ProposalItemOrderByRelationAggregateInput
@@ -49891,6 +49907,7 @@ export namespace Prisma {
     documentSize?: StringNullableFilter<"Proposal"> | string | null
     notes?: StringNullableFilter<"Proposal"> | string | null
     terms?: StringNullableFilter<"Proposal"> | string | null
+    rejectionReason?: StringNullableFilter<"Proposal"> | string | null
     createdAt?: DateTimeFilter<"Proposal"> | Date | string
     updatedAt?: DateTimeFilter<"Proposal"> | Date | string
     items?: ProposalItemListRelationFilter
@@ -49923,6 +49940,7 @@ export namespace Prisma {
     documentSize?: SortOrderInput | SortOrder
     notes?: SortOrderInput | SortOrder
     terms?: SortOrderInput | SortOrder
+    rejectionReason?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: ProposalCountOrderByAggregateInput
@@ -49962,6 +49980,7 @@ export namespace Prisma {
     documentSize?: StringNullableWithAggregatesFilter<"Proposal"> | string | null
     notes?: StringNullableWithAggregatesFilter<"Proposal"> | string | null
     terms?: StringNullableWithAggregatesFilter<"Proposal"> | string | null
+    rejectionReason?: StringNullableWithAggregatesFilter<"Proposal"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Proposal"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Proposal"> | Date | string
   }
@@ -55087,6 +55106,7 @@ export namespace Prisma {
     documentSize?: string | null
     notes?: string | null
     terms?: string | null
+    rejectionReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: ProposalItemCreateNestedManyWithoutProposalInput
@@ -55119,6 +55139,7 @@ export namespace Prisma {
     documentSize?: string | null
     notes?: string | null
     terms?: string | null
+    rejectionReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     items?: ProposalItemUncheckedCreateNestedManyWithoutProposalInput
@@ -55151,6 +55172,7 @@ export namespace Prisma {
     documentSize?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     terms?: NullableStringFieldUpdateOperationsInput | string | null
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: ProposalItemUpdateManyWithoutProposalNestedInput
@@ -55183,6 +55205,7 @@ export namespace Prisma {
     documentSize?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     terms?: NullableStringFieldUpdateOperationsInput | string | null
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     items?: ProposalItemUncheckedUpdateManyWithoutProposalNestedInput
@@ -55215,6 +55238,7 @@ export namespace Prisma {
     documentSize?: string | null
     notes?: string | null
     terms?: string | null
+    rejectionReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -55246,6 +55270,7 @@ export namespace Prisma {
     documentSize?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     terms?: NullableStringFieldUpdateOperationsInput | string | null
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -55277,6 +55302,7 @@ export namespace Prisma {
     documentSize?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     terms?: NullableStringFieldUpdateOperationsInput | string | null
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -59528,6 +59554,7 @@ export namespace Prisma {
     documentSize?: SortOrder
     notes?: SortOrder
     terms?: SortOrder
+    rejectionReason?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -59567,6 +59594,7 @@ export namespace Prisma {
     documentSize?: SortOrder
     notes?: SortOrder
     terms?: SortOrder
+    rejectionReason?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -59598,6 +59626,7 @@ export namespace Prisma {
     documentSize?: SortOrder
     notes?: SortOrder
     terms?: SortOrder
+    rejectionReason?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -63096,6 +63125,7 @@ export namespace Prisma {
     documentSize?: string | null
     notes?: string | null
     terms?: string | null
+    rejectionReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -63127,6 +63157,7 @@ export namespace Prisma {
     documentSize?: string | null
     notes?: string | null
     terms?: string | null
+    rejectionReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -63174,6 +63205,7 @@ export namespace Prisma {
     documentSize?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     terms?: NullableStringFieldUpdateOperationsInput | string | null
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -63205,6 +63237,7 @@ export namespace Prisma {
     documentSize?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     terms?: NullableStringFieldUpdateOperationsInput | string | null
+    rejectionReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

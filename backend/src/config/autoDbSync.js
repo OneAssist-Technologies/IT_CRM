@@ -169,15 +169,14 @@ export async function syncExistingContactLeadMeetings() {
  */
 export async function autoSyncDatabase() {
   try {
-    console.log('🔄 [Auto-Sync] Verifying database synchronization...');
+    console.log('🔄 [Auto-Sync] Initializing system roles...');
     await ensureSystemRolesService();
-    console.log('🛡️ [Auto-Sync] Default system roles verified and active!');
-    await syncExistingContactLeadMeetings();
-    console.log('🤝 [Auto-Sync] Contact, Lead, and Meeting synchronization verified!');
+    console.log('✅ [Auto-Sync] System roles initialized successfully!');
   } catch (error) {
-    console.warn('⚠️ [Auto-Sync Notice]:', error.message || error);
-    // Still run meetings sync in case
-    await syncExistingContactLeadMeetings();
+    console.error(
+      '❌ [Auto-Sync] System role initialization failed:',
+      error.message || error
+    );
   }
 }
 
