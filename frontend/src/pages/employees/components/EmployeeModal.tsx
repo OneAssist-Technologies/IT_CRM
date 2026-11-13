@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../../meetings/components/MeetingDatePicker';
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -226,11 +227,12 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
 
             <Select
               label="System Role"
-              value={formData.role || 'DEVELOPER'}
-              onChange={(val) => setFormData({ ...formData, role: (val as UserRole) || 'DEVELOPER' })}
+              value={formData.role || 'Employee'}
+              onChange={(val) => setFormData({ ...formData, role: (val as UserRole) || 'Employee' })}
               radius="14px"
               data={[
                 { value: 'SUPER_ADMIN', label: 'Super Admin / CEO' },
+                { value: 'Employee', label: 'Employee' },
                 { value: 'PROJECT_MANAGER', label: 'Project / Delivery Manager' },
                 { value: 'TECH_LEAD', label: 'Technical Lead' },
                 { value: 'DEVELOPER', label: 'Software Engineer' },
@@ -272,15 +274,12 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
               }}
             />
 
-            <TextInput
+            <MeetingDatePicker
               label="Joining Date"
-              type="date"
+              placeholder="DD-MM-YYYY"
               value={formData.joiningDate || ''}
-              onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
-              radius="14px"
-              styles={{
-                input: { background: CRM_COLORS.backgroundLight },
-              }}
+              onChange={(val: string) => setFormData({ ...formData, joiningDate: val })}
+              zIndex={3000}
             />
           </SimpleGrid>
 

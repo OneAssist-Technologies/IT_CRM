@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Stack,
@@ -173,11 +173,24 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
         saved &&
         ['meetings', 'proposals', 'quotation', 'quotations', 'negotiation', 'contracts', 'invoices', 'payments', 'progress', 'handover'].includes(saved)
       ) {
-        return saved;
+        return saved === 'quotation' ? 'quotations' : saved;
       }
     } catch (_) {}
     return 'meetings';
   });
+
+  // Re-sync active tab if crm_lead_active_section was updated in sessionStorage
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem('crm_lead_active_section');
+      if (
+        saved &&
+        ['meetings', 'proposals', 'quotation', 'quotations', 'negotiation', 'contracts', 'invoices', 'payments', 'progress', 'handover'].includes(saved)
+      ) {
+        setActiveTab(saved === 'quotation' ? 'quotations' : saved);
+      }
+    } catch (_) {}
+  }, [activeLead?.id]);
 
   const handleSelectTab = (tab: string) => {
     const normalized = tab === 'quotation' ? 'quotations' : tab;
@@ -244,101 +257,101 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     return null;
   });
 
+  const prevLeadIdRef = useRef<string | null>(activeLead?.id || null);
+
   useEffect(() => {
-    if (activeLead) {
+    if (activeLead && activeLead.id !== prevLeadIdRef.current) {
+      prevLeadIdRef.current = activeLead.id;
       setDealData(loadLeadDealData(activeLead));
     }
-  }, [activeLead]);
+  }, [activeLead?.id]);
 
-  const handleUpdateProposals = async (newProposals: any) => {
+  const handleUpdateProposals = useCallback(async (newProposals: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, proposals: newProposals };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Proposals', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Proposals',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Proposals' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Proposals', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Proposals',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateQuotations = async (newQuotations: any) => {
+  const handleUpdateQuotations = useCallback(async (newQuotations: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, quotations: newQuotations };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Quotations', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Quotations',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Quotations' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Quotations', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Quotations',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateNegotiation = async (newNeg: any) => {
+  const handleUpdateNegotiation = useCallback(async (newNeg: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, negotiation: newNeg };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Negotiation', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Negotiation',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Negotiation' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Negotiation', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Negotiation',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateContract = async (newContract: any) => {
+  const handleUpdateContract = useCallback(async (newContract: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, contract: newContract };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Contracts', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Contracts',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+    if (activeLead.stage !== 'Contracts' || activeLead.status !== 'In Progress') {
+      setActiveLead((prev) => (prev ? { ...prev, stage: 'Contracts', status: 'In Progress' } : prev));
+      try {
+        await updateLead(
+          activeLead.id,
+          {
+            stage: 'Contracts',
+            status: 'In Progress',
+          },
+          { silent: true }
+        );
+      } catch (_) {}
+    }
+  }, [dealData, activeLead, updateLead]);
 
-  const handleUpdateInvoices = async (newInvoices: any) => {
+  const handleUpdateInvoices = useCallback(async (newInvoices: any) => {
     if (!dealData || !activeLead) return;
     const updated = { ...dealData, invoices: newInvoices };
     setDealData(updated);
     saveLeadDealData(activeLead.id, updated);
-    setActiveLead((prev) => (prev ? { ...prev, stage: 'Invoices', status: 'In Progress' } : prev));
-    try {
-      await updateLead(
-        activeLead.id,
-        {
-          stage: 'Invoices',
-          status: 'In Progress',
-        },
-        { silent: true }
-      );
-    } catch (_) {}
-  };
+  }, [dealData, activeLead]);
 
   const handleUpdatePayments = async (newPayments: any) => {
     if (!dealData || !activeLead) return;
@@ -534,7 +547,12 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     try {
       const res = await fetchMeetingsApi({ leadId: activeLead.id });
       if (res && Array.isArray(res.meetings)) {
-        const mapped: ScheduledMeeting[] = res.meetings.map((m) => ({
+        const seenIds = new Set<string>();
+        const mapped: ScheduledMeeting[] = [];
+        for (const m of res.meetings) {
+          if (!m.id || seenIds.has(m.id)) continue;
+          seenIds.add(m.id);
+          mapped.push({
           id: m.id,
           leadId: activeLead.id,
           title: m.meetingTitle || m.title || m.purpose || 'Meeting',
@@ -544,6 +562,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           meetingDate: m.meetingDate || m.date || '',
           time: m.startTime || m.meetingTime || m.time || '',
           startTime: m.startTime || m.meetingTime || m.time || '',
+          endTime: m.endTime || '',
           duration: m.duration || '30 Minutes',
           hostName: m.assignedTo || m.employeeName || currentUser?.name || '',
           employeeName: m.assignedTo || m.employeeName || currentUser?.name || '',
@@ -559,7 +578,8 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           rescheduleHistory: m.rescheduleHistory,
           notes: m.notes,
           createdAt: m.createdAt || new Date().toISOString(),
-        }));
+          });
+        }
         setScheduledMeetings(mapped);
         try {
           localStorage.setItem(`crm_meetings_${activeLead.id}`, JSON.stringify(mapped));
@@ -570,6 +590,13 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
 
   useEffect(() => {
     fetchLeadBackendMeetings();
+    const handleMeetingSync = () => {
+      fetchLeadBackendMeetings();
+    };
+    window.addEventListener('crm_meetings_updated', handleMeetingSync);
+    return () => {
+      window.removeEventListener('crm_meetings_updated', handleMeetingSync);
+    };
   }, [fetchLeadBackendMeetings]);
 
   // Synchronize call logs for this lead from backend
@@ -826,7 +853,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     };
     const updated = [newComment, ...customActivities];
     setCustomActivities(updated);
-    localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated));
+    try { localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated)); } catch (_) {}
     setCommentText('');
     setNoteTitle('');
     setCommentBoxOpened(false);
@@ -847,7 +874,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
     };
     const updated = [newReply, ...customActivities];
     setCustomActivities(updated);
-    localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated));
+    try { localStorage.setItem(`crm_activities_${activeLead.id}`, JSON.stringify(updated)); } catch (_) {}
     setReplyText('');
     setEmailSubject('');
     setReplyBoxOpened(false);
@@ -909,6 +936,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
               time: updatedMeeting.startTime || updatedMeeting.meetingTime || updatedMeeting.time || m.time,
               startTime: updatedMeeting.startTime || updatedMeeting.meetingTime || updatedMeeting.time || m.startTime || m.time,
               meetingTime: updatedMeeting.meetingTime || updatedMeeting.startTime || updatedMeeting.time || m.meetingTime || m.time,
+              endTime: updatedMeeting.endTime !== undefined ? updatedMeeting.endTime : m.endTime,
               duration: updatedMeeting.duration || m.duration,
               meetingType: updatedMeeting.meetingType || m.meetingType,
               hostName: updatedMeeting.employeeName || updatedMeeting.hostName || m.hostName,
@@ -942,6 +970,9 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
         ).catch(() => {});
         setActiveLead((prev) => (prev ? { ...prev, stage: 'Meetings', status: 'In Progress' } : prev));
       }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+      }
       return updated;
     });
   };
@@ -950,7 +981,13 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
   const meetingTableData = useMemo<MeetingTypeScheduledMeeting[]>(() => {
     const lName = activeLead?.name || '';
     const cName = activeLead?.companyName || activeLead?.profession || '';
-    return scheduledMeetings.map((m) => {
+    const seenIds = new Set<string>();
+    const uniqueMeetings = scheduledMeetings.filter((m) => {
+      if (!m.id || seenIds.has(m.id)) return false;
+      seenIds.add(m.id);
+      return true;
+    });
+    return uniqueMeetings.map((m) => {
       const chosenDate = m.meetingDate || m.date || '';
       const chosenTime = m.startTime || m.meetingTime || m.time || '';
       const calcEnd = calculateEndTime(chosenTime, m.duration || '30 Minutes');
@@ -1147,7 +1184,9 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
             }}
             onClick={onBack}
           >
-            Leads
+            {typeof window !== 'undefined' && sessionStorage.getItem('crm_lead_nav_source') === 'activity-timeline'
+              ? 'Activity Timeline'
+              : 'Leads'}
           </Text>
           <IconChevronRight size={13} color="#94A3B8" />
           <Text
@@ -1156,6 +1195,14 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
             style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}
           >
             {leadName}
+          </Text>
+          <IconChevronRight size={13} color="#94A3B8" />
+          <Text
+            size="13px"
+            fw={600}
+            style={{ color: isDark ? '#60A5FA' : '#2563EB' }}
+          >
+            Deal Pipeline
           </Text>
         </Group>
 
@@ -1366,6 +1413,7 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           isDark={isDark}
           payments={dealData.payments}
           invoices={dealData.invoices}
+          contract={dealData.contract}
           onUpdatePayments={handleUpdatePayments}
           onNavigateSection={handleProceedToSection}
         />
@@ -1377,7 +1425,9 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           lead={activeLead}
           isDark={isDark}
           progress={dealData.progress}
+          handover={dealData.handover}
           onUpdateProgress={handleUpdateProgress}
+          onUpdateHandover={handleUpdateHandover}
           onNavigateSection={handleProceedToSection}
         />
       )}
@@ -1525,7 +1575,6 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
                 data={[
                   { value: 'Virtual', label: 'Virtual (Google Meet / Zoom)' },
                   { value: 'In-person', label: 'In-person (Office / Client Site)' },
-                  { value: 'Phone Call', label: 'Phone Call' },
                 ]}
                 value={meetingType}
                 onChange={(val) => setMeetingType(val || 'Virtual')}

@@ -60,7 +60,7 @@ export async function getLeadMetadata(req, res) {
  */
 export async function getLeadById(req, res) {
   try {
-    const result = await leadService.getLeadByIdService(req.params.id);
+    const result = await leadService.getLeadByIdService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       data: result.data,

@@ -33,6 +33,20 @@ interface ContactContextType {
   updateContact: (id: string, data: Partial<ContactFormData>, options?: { silent?: boolean }) => Promise<{ success: boolean; data?: Contact; message?: string }>;
   deleteContact: (id: string) => Promise<{ success: boolean; message?: string }>;
   assignContact: (id: string, employeeId: string | null) => Promise<{ success: boolean; data?: Contact; message?: string }>;
+  bulkImportContacts: (data: {
+    contacts: any[];
+    defaultAssignedTo?: string;
+    defaultCategory?: string;
+    defaultSource?: string;
+    fileName?: string;
+  }) => Promise<{
+    success: boolean;
+    importedCount: number;
+    errorCount: number;
+    data?: Contact[];
+    errors?: any[];
+    message?: string;
+  }>;
 }
 
 const defaultPagination: ContactPagination = {
@@ -44,7 +58,18 @@ const defaultPagination: ContactPagination = {
   hasNext: false,
 };
 
+const getInitialSavedTab = (): string => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('crm_contacts_tab');
+    if (saved === 'ASSIGNED' || saved === 'BULK_IMPORT' || saved === 'NEW') {
+      return saved;
+    }
+  }
+  return 'NEW';
+};
+
 const defaultFilters: ContactFilter = {
+  tab: getInitialSavedTab(),
   search: '',
   companyName: 'All',
   contactType: 'All',
@@ -83,7 +108,18 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
       if (res.success) {
         setContacts(res.data || []);
         if (res.pagination) {
-          setPagination(res.pagination);
+          const page = res.pagination.page ?? pagination.page ?? 1;
+          const limit = res.pagination.limit ?? pagination.limit ?? 10;
+          const total = res.pagination.total ?? 0;
+          const totalPages = res.pagination.totalPages ?? (Math.ceil(total / limit) || 1);
+          setPagination({
+            total,
+            page,
+            limit,
+            totalPages,
+            hasPrev: typeof res.pagination.hasPrev === 'boolean' ? res.pagination.hasPrev : page > 1,
+            hasNext: typeof res.pagination.hasNext === 'boolean' ? res.pagination.hasNext : page < totalPages,
+          });
         }
       }
     } catch (err: any) {
@@ -300,6 +336,58 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const bulkImportContacts = async (data: {
+    contacts: any[];
+    defaultAssignedTo?: string;
+    defaultCategory?: string;
+    defaultSource?: string;
+    fileName?: string;
+  }) => {
+    try {
+      setLoading(true);
+      const res = await contactService.bulkImportContacts(data);
+      if (res.success) {
+        notifications.show({
+          title: 'Bulk Import Completed',
+          message: res.message || `Successfully uploaded ${res.importedCount} contacts to Bulk Upload table!`,
+          color: 'teal',
+        });
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
+        }
+        await Promise.all([fetchContacts(), fetchStats(), fetchMetadata()]);
+        return {
+          success: true,
+          importedCount: res.importedCount,
+          errorCount: res.errorCount,
+          data: res.data,
+          errors: res.errors,
+          message: res.message,
+        };
+      }
+      return {
+        success: false,
+        importedCount: 0,
+        errorCount: data.contacts.length,
+        message: res.message || 'Import failed.',
+      };
+    } catch (err: any) {
+      notifications.show({
+        title: 'Bulk Import Failed',
+        message: err.message || 'Failed to import contacts.',
+        color: 'red',
+      });
+      return {
+        success: false,
+        importedCount: 0,
+        errorCount: data.contacts.length,
+        message: err.message,
+      };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <ContactContext.Provider
       value={{
@@ -323,6 +411,7 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateContact,
         deleteContact,
         assignContact,
+        bulkImportContacts,
       }}
     >
       {children}

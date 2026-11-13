@@ -27,6 +27,21 @@ export type LeadStage =
   | 'Won'
   | 'Lost';
 
+export interface LeadActivity {
+  type: string;
+  title: string;
+  status?: string | null;
+  direction?: string | null;
+  meetingTitle?: string | null;
+  followUpDate?: string | null;
+  nextFollowDate?: string | null;
+  date?: string | null;
+  time?: string | null;
+  performedBy?: string | null;
+  createdAt: string;
+  updatedAt?: string | null;
+}
+
 export interface Lead {
   id: string;
   leadId: string;
@@ -55,6 +70,9 @@ export interface Lead {
   // Pipeline Status & Stage
   status: LeadStatus | string;
   stage?: LeadStage | string | null;
+  priority?: string | null;
+  tag?: string | null;
+  tagPriority?: string | null;
 
   // Assignment & Additional Details
   assignedTo?: string | null;
@@ -65,6 +83,8 @@ export interface Lead {
   agenda?: string | null;
 
   displayCompany?: string;
+  lastActivity?: LeadActivity | null;
+  nextFollowDate?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -85,10 +105,14 @@ export interface LeadFormData {
   serviceList?: string[];
   status?: LeadStatus | string;
   stage?: LeadStage | string;
+  priority?: string;
+  tag?: string;
+  tagPriority?: string;
   assignedTo?: string | null;
   assignedToName?: string | null;
   createdBy?: string | null;
   createdByName?: string | null;
+  notes?: string | null;
 }
 
 export interface LeadFilter {
@@ -211,6 +235,7 @@ export interface LeadProposal {
   issueDate: string;
   validUntil: string;
   status: 'Draft' | 'Sent' | 'Under Review' | 'Accepted' | 'Rejected';
+  rejectionReason?: string | null;
   currency: string;
   items: ProposalItem[];
   discountPercent: number;
@@ -654,7 +679,7 @@ export interface LeadInvoiceItem {
   amount: number;
   taxAmount: number;
   totalAmount: number;
-  status: 'Draft' | 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue';
+  status: 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Void' | string;
   type: 'Advance (40%)' | 'Milestone 1 (30%)' | 'Final Handover (30%)' | 'Custom';
   description?: string;
 }
@@ -719,6 +744,21 @@ export interface HandoverCommentItem {
   role?: string;
 }
 
+export interface HandoverDeliverableItem {
+  id: string;
+  moduleId?: string;
+  projectId?: string;
+  name: string;
+  projectName?: string;
+  projectCode?: string;
+  assignedTo?: string;
+  deadline?: string;
+  progress?: number;
+  status?: string;
+  handoverStatus?: 'Ready for Handover' | 'Verified' | 'Accepted' | string;
+  transferredAt?: string;
+}
+
 export interface LeadHandoverData {
   // 14 Required Fields
   handoverId: string;
@@ -742,6 +782,9 @@ export interface LeadHandoverData {
   approvalStatus: 'Pending Approval' | 'Approved' | 'Rejected' | 'Revision Requested' | string;
   handoverStatus: 'Draft' | 'In Progress' | 'Submitted' | 'Completed' | 'On Hold' | string;
   comments: HandoverCommentItem[];
+
+  // Transferred deliverables & modules from Progress section
+  handoverModules?: HandoverDeliverableItem[];
 
   // Optional / compatibility properties
   leadId?: string;

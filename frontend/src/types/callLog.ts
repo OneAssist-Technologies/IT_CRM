@@ -1,6 +1,8 @@
 export type CallType = 'Incoming' | 'Outgoing';
 
-export type CallStatus = 'Completed' | 'Follow-up' | 'Missed' | 'Busy' | 'No Answer' | 'Not Interested';
+export type CallStatus = 'Completed' | 'Follow-up' | 'Interested' | 'Missed' | 'Busy' | 'No Answer' | 'Not Interested';
+
+export type ActivityLogSection = 'calls' | 'whatsapp' | 'email' | 'others';
 
 export interface CallLog {
   id: string;
@@ -10,13 +12,46 @@ export interface CallLog {
   employeeName: string;
   contactId?: string | null;
   contactName: string;
+  companyName?: string | null;
   phoneNumber: string;
   leadId?: string | null;
+  leadCode?: string | null;
   duration: string;
   status: CallStatus;
   callDate: string;
   callTime: string;
   description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ActivityLogItem {
+  id: string;
+  activityNumber: string;
+  type: string;
+  title: string;
+  description?: string | null;
+  leadId?: string | null;
+  leadName?: string | null;
+  leadCode?: string | null;
+  customerId?: string | null;
+  customerName?: string | null;
+  companyName?: string | null;
+  contactId?: string | null;
+  contactName: string;
+  phone?: string;
+  phoneNumber?: string;
+  email?: string;
+  messageType?: string;
+  emailType?: string;
+  activityType?: string;
+  status: string;
+  activityDate: string;
+  activityTime: string;
+  performedBy: string;
+  performedById?: string | null;
+  nextFollowDate?: string | null;
+  metadata?: any;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -31,6 +66,36 @@ export interface CallLogStats {
   noAnswer: number;
   notInterested?: number;
   followUp?: number;
+}
+
+export interface WhatsAppStats {
+  total: number;
+  sent: number;
+  replied: number;
+  interested: number;
+  followUp: number;
+  failed: number;
+  notInterested: number;
+}
+
+export interface EmailStats {
+  total: number;
+  sent: number;
+  replied: number;
+  draft: number;
+  interested: number;
+  followUp: number;
+  failed: number;
+  notInterested: number;
+}
+
+export interface OthersStats {
+  total: number;
+  interested: number;
+  followUp: number;
+  notInterested: number;
+  directVisit: number;
+  sms: number;
 }
 
 export interface CallLogFilters {

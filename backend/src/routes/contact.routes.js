@@ -10,6 +10,16 @@ import {
   updateContact,
   deleteContact,
   assignContact,
+  bulkImportContacts,
+  getBulkUploadContacts,
+  promoteBulkUploadToContact,
+  deleteBulkUploadContact,
+  getImportBatches,
+  getImportBatchDetails,
+  getBatchContacts,
+  deleteImportBatch,
+  downloadFailedReport,
+  assignImportBatch,
 } from '../controllers/contact.controller.js';
 
 const router = Router();
@@ -30,7 +40,81 @@ router.get(
   getContactMetadata
 );
 
-// 3. Contact List with Search, Filters, Sorting & Pagination
+// 3. Bulk Import Contacts (Saves to dedicated bulk table)
+router.post(
+  '/bulk-import',
+  requireAuth,
+  authorizePermission('contacts', 'create'),
+  bulkImportContacts
+);
+
+// 3b. Dedicated Bulk Upload Records Management
+router.get(
+  '/bulk-data',
+  requireAuth,
+  authorizePermission('contacts', 'view'),
+  getBulkUploadContacts
+);
+
+router.post(
+  '/bulk-data/:id/promote',
+  requireAuth,
+  authorizePermission('contacts', 'create'),
+  promoteBulkUploadToContact
+);
+
+router.delete(
+  '/bulk-data/:id',
+  requireAuth,
+  authorizePermission('contacts', 'delete'),
+  deleteBulkUploadContact
+);
+
+// 3c. Bulk Import History and Batch Specific Contacts
+router.get(
+  '/import-batches',
+  requireAuth,
+  authorizePermission('contacts', 'view'),
+  getImportBatches
+);
+
+router.get(
+  '/import-batches/:batchId',
+  requireAuth,
+  authorizePermission('contacts', 'view'),
+  getImportBatchDetails
+);
+
+router.get(
+  '/import-batches/:batchId/contacts',
+  requireAuth,
+  authorizePermission('contacts', 'view'),
+  getBatchContacts
+);
+
+router.delete(
+  '/import-batches/:batchId',
+  requireAuth,
+  authorizePermission('contacts', 'delete'),
+  deleteImportBatch
+);
+
+router.get(
+  '/import-batches/:batchId/failed-report',
+  requireAuth,
+  authorizePermission('contacts', 'view'),
+  downloadFailedReport
+);
+
+router.put(
+  '/import-batches/:batchId/assign',
+  requireAuth,
+  authorizePermission('contacts', 'edit'),
+  assignImportBatch
+);
+
+
+// 4. Contact List with Search, Filters, Sorting & Pagination
 router.get(
   '/',
   requireAuth,
@@ -38,7 +122,7 @@ router.get(
   getContacts
 );
 
-// 4. Single Contact Details by ID
+// 5. Single Contact Details by ID
 router.get(
   '/:id',
   requireAuth,
@@ -46,7 +130,7 @@ router.get(
   getContactById
 );
 
-// 5. Create Contact
+// 6. Create Contact
 router.post(
   '/',
   requireAuth,

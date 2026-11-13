@@ -1,18 +1,18 @@
 import { createTheme, MantineColorsTuple } from '@mantine/core';
 import CRM_COLORS from './colors';
 
-// OneAssist Signature Indigo Swatch
+// OneAssist Signature Royal Swatch
 const oneassist: MantineColorsTuple = [
-  '#eef2ff',
-  '#e0e7ff',
-  '#c7d2fe',
-  '#a5b4fc',
-  '#818cf8',
-  '#6366f1',
-  '#4f46e5',
-  '#4338ca',
-  '#3730a3',
-  '#312e81',
+  '#EFF6FF',
+  '#DBEAFE',
+  '#BFDBFE',
+  '#93C5FD',
+  '#60A5FA',
+  '#3B82F6',
+  '#2563EB',
+  '#1D4ED8',
+  '#1E40AF',
+  '#1E3A8A',
 ];
 
 // Modern Slate Neutral Swatch
@@ -38,8 +38,15 @@ export const theme = createTheme({
   },
   primaryColor: 'oneassist',
   primaryShade: 6,
+  defaultGradient: {
+    from: '#1D4ED8',
+    to: '#3B82F6',
+    deg: 135,
+  },
   colors: {
     oneassist,
+    blue: oneassist,
+    indigo: oneassist,
     slate,
   },
   defaultRadius: 'xl',
@@ -113,6 +120,12 @@ export const theme = createTheme({
       defaultProps: {
         radius: 'md',
         withArrow: true,
+      },
+    },
+    Checkbox: {
+      defaultProps: {
+        radius: 'sm',
+        color: 'oneassist',
       },
     },
   },

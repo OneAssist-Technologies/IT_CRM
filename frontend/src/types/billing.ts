@@ -21,7 +21,7 @@ export interface BillingProduct {
   updatedAt?: string;
 }
 
-export type QuotationStatus = 'Draft' | 'Sent' | 'Under Review' | 'Changes Required' | 'Accepted' | 'Rejected' | 'Expired' | 'Converted' | string;
+export type QuotationStatus = 'Draft' | 'Sent' | 'Under Review' | 'Changes Required' | 'Accepted' | 'Rejected' | 'Expired' | 'Converted' | 'Superseded' | string;
 
 export interface QuotationItem {
   id?: string;
@@ -42,6 +42,14 @@ export interface QuotationItem {
 export interface Quotation {
   id: string;
   quotationNumber: string;
+  originalQuotationNumber?: string;
+  version?: number;
+  revisionNumber?: number;
+  revisionName?: string;
+  isLatest?: boolean;
+  projectName?: string | null;
+  revisionNotes?: string | null;
+  parentQuotationId?: string | null;
   contactId?: string | null;
   contactName: string;
   contactEmail?: string | null;
@@ -53,6 +61,9 @@ export interface Quotation {
   quotationDate: string;
   validUntil: string;
   status: QuotationStatus;
+  sentAt?: string | null;
+  acceptedAt?: string | null;
+  supersededAt?: string | null;
   currency: string;
   subtotal: number;
   discountType: 'percentage' | 'fixed';
@@ -72,6 +83,17 @@ export interface Quotation {
   documentUrl?: string | null;
   documentSize?: string | null;
   items: QuotationItem[];
+  allRevisions?: Quotation[];
+  revisions?: Quotation[];
+  parentQuotation?: Quotation | null;
+  latestVersion?: number;
+  latestRevisionName?: string;
+  latestGrandTotal?: number;
+  latestStatus?: QuotationStatus;
+  latestQuotationNumber?: string;
+  latestQuotationId?: string;
+  revisionCount?: number;
+  hasRevisions?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -161,7 +183,7 @@ export interface BillingMilestone {
   updatedAt?: string;
 }
 
-export type InvoiceStatus = 'Draft' | 'Sent' | 'Issued' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled';
+export type InvoiceStatus = 'Draft' | 'Sent' | 'Viewed' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled' | 'Void' | string;
 export type PaymentStatus = 'Unpaid' | 'Partially Paid' | 'Paid' | 'Overdue' | 'Cancelled';
 export type TaxType = 'INTRA_STATE' | 'INTER_STATE' | 'EXPORT_NON_GST';
 export type InvoiceType = 'One-Time' | 'Recurring';

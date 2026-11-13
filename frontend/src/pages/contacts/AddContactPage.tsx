@@ -126,7 +126,7 @@ export const AddContactPage: React.FC<AddContactPageProps> = ({ onBack, initialD
 
     try {
       const payload: ContactFormData = {
-        name: formData.name.trim(),
+        name: (formData.name || '').trim(),
         companyName: formData.companyName?.trim(),
         contactPerson: formData.contactPerson?.trim() || undefined,
         email: formData.email?.trim() || undefined,
@@ -135,6 +135,8 @@ export const AddContactPage: React.FC<AddContactPageProps> = ({ onBack, initialD
         estimatedValue: formData.estimatedValue?.trim() || undefined,
         expectedCloseDate: formData.expectedCloseDate?.trim() || undefined,
         description: formData.description?.trim() || undefined,
+        remarks: formData.description?.trim() || undefined,
+        notes: formData.description?.trim() || undefined,
         status: initialData?.status || 'New',
         stage: initialData?.stage || 'Initialization',
         qualificationStatus: initialData?.qualificationStatus || 'New',
@@ -330,11 +332,11 @@ export const AddContactPage: React.FC<AddContactPageProps> = ({ onBack, initialD
               />
             </SimpleGrid>
 
-            {/* Row 4: Description */}
+            {/* Row 4: Description & Remarks */}
             <Textarea
               className="contact-form-field"
-              label="Description"
-              placeholder="Add context, requirements, or notes..."
+              label="Description & Remarks"
+              placeholder="Add context, requirements, notes, or remarks..."
               minRows={3}
               value={formData.description || ''}
               onChange={(e) => handleFieldChange('description', e.target.value)}

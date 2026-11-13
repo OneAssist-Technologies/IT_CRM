@@ -38,7 +38,7 @@ export const SYSTEM_MODULES = [
   },
   {
     id: 'scheduled_meetings',
-    name: 'Scheduled Meetings',
+    name: 'Meetings',
     category: 'Main Navigation',
     description: 'Date-wise scheduled client and team meetings, employee creator tracking, and timings.',
   },
@@ -61,16 +61,16 @@ export const SYSTEM_MODULES = [
     description: 'Client project delivery, sprints, milestones, and task SLAs.',
   },
   {
-    id: 'negotiations',
-    name: 'Negotiations',
+    id: 'support_tickets',
+    name: 'Support Tickets',
     category: 'Main Navigation',
-    description: 'Commercial deal negotiations, expected values, discounts, and client discussions.',
+    description: 'Customer support tickets, SLA tracking, investigation, and multi-channel resolution.',
   },
   {
-    id: 'invoices',
-    name: 'Invoices',
+    id: 'activity_timeline',
+    name: 'Activity Timeline',
     category: 'Main Navigation',
-    description: 'Invoice management, GST tax calculations, payment tracking, and settlements.',
+    description: 'Chronological timeline of all CRM activities across leads, customers, and deals.',
   },
 
   // 2. Administration & Security
@@ -95,7 +95,7 @@ export const MODULE_CATEGORIES = [
 ];
 
 // Obsolete / legacy template module IDs to exclude from display
-const EXCLUDED_LEGACY_MODULES = new Set([
+export const EXCLUDED_LEGACY_MODULES = new Set([
   'calendar',
   'daily_working_plan',
   'distributor_dashboard',
@@ -115,6 +115,8 @@ const EXCLUDED_LEGACY_MODULES = new Set([
   'meetings', // aliased to scheduled_meetings
   'rbac', // aliased to access_control
   'billing', // standalone billing module excluded from sidebar/rbac
+  'negotiations',
+  'invoices',
 ]);
 
 /**

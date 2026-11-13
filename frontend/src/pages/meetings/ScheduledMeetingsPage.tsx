@@ -51,6 +51,9 @@ import {
   deleteMeetingApi,
 } from '../../services/meetingService';
 import { leadService } from '../../services/leadService';
+import { contactService } from '../../services/contactService';
+import { customerService } from '../../services/customerService';
+import { Contact } from '../../types/contact';
 import { useEmployee } from '../../context/EmployeeContext';
 import { useCRM } from '../../context/CRMContext';
 import { useLead } from '../../context/LeadContext';
@@ -60,7 +63,7 @@ import { LeadMeetingsTableView } from './components/LeadMeetingsTableView';
 import { MeetingDetailsModal } from './components/MeetingDetailsModal';
 import { MeetingTimePicker } from './components/MeetingTimePicker';
 import { MeetingDatePicker } from './components/MeetingDatePicker';
-import { findLeadForMeeting } from './meetingLeadUtils';
+import { findLeadForMeeting, isMeetingForLead } from './meetingLeadUtils';
 
 type ActiveLeadTabType = 'ALL' | 'TODAY' | 'UPCOMING' | 'COMPLETED';
 
@@ -71,9 +74,122 @@ export const ScheduledMeetingsPage: React.FC = () => {
   const { activeNav, setActiveNav } = useCRM();
   const { leads, setSelectedLead, fetchLeads } = useLead();
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
-  const effectiveLeads = allLeads.length > 0 ? allLeads : leads;
-
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<ScheduledMeeting[]>([]);
+
+  const baseLeads = allLeads.length > 0 ? allLeads : leads;
+
+  const effectiveLeads = useMemo(() => {
+    const list: Lead[] = [...baseLeads];
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
+
+    list.forEach((l) => {
+      if (l.id) seenIds.add(String(l.id));
+      if (l.leadId) seenIds.add(String(l.leadId));
+      if (l.name) seenNames.add(l.name.toLowerCase().trim());
+    });
+
+    // 1. Incorporate CRM contacts as virtual leads
+    allContacts.forEach((c) => {
+      const cId = String(c.id);
+      const cContactId = c.contactId ? String(c.contactId) : '';
+      const cName = (c.name || c.contactPerson || '').trim();
+      const cNameLower = cName.toLowerCase();
+
+      const exists =
+        seenIds.has(cId) ||
+        (cContactId && seenIds.has(cContactId)) ||
+        (cName && seenNames.has(cNameLower));
+
+      if (!exists && cName) {
+        seenIds.add(cId);
+        if (cContactId) seenIds.add(cContactId);
+        seenNames.add(cNameLower);
+
+        list.push({
+          id: c.id,
+          leadId: c.contactId || c.id,
+          name: c.name || c.contactPerson || 'Contact',
+          companyName: c.companyName || '',
+          email: c.email || '',
+          phone: c.phone || '',
+          profession: (c as any).designation || 'Contact',
+          status: c.status || 'New',
+          stage: c.stage || 'Initialization',
+          assignedTo: c.assignedTo || '',
+          createdAt: c.createdAt || new Date().toISOString(),
+        } as Lead);
+      }
+    });
+
+    // 2. Incorporate Customers (e.g. from Support Tickets and converted accounts)
+    allCustomers.forEach((cust) => {
+      const custId = String(cust.id);
+      const custCode = cust.customerId ? String(cust.customerId) : '';
+      const custName = (cust.contactPerson || cust.name || cust.companyName || '').trim();
+      const custCo = cust.companyName || cust.name || '';
+      const custNameLower = custName.toLowerCase();
+
+      const exists =
+        seenIds.has(custId) ||
+        (custCode && seenIds.has(custCode)) ||
+        (custName && seenNames.has(custNameLower));
+
+      if (!exists && (custName || custCo)) {
+        seenIds.add(custId);
+        if (custCode) seenIds.add(custCode);
+        if (custName) seenNames.add(custNameLower);
+
+        list.push({
+          id: custId,
+          leadId: custCode || custId,
+          name: custName || custCo,
+          companyName: custCo,
+          email: cust.email || '',
+          phone: cust.phone || '',
+          profession: cust.designation || 'Customer',
+          status: 'Customer',
+          stage: 'Customer',
+          assignedTo: cust.accountManager || '',
+          createdAt: cust.createdAt || new Date().toISOString(),
+        } as Lead);
+      }
+    });
+
+    // 3. Synthesize virtual leads for any meeting not matched yet
+    meetings.forEach((m) => {
+      const matched = findLeadForMeeting(m, list);
+      if (!matched) {
+        const rawName = (m.clientName || m.leadName || 'Client').replace(/\s*\(.*?\)\s*/g, '').trim() || 'Client';
+        const rawCompany = m.clientName && m.clientName.includes('(')
+          ? m.clientName.split('(')[1].replace(')', '').trim()
+          : '';
+        const synthId = m.contactId || m.leadId || `synth-${m.id}`;
+
+        const synthLead: Lead = {
+          id: synthId,
+          leadId: m.contactId || m.leadId || `MEET-${m.id.slice(0, 8)}`,
+          name: rawName,
+          companyName: rawCompany,
+          email: '',
+          phone: '',
+          profession: 'Client',
+          status: m.status || 'Scheduled',
+          stage: 'Meeting',
+          assignedTo: m.employeeName || '',
+          createdAt: m.createdAt || new Date().toISOString(),
+        } as Lead;
+
+        seenIds.add(synthId);
+        seenNames.add(rawName.toLowerCase());
+        list.push(synthLead);
+      }
+    });
+
+    return list;
+  }, [baseLeads, allContacts, allCustomers, meetings]);
   const [stats, setStats] = useState<MeetingStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -175,15 +291,23 @@ const inferDuration = (start?: string, end?: string): string => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [meetingsRes, statsRes, leadsRes] = await Promise.all([
+      const [meetingsRes, statsRes, leadsRes, contactsRes, customersRes] = await Promise.all([
         fetchMeetingsApi(),
         fetchMeetingStatsApi().catch(() => null),
         leadService.getLeads({}, { page: 1, limit: 1000 }).catch(() => null),
+        contactService.getContacts({ limit: 1000 }).catch(() => null),
+        customerService.getCustomers({ limit: 1000 }).catch(() => null),
       ]);
       setMeetings(meetingsRes.meetings || []);
       if (statsRes) setStats(statsRes);
       if (leadsRes && leadsRes.data) {
         setAllLeads(leadsRes.data);
+      }
+      if (contactsRes && contactsRes.data) {
+        setAllContacts(contactsRes.data);
+      }
+      if (customersRes && (customersRes.data || (customersRes as any).customers)) {
+        setAllCustomers(customersRes.data || (customersRes as any).customers || []);
       }
       if (fetchLeads) fetchLeads();
     } catch (err: any) {
@@ -202,12 +326,26 @@ const inferDuration = (start?: string, end?: string): string => {
   }, []);
 
   useEffect(() => {
+    if (activeNav === 'scheduled-meetings' || activeNav === 'meetings') {
+      loadData();
+    }
+  }, [activeNav]);
+
+  useEffect(() => {
     const handleUpdated = () => {
       loadData();
     };
     window.addEventListener('crm_meetings_updated', handleUpdated);
+    window.addEventListener('crm_contacts_updated', handleUpdated);
+    window.addEventListener('crm_customers_updated', handleUpdated);
+    window.addEventListener('crm_leads_updated', handleUpdated);
+    window.addEventListener('crm_activities_updated', handleUpdated);
     return () => {
       window.removeEventListener('crm_meetings_updated', handleUpdated);
+      window.removeEventListener('crm_contacts_updated', handleUpdated);
+      window.removeEventListener('crm_customers_updated', handleUpdated);
+      window.removeEventListener('crm_leads_updated', handleUpdated);
+      window.removeEventListener('crm_activities_updated', handleUpdated);
     };
   }, []);
 
@@ -397,7 +535,7 @@ const inferDuration = (start?: string, end?: string): string => {
   // Selected Lead's Meetings (filtered strictly by the active tab if on Completed/Today/Upcoming)
   const selectedLeadMeetings = useMemo(() => {
     if (!activeLeadSelection) return [];
-    let leadMeets = leadMeetingsMap.get(activeLeadSelection.id) || [];
+    let leadMeets = meetings.filter((m) => isMeetingForLead(m, activeLeadSelection));
     if (leadTab === 'COMPLETED') {
       leadMeets = leadMeets.filter(
         (m) => (m.status || m.meetingStatus || '').toLowerCase() === 'completed'
@@ -415,7 +553,7 @@ const inferDuration = (start?: string, end?: string): string => {
       );
     }
     return leadMeets;
-  }, [activeLeadSelection, leadMeetingsMap, leadTab, dateFilter, todayStr]);
+  }, [activeLeadSelection, meetings, leadTab, dateFilter, todayStr]);
 
   // Handlers
   const handleLeadTabChange = (tab: ActiveLeadTabType) => {
@@ -569,6 +707,8 @@ const inferDuration = (start?: string, end?: string): string => {
       setModalOpen(false);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
       }
       await loadData();
     } catch (err: any) {
@@ -596,6 +736,8 @@ const inferDuration = (start?: string, end?: string): string => {
       setDeleteTarget(null);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
       }
       await loadData();
     } catch (err: any) {
@@ -971,7 +1113,7 @@ const inferDuration = (start?: string, end?: string): string => {
               <Stack align="center" gap="sm">
                 <Loader color="indigo" />
                 <Text size="sm" c="dimmed">
-                  Loading leads and scheduled meetings...
+                  Loading leads and meetings...
                 </Text>
               </Stack>
             </Center>

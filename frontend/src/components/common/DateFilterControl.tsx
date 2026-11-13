@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../../pages/meetings/components/MeetingDatePicker';
 import React, { useState, useMemo } from 'react';
 import {
   Popover,
@@ -431,23 +432,16 @@ export const DateFilterControl: React.FC<DateFilterControlProps> = ({
 
               <Divider my={4} label="Or Specific Date" labelPosition="center" />
 
-              <TextInput
-                type="date"
-                size="xs"
+              <MeetingDatePicker
                 label="Pick Any Day"
+                placeholder="DD-MM-YYYY"
                 value={value.customDay || (value.type === 'CUSTOM_DAY' ? todayStr : '')}
-                onChange={(e) => {
-                  const day = e.target.value;
-                  if (day) {
-                    onChange({ type: 'CUSTOM_DAY', customDay: day });
+                onChange={(val: string) => {
+                  if (val) {
+                    onChange({ type: 'CUSTOM_DAY', customDay: val });
                   }
                 }}
-                styles={{
-                  input: {
-                    backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                    borderColor: isDark ? '#334155' : '#E2E8F0',
-                  },
-                }}
+                zIndex={3500}
               />
             </Stack>
           )}
@@ -527,43 +521,31 @@ export const DateFilterControl: React.FC<DateFilterControlProps> = ({
               <Divider my={4} label="Custom Date Range" labelPosition="center" />
 
               <Group grow gap="xs">
-                <TextInput
-                  type="date"
-                  size="xs"
+                <MeetingDatePicker
                   label="From"
+                  placeholder="DD-MM-YYYY"
                   value={value.startDate || ''}
-                  onChange={(e) => {
+                  onChange={(val: string) => {
                     onChange({
                       type: 'CUSTOM_RANGE',
-                      startDate: e.target.value,
+                      startDate: val,
                       endDate: value.endDate || '',
                     });
                   }}
-                  styles={{
-                    input: {
-                      backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                      borderColor: isDark ? '#334155' : '#E2E8F0',
-                    },
-                  }}
+                  zIndex={3500}
                 />
-                <TextInput
-                  type="date"
-                  size="xs"
+                <MeetingDatePicker
                   label="To"
+                  placeholder="DD-MM-YYYY"
                   value={value.endDate || ''}
-                  onChange={(e) => {
+                  onChange={(val: string) => {
                     onChange({
                       type: 'CUSTOM_RANGE',
                       startDate: value.startDate || '',
-                      endDate: e.target.value,
+                      endDate: val,
                     });
                   }}
-                  styles={{
-                    input: {
-                      backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                      borderColor: isDark ? '#334155' : '#E2E8F0',
-                    },
-                  }}
+                  zIndex={3500}
                 />
               </Group>
             </Stack>

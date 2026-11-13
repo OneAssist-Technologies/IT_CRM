@@ -76,10 +76,14 @@ export const CallLogTableView: React.FC<CallLogTableViewProps> = ({
       bg = isDark ? 'rgba(245, 158, 11, 0.14)' : '#FFFBEB';
       color = isDark ? '#FCD34D' : '#B45309';
       border = isDark ? 'rgba(245, 158, 11, 0.25)' : '#FDE68A';
-    } else if (sLow.includes('interest') || sLow.includes('intrest')) {
+    } else if (sLow.includes('not interest') || sLow.includes('not intrest')) {
       bg = isDark ? 'rgba(244, 63, 94, 0.16)' : '#FFF1F2';
       color = isDark ? '#FDA4AF' : '#E11D48';
       border = isDark ? 'rgba(244, 63, 94, 0.35)' : '#FECDD3';
+    } else if (sLow.includes('interest') || sLow.includes('intrest')) {
+      bg = isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5';
+      color = isDark ? '#10B981' : '#047857';
+      border = isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0';
     }
 
     return (
@@ -230,7 +234,7 @@ export const CallLogTableView: React.FC<CallLogTableViewProps> = ({
             >
               <Table.Tr>
                 <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>
-                  CONTACT NAME
+                  CONTACT / COMPANY
                 </Table.Th>
                 <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>
                   ASSIGNED EMPLOYEE
@@ -265,7 +269,7 @@ export const CallLogTableView: React.FC<CallLogTableViewProps> = ({
                     style={{ cursor: 'pointer' }}
                     onClick={() => onViewDetails(call)}
                   >
-                    {/* 1. Contact Name */}
+                    {/* 1. Contact / Company */}
                     <Table.Td>
                       <Group gap="sm" wrap="nowrap">
                         <Box
@@ -285,15 +289,25 @@ export const CallLogTableView: React.FC<CallLogTableViewProps> = ({
                         >
                           {initialLetter}
                         </Box>
-                        <Text
-                          fw={700}
-                          size="sm"
-                          style={{
-                            color: isDark ? '#F9FAFB' : '#0F172A',
-                          }}
-                        >
-                          {call.contactName}
-                        </Text>
+                        <Stack gap={2}>
+                          <Text
+                            fw={700}
+                            size="sm"
+                            style={{
+                              color: isDark ? '#F9FAFB' : '#0F172A',
+                            }}
+                          >
+                            {call.contactName}
+                          </Text>
+                          {call.companyName && (
+                            <Group gap={4} wrap="nowrap">
+                              <IconBuilding size={12} color={isDark ? '#64748B' : '#94A3B8'} />
+                              <Text size="11px" style={{ color: isDark ? '#94A3B8' : '#64748B', fontWeight: 500 }}>
+                                {call.companyName}
+                              </Text>
+                            </Group>
+                          )}
+                        </Stack>
                       </Group>
                     </Table.Td>
 
@@ -419,7 +433,15 @@ export const CallLogTableView: React.FC<CallLogTableViewProps> = ({
                 <Text fw={700} size="sm" style={{ color: isDark ? '#F9FAFB' : '#0F172A' }}>
                   {call.contactName}
                 </Text>
-                <Text size="xs" c="dimmed">
+                {call.companyName && (
+                  <Group gap={4} wrap="nowrap" mt={1}>
+                    <IconBuilding size={12} color={isDark ? '#64748B' : '#94A3B8'} />
+                    <Text size="xs" style={{ color: isDark ? '#94A3B8' : '#64748B', fontWeight: 500 }}>
+                      {call.companyName}
+                    </Text>
+                  </Group>
+                )}
+                <Text size="xs" c="dimmed" mt={call.companyName ? 1 : 2}>
                   Assigned: {call.employeeName}
                 </Text>
               </div>

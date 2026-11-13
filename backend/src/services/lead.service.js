@@ -11,10 +11,353 @@ import {
   formatContractResponse,
   buildContractFilterQuery,
 } from '../utils/lead.util.js';
+import { recordActivity } from './activity.service.js';
+import {
+  resolveUserScope,
+  buildLeadScopeFilter,
+  isRecordAccessible,
+} from '../middlewares/permission.middleware.js';
 
 /**
  * 1. List leads with search, filters, pagination, and sorting
  */
+/**
+ * Computes accurate effective timestamp for an activity item based on its business date and time
+ */
+export function getActivityEffectiveTime(item) {
+  if (!item) return 0;
+  const createdMs = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+  const updatedMs = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+  // If the record was updated after creation (e.g. status was updated, notes edited)
+  const isUpdatedLater = updatedMs > (createdMs + 5000);
+  const effectiveBaseMs = isUpdatedLater ? updatedMs : createdMs;
+
+  if (item.date) {
+    try {
+      let datePart = String(item.date).trim();
+      // Normalize DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD
+      if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(datePart)) {
+        const parts = datePart.split(/[-/]/);
+        datePart = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else {
+        datePart = datePart.slice(0, 10);
+      }
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const effectiveDateStr = effectiveBaseMs ? new Date(effectiveBaseMs).toISOString().slice(0, 10) : '';
+
+        // If updated today or created today, the latest action timestamp gives the true sequence
+        if (effectiveDateStr === todayStr || datePart === todayStr) {
+          return effectiveBaseMs || new Date(`${datePart}T12:00:00Z`).getTime();
+        }
+
+        // If date is in the future, it is a scheduled future activity (e.g. meeting next week)
+        // For "Last Activity", the event of scheduling it was completed at createdAt/updatedAt
+        if (datePart > todayStr) {
+          return effectiveBaseMs || Date.now();
+        }
+
+        // If record was modified on a later date than its scheduled/past date, use the update timestamp
+        if (isUpdatedLater && effectiveDateStr > datePart) {
+          return effectiveBaseMs;
+        }
+
+        // If it's an explicitly backdated past day:
+        let timePart = '12:00:00';
+        if (item.time) {
+          const tStr = String(item.time).trim();
+          const match12 = tStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+          if (match12) {
+            let h = parseInt(match12[1], 10);
+            const m = match12[2];
+            const s = match12[3] || '00';
+            const meridiem = (match12[4] || '').toUpperCase();
+            if (meridiem === 'PM' && h < 12) h += 12;
+            if (meridiem === 'AM' && h === 12) h = 0;
+            timePart = `${String(h).padStart(2, '0')}:${m}:${s}`;
+          } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(tStr)) {
+            timePart = tStr;
+          }
+        }
+        const combined = new Date(`${datePart}T${timePart}`);
+        if (!isNaN(combined.getTime())) {
+          return combined.getTime();
+        }
+      }
+    } catch (_) {}
+  }
+
+  return effectiveBaseMs;
+}
+
+/**
+ * Helper to attach the most recent activity summary to each lead
+ */
+export async function attachLastActivityToLeads(leads = []) {
+  if (!leads || leads.length === 0) return [];
+
+  const leadIds = leads.map((l) => l.id).filter(Boolean);
+  const leadCodes = leads.map((l) => l.leadId).filter(Boolean);
+  const leadPhones = leads
+    .map((l) => (l.phone ? String(l.phone).replace(/\D/g, '') : null))
+    .filter(Boolean);
+  const leadEmails = leads
+    .map((l) => (l.email ? String(l.email).toLowerCase().trim() : null))
+    .filter(Boolean);
+  const allIdentifiers = Array.from(new Set([...leadIds, ...leadCodes]));
+
+  let linkedContacts = [];
+  try {
+    linkedContacts = await prisma.contact.findMany({
+      where: {
+        OR: [
+          { internalReference: { in: leadCodes } },
+          { id: { in: leadIds } },
+          { contactId: { in: leadCodes } },
+          ...(leadPhones.length > 0 ? [{ phone: { in: leadPhones } }] : []),
+          ...(leadEmails.length > 0
+            ? [{ email: { in: leadEmails, mode: 'insensitive' } }]
+            : []),
+        ],
+      },
+      select: {
+        id: true,
+        contactId: true,
+        phone: true,
+        email: true,
+        internalReference: true,
+        contactMode: true,
+        nextFollowDate: true,
+        updatedAt: true,
+      },
+    });
+  } catch (err) {
+    console.warn('[attachLastActivityToLeads Notice]:', err.message);
+  }
+
+  const allContactIds = Array.from(
+    new Set(linkedContacts.flatMap((c) => [c.id, c.contactId]).filter(Boolean))
+  );
+
+  let activities = [];
+  let meetings = [];
+  let callLogs = [];
+
+  try {
+    [activities, meetings, callLogs] = await Promise.all([
+      prisma.activity.findMany({
+        where: {
+          OR: [
+            { leadId: { in: allIdentifiers } },
+            { leadCode: { in: leadCodes } },
+            { entityId: { in: allIdentifiers } },
+            ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }).catch(() => []),
+      prisma.scheduledMeeting.findMany({
+        where: {
+          OR: [
+            { leadId: { in: allIdentifiers } },
+            ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }).catch(() => []),
+      prisma.callLog.findMany({
+        where: {
+          OR: [
+            { leadId: { in: allIdentifiers } },
+            ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
+            ...(leadPhones.length > 0 ? [{ phoneNumber: { in: leadPhones } }] : []),
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+      }).catch(() => []),
+    ]);
+  } catch (err) {
+    console.warn('[attachLastActivityToLeads Notice]:', err.message);
+  }
+
+  return leads.map((lead) => {
+    const lIds = new Set([lead.id, lead.leadId].filter(Boolean));
+    const cleanLeadPhone = lead.phone ? String(lead.phone).replace(/\D/g, '') : '';
+    const cleanLeadEmail = lead.email ? String(lead.email).toLowerCase().trim() : '';
+
+    const matchedContactIds = new Set();
+    linkedContacts.forEach((c) => {
+      const match =
+        (c.internalReference && (c.internalReference === lead.leadId || c.internalReference === lead.id)) ||
+        (c.id === lead.id) ||
+        (c.contactId === lead.leadId) ||
+        (cleanLeadPhone && c.phone && String(c.phone).replace(/\D/g, '') === cleanLeadPhone) ||
+        (cleanLeadEmail && c.email && String(c.email).toLowerCase().trim() === cleanLeadEmail);
+
+      if (match) {
+        if (c.id) {
+          lIds.add(c.id);
+          matchedContactIds.add(c.id);
+        }
+        if (c.contactId) {
+          lIds.add(c.contactId);
+          matchedContactIds.add(c.contactId);
+        }
+      }
+    });
+
+    const candidateItems = [];
+
+    activities
+      .filter((a) => {
+        if (a.leadId && lIds.has(a.leadId)) return true;
+        if (a.leadCode && lIds.has(a.leadCode)) return true;
+        if (a.entityId && lIds.has(a.entityId)) return true;
+        if (a.customerId && lIds.has(a.customerId)) return true;
+        if (a.contactId && (lIds.has(a.contactId) || matchedContactIds.has(a.contactId))) return true;
+        if (cleanLeadPhone && a.metadata && typeof a.metadata === 'object' && a.metadata.phoneNumber && String(a.metadata.phoneNumber).replace(/\D/g, '') === cleanLeadPhone) return true;
+        return false;
+      })
+      .forEach((a) => {
+        const meta = typeof a.metadata === 'object' && a.metadata !== null ? a.metadata : {};
+        const direction = meta.emailType || meta.messageType || meta.callType || (a.type === 'call' ? 'Outgoing' : 'Outgoing');
+        const followUpDate = meta.nextFollowDate || meta.followUpDate || null;
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const isUpdatedToday = a.updatedAt && new Date(a.updatedAt).toISOString().slice(0, 10) === todayStr && new Date(a.updatedAt).getTime() > (new Date(a.createdAt || 0).getTime() + 5000);
+
+        candidateItems.push({
+          type: a.type || 'activity',
+          title: a.title || 'Activity Logged',
+          status: a.status || null,
+          direction: direction || 'Outgoing',
+          followUpDate: followUpDate || null,
+          date: isUpdatedToday ? todayStr : (a.activityDate || null),
+          time: a.activityTime || null,
+          performedBy: a.performedBy || null,
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
+        });
+      });
+
+    meetings
+      .filter((m) => {
+        if (m.leadId && lIds.has(m.leadId)) return true;
+        if (m.contactId && (lIds.has(m.contactId) || matchedContactIds.has(m.contactId))) return true;
+        if (m.clientName) {
+          const clientLow = m.clientName.toLowerCase();
+          if (lead.name && clientLow.includes(lead.name.toLowerCase())) return true;
+          if (lead.companyName && clientLow.includes(lead.companyName.toLowerCase())) return true;
+        }
+        return false;
+      })
+      .forEach((m) => {
+        let followUpDate = null;
+        if (/follow/i.test(m.status || '')) {
+          const matchedContact = linkedContacts.find(c => (matchedContactIds.has(c.id) || matchedContactIds.has(c.contactId)) && c.nextFollowDate);
+          if (matchedContact) followUpDate = matchedContact.nextFollowDate;
+        }
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const isUpdatedToday = m.updatedAt && new Date(m.updatedAt).toISOString().slice(0, 10) === todayStr && new Date(m.updatedAt).getTime() > (new Date(m.createdAt || 0).getTime() + 5000);
+
+        candidateItems.push({
+          type: 'meeting',
+          title: m.title ? `Meeting: ${m.title}` : 'Scheduled Meeting',
+          meetingTitle: m.title || 'Meeting',
+          status: m.status || 'Scheduled',
+          direction: null,
+          followUpDate: followUpDate || null,
+          date: isUpdatedToday ? todayStr : (m.meetingDate || null),
+          time: m.startTime || null,
+          performedBy: m.employeeName || null,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+        });
+      });
+
+    callLogs
+      .filter((c) => {
+        if (c.leadId && lIds.has(c.leadId)) return true;
+        if (c.contactId && (lIds.has(c.contactId) || matchedContactIds.has(c.contactId))) return true;
+        if (cleanLeadPhone && c.phoneNumber && String(c.phoneNumber).replace(/\D/g, '') === cleanLeadPhone) return true;
+        return false;
+      })
+      .forEach((c) => {
+        let followUpDate = null;
+        if (/follow/i.test(c.status || '')) {
+          const matchedContact = linkedContacts.find(con => (matchedContactIds.has(con.id) || matchedContactIds.has(con.contactId)) && con.nextFollowDate);
+          if (matchedContact) followUpDate = matchedContact.nextFollowDate;
+        }
+
+        candidateItems.push({
+          type: 'call',
+          title: c.callType ? `${c.callType} Call` : 'Call Log',
+          status: c.status || 'Completed',
+          direction: c.callType || 'Outgoing',
+          followUpDate: followUpDate || null,
+          date: c.callDate || null,
+          time: c.callTime || null,
+          performedBy: c.employeeName || null,
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        });
+      });
+
+    candidateItems.sort((a, b) => {
+      const diff = getActivityEffectiveTime(b) - getActivityEffectiveTime(a);
+      if (diff !== 0) return diff;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    });
+
+    const lastActivity = candidateItems[0] || {
+      type: 'lead_created',
+      title: 'Lead Created',
+      status: 'New',
+      direction: null,
+      followUpDate: null,
+      date: lead.createdAt ? new Date(lead.createdAt).toISOString().slice(0, 10) : null,
+      performedBy: lead.createdByName || 'Admin',
+      createdAt: lead.createdAt,
+    };
+
+    if (lastActivity && (/follow/i.test(lastActivity.status || '') || /follow/i.test(lastActivity.title || '')) && !lastActivity.followUpDate) {
+      const contactWithFollowUp = linkedContacts.find((c) => {
+        const isMatched =
+          matchedContactIds.has(c.id) ||
+          matchedContactIds.has(c.contactId) ||
+          lIds.has(c.id) ||
+          lIds.has(c.contactId) ||
+          lIds.has(c.internalReference) ||
+          (cleanLeadPhone && c.phone && String(c.phone).replace(/\D/g, '').endsWith(cleanLeadPhone.slice(-10))) ||
+          (cleanLeadEmail && c.email && String(c.email).toLowerCase().trim() === cleanLeadEmail);
+        return isMatched && c.nextFollowDate;
+      });
+      if (contactWithFollowUp) {
+        lastActivity.followUpDate = contactWithFollowUp.nextFollowDate;
+      } else {
+        const actWithFollowUp = activities.find(
+          (a) => (lIds.has(a.leadId) || lIds.has(a.leadCode) || matchedContactIds.has(a.contactId)) &&
+                 a.metadata && (a.metadata.nextFollowDate || a.metadata.followUpDate)
+        );
+        if (actWithFollowUp) {
+          lastActivity.followUpDate = actWithFollowUp.metadata.nextFollowDate || actWithFollowUp.metadata.followUpDate;
+        }
+      }
+    }
+
+    return {
+      ...lead,
+      nextFollowDate: lastActivity?.followUpDate || null,
+      lastActivity,
+    };
+  });
+}
+
 export async function getLeadsService(queryParams = {}, currentUser = null) {
   const {
     sortBy = 'createdAt',
@@ -29,55 +372,13 @@ export async function getLeadsService(queryParams = {}, currentUser = null) {
 
   const where = buildLeadFilterQuery(queryParams);
 
-  // Role-Based Data Access: Super Admin sees all leads.
-  // Non-admin employees strictly see ONLY leads assigned to them!
-  const roleUpper = (currentUser?.role || '').toUpperCase();
-  const isSuperAdmin = !currentUser || roleUpper === 'SUPER_ADMIN' || roleUpper.includes('ADMIN');
-
-  if (!isSuperAdmin) {
-    const emp = await prisma.employee.findFirst({
-      where: {
-        OR: [
-          currentUser?.email ? { email: { equals: currentUser.email, mode: 'insensitive' } } : null,
-          currentUser?.name ? { name: { equals: currentUser.name, mode: 'insensitive' } } : null,
-          currentUser?.id ? { id: currentUser.id } : null,
-        ].filter(Boolean),
-      },
-    });
-
-    const assignedMatch = [];
-    if (emp?.id) assignedMatch.push({ assignedTo: emp.id });
-    if (emp?.empCode) assignedMatch.push({ assignedTo: emp.empCode });
-    if (emp?.name) assignedMatch.push({ assignedToName: { equals: emp.name, mode: 'insensitive' } });
-    if (currentUser?.id) assignedMatch.push({ assignedTo: currentUser.id });
-    if (currentUser?.name) assignedMatch.push({ assignedToName: { equals: currentUser.name, mode: 'insensitive' } });
-    if (currentUser?.email) assignedMatch.push({ assignedTo: currentUser.email });
-
-    // Include leads created or qualified by this user/employee
-    if (currentUser?.name) {
-      assignedMatch.push({ createdBy: { equals: currentUser.name, mode: 'insensitive' } });
-      assignedMatch.push({ createdByName: { equals: currentUser.name, mode: 'insensitive' } });
-    }
-    if (currentUser?.email) {
-      assignedMatch.push({ createdBy: { equals: currentUser.email, mode: 'insensitive' } });
-    }
-    if (currentUser?.id) {
-      assignedMatch.push({ createdBy: currentUser.id });
-    }
-    if (emp?.id) {
-      assignedMatch.push({ createdBy: emp.id });
-    }
-    if (emp?.name) {
-      assignedMatch.push({ createdBy: { equals: emp.name, mode: 'insensitive' } });
-      assignedMatch.push({ createdByName: { equals: emp.name, mode: 'insensitive' } });
-    }
-
-    if (assignedMatch.length > 0) {
-      if (!where.AND) where.AND = [];
-      where.AND.push({ OR: assignedMatch });
-    } else {
-      if (!where.AND) where.AND = [];
-      where.AND.push({ id: '__none__' });
+  // Enforce role-based Data Scope (Own / All)
+  if (currentUser) {
+    const userScope = await resolveUserScope(currentUser, 'leads');
+    const scopeFilter = buildLeadScopeFilter(userScope);
+    if (scopeFilter) {
+      where.AND = where.AND || [];
+      where.AND.push(scopeFilter);
     }
   }
 
@@ -95,8 +396,10 @@ export async function getLeadsService(queryParams = {}, currentUser = null) {
     }),
   ]);
 
+  const enrichedLeads = await attachLastActivityToLeads(leads);
+
   return {
-    data: leads.map(formatLeadResponse),
+    data: enrichedLeads.map(formatLeadResponse),
     pagination: {
       total,
       page: pageNum,
@@ -109,12 +412,35 @@ export async function getLeadsService(queryParams = {}, currentUser = null) {
 /**
  * 2. Get Single Lead by ID
  */
-export async function getLeadByIdService(id) {
-  const lead = await prisma.lead.findFirst({
+export async function getLeadByIdService(id, currentUser = null) {
+  let lead = await prisma.lead.findFirst({
     where: {
       OR: [{ id }, { leadId: id }],
     },
   });
+
+  if (!lead && typeof id === 'string' && (id.startsWith('BLK-') || id.startsWith('CNT-'))) {
+    const contactOrBulk =
+      (await prisma.contact.findFirst({
+        where: { OR: [{ id }, { contactId: id }, { internalReference: id }] },
+      })) ||
+      (await prisma.bulkUploadContact.findFirst({
+        where: { OR: [{ id }, { bulkId: id }] },
+      }));
+
+    if (contactOrBulk) {
+      const cleanPhone = contactOrBulk.phone ? contactOrBulk.phone.replace(/\D/g, '') : null;
+      lead = await prisma.lead.findFirst({
+        where: {
+          OR: [
+            ...(contactOrBulk.email ? [{ email: { equals: contactOrBulk.email.trim(), mode: 'insensitive' } }] : []),
+            ...(cleanPhone ? [{ phone: { contains: cleanPhone } }] : []),
+            ...(contactOrBulk.name ? [{ name: { equals: contactOrBulk.name.trim(), mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+    }
+  }
 
   if (!lead) {
     const error = new Error('Lead not found');
@@ -122,7 +448,17 @@ export async function getLeadByIdService(id) {
     throw error;
   }
 
-  return { data: formatLeadResponse(lead) };
+  if (currentUser) {
+    const userScope = await resolveUserScope(currentUser, 'leads');
+    if (!isRecordAccessible(lead, userScope)) {
+      const error = new Error('Access denied: You do not have permission to access this lead.');
+      error.status = 403;
+      throw error;
+    }
+  }
+
+  const [enrichedLead] = await attachLastActivityToLeads([lead]);
+  return { data: formatLeadResponse(enrichedLead) };
 }
 
 /**
@@ -130,60 +466,21 @@ export async function getLeadByIdService(id) {
  */
 export async function getLeadStatsService(currentUser = null) {
   let baseWhere = {};
-  const roleUpper = (currentUser?.role || '').toUpperCase();
-  const isSuperAdmin = !currentUser || roleUpper === 'SUPER_ADMIN' || roleUpper.includes('ADMIN');
 
-  if (!isSuperAdmin) {
-    const emp = await prisma.employee.findFirst({
-      where: {
-        OR: [
-          currentUser?.email ? { email: { equals: currentUser.email, mode: 'insensitive' } } : null,
-          currentUser?.name ? { name: { equals: currentUser.name, mode: 'insensitive' } } : null,
-          currentUser?.id ? { id: currentUser.id } : null,
-        ].filter(Boolean),
-      },
-    });
-
-    const assignedMatch = [];
-    if (emp?.id) assignedMatch.push({ assignedTo: emp.id });
-    if (emp?.empCode) assignedMatch.push({ assignedTo: emp.empCode });
-    if (emp?.name) assignedMatch.push({ assignedToName: { equals: emp.name, mode: 'insensitive' } });
-    if (currentUser?.id) assignedMatch.push({ assignedTo: currentUser.id });
-    if (currentUser?.name) assignedMatch.push({ assignedToName: { equals: currentUser.name, mode: 'insensitive' } });
-    if (currentUser?.email) assignedMatch.push({ assignedTo: currentUser.email });
-
-    // Include leads created or qualified by this user/employee
-    if (currentUser?.name) {
-      assignedMatch.push({ createdBy: { equals: currentUser.name, mode: 'insensitive' } });
-      assignedMatch.push({ createdByName: { equals: currentUser.name, mode: 'insensitive' } });
-    }
-    if (currentUser?.email) {
-      assignedMatch.push({ createdBy: { equals: currentUser.email, mode: 'insensitive' } });
-    }
-    if (currentUser?.id) {
-      assignedMatch.push({ createdBy: currentUser.id });
-    }
-    if (emp?.id) {
-      assignedMatch.push({ createdBy: emp.id });
-    }
-    if (emp?.name) {
-      assignedMatch.push({ createdBy: { equals: emp.name, mode: 'insensitive' } });
-      assignedMatch.push({ createdByName: { equals: emp.name, mode: 'insensitive' } });
-    }
-
-    if (assignedMatch.length > 0) {
-      baseWhere = { OR: assignedMatch };
-    } else {
-      baseWhere = { id: '__none__' };
+  if (currentUser) {
+    const userScope = await resolveUserScope(currentUser, 'leads');
+    const scopeFilter = buildLeadScopeFilter(userScope);
+    if (scopeFilter) {
+      baseWhere = scopeFilter;
     }
   }
 
   const [total, newCount, inProgress, won, lost] = await Promise.all([
     prisma.lead.count({ where: baseWhere }),
     prisma.lead.count({ where: { ...baseWhere, status: 'New' } }),
-    prisma.lead.count({ where: { ...baseWhere, status: { in: ['In Progress', 'Contacted', 'Qualified', 'Active'] } } }),
+    prisma.lead.count({ where: { ...baseWhere, status: { in: ['In Progress', 'Contacted', 'Qualified', 'Active', 'Follow-up', 'Interested', 'Proposal Sent'] } } }),
     prisma.lead.count({ where: { ...baseWhere, status: { in: ['Won', 'Closed Won', 'Completed', 'Complete'] } } }),
-    prisma.lead.count({ where: { ...baseWhere, status: { in: ['Lost', 'Disqualified'] } } }),
+    prisma.lead.count({ where: { ...baseWhere, status: { in: ['Lost', 'Disqualified', 'Unqualified', 'Cancelled'] } } }),
   ]);
 
   return {
@@ -227,6 +524,9 @@ export async function createLeadService(body, currentUser = null) {
     serviceList = [],
     status = 'New',
     stage = 'Initialization',
+    priority = 'Medium',
+    tagPriority,
+    tag,
     assignedTo = null,
     assignedToName = null,
     createdBy = null,
@@ -280,6 +580,7 @@ export async function createLeadService(body, currentUser = null) {
       serviceList: Array.isArray(serviceList) ? serviceList : [],
       status: status || 'New',
       stage: stage || 'Initialization',
+      priority: (body.priority || body.tagPriority || body.tag || priority || 'Medium').trim(),
       assignedTo: finalAssignedTo,
       assignedToName: finalAssignedToName,
       createdBy: finalCreatedBy,
@@ -299,14 +600,46 @@ export async function createLeadService(body, currentUser = null) {
  * 6. Update Lead
  */
 export async function updateLeadService(id, body, currentUser = null) {
-  const existing = await prisma.lead.findFirst({
+  let existing = await prisma.lead.findFirst({
     where: { OR: [{ id }, { leadId: id }] },
   });
+
+  if (!existing && typeof id === 'string' && (id.startsWith('BLK-') || id.startsWith('CNT-'))) {
+    const contactOrBulk =
+      (await prisma.contact.findFirst({
+        where: { OR: [{ id }, { contactId: id }, { internalReference: id }] },
+      })) ||
+      (await prisma.bulkUploadContact.findFirst({
+        where: { OR: [{ id }, { bulkId: id }] },
+      }));
+
+    if (contactOrBulk) {
+      const cleanPhone = contactOrBulk.phone ? contactOrBulk.phone.replace(/\D/g, '') : null;
+      existing = await prisma.lead.findFirst({
+        where: {
+          OR: [
+            ...(contactOrBulk.email ? [{ email: { equals: contactOrBulk.email.trim(), mode: 'insensitive' } }] : []),
+            ...(cleanPhone ? [{ phone: { contains: cleanPhone } }] : []),
+            ...(contactOrBulk.name ? [{ name: { equals: contactOrBulk.name.trim(), mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+    }
+  }
 
   if (!existing) {
     const error = new Error('Lead not found');
     error.status = 404;
     throw error;
+  }
+
+  if (currentUser) {
+    const userScope = await resolveUserScope(currentUser, 'leads');
+    if (!isRecordAccessible(existing, userScope)) {
+      const error = new Error('Access denied: You do not have permission to edit this lead.');
+      error.status = 403;
+      throw error;
+    }
   }
 
   const {
@@ -349,6 +682,10 @@ export async function updateLeadService(id, body, currentUser = null) {
   if (stage !== undefined) updateData.stage = stage;
   if (createdBy !== undefined) updateData.createdBy = createdBy;
   if (createdByName !== undefined) updateData.createdByName = createdByName;
+  if (body.priority !== undefined || body.tagPriority !== undefined || body.tag !== undefined) {
+    const rawP = body.priority ?? body.tagPriority ?? body.tag;
+    updateData.priority = rawP ? String(rawP).trim() : 'Medium';
+  }
 
   if (assignedTo !== undefined) {
     if (assignedTo && assignedTo !== 'null' && assignedTo !== 'Unassigned') {
@@ -374,6 +711,143 @@ export async function updateLeadService(id, body, currentUser = null) {
     data: updateData,
   });
 
+  if (updateData.priority) {
+    try {
+      await prisma.contact.updateMany({
+        where: {
+          OR: [
+            { id: existing.id },
+            { contactId: existing.leadId },
+            { internalReference: existing.leadId },
+            ...(existing.phone ? [{ phone: existing.phone }] : []),
+            ...(existing.email ? [{ email: { equals: existing.email, mode: 'insensitive' } }] : []),
+          ],
+        },
+        data: { priority: updateData.priority, updatedAt: new Date() },
+      });
+      await prisma.bulkUploadContact.updateMany({
+        where: {
+          OR: [
+            { bulkId: existing.leadId },
+            ...(existing.phone ? [{ phone: existing.phone }] : []),
+            ...(existing.email ? [{ email: { equals: existing.email, mode: 'insensitive' } }] : []),
+          ],
+        },
+        data: { priority: updateData.priority, updatedAt: new Date() },
+      });
+    } catch (tagSyncErr) {
+      console.warn('[updateLeadService] Failed to sync priority to contact:', tagSyncErr.message);
+    }
+  }
+
+  // Record status or stage change activity in timeline
+  try {
+    if (status !== undefined && status !== existing.status) {
+      await recordActivity({
+        type: 'status_change',
+        title: `Status: ${status}`,
+        description: `Lead status updated to ${status}.`,
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    } else if (notes !== undefined && notes !== existing.notes && String(notes).trim().length > 0) {
+      await recordActivity({
+        type: 'note',
+        title: 'Lead Note Added',
+        description: String(notes).slice(0, 150),
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: updated.status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    } else if (stage !== undefined && stage !== existing.stage) {
+      await recordActivity({
+        type: 'stage_change',
+        title: `Stage: ${stage}`,
+        description: `Lead stage updated to ${stage}.`,
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: updated.status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    } else if (notes !== undefined && notes !== existing.notes && String(notes).trim().length > 0) {
+      await recordActivity({
+        type: 'note',
+        title: 'Lead Note Added',
+        description: String(notes).slice(0, 150),
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: updated.status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    }
+  } catch (_) {}
+
+  // If lead is closed or won, automatically record or update closure activity in timeline
+  try {
+    const sLow = (updated.status || '').toLowerCase();
+    const stgLow = (updated.stage || '').toLowerCase();
+    if (sLow.includes('won') || sLow.includes('closed') || sLow.includes('completed') || stgLow.includes('completed') || stgLow.includes('closure')) {
+      const existingClosure = await prisma.activity.findFirst({
+        where: {
+          leadId: updated.id,
+          type: 'closure',
+        },
+      });
+      if (existingClosure) {
+        await prisma.activity.update({
+          where: { id: existingClosure.id },
+          data: {
+            status: updated.status,
+            description: `Status: ${updated.status} · Reason: ${sLow.includes('won') ? 'Successful conversion' : 'Lead completed/closed'} · Client: ${updated.companyName || updated.name} (By ${updated.assignedToName || currentUser?.name || 'Staff'})`,
+          },
+        });
+      } else {
+        await recordActivity({
+          type: 'closure',
+          title: 'Lead Closed',
+          description: `Status: ${updated.status} · Reason: ${sLow.includes('won') ? 'Successful conversion' : 'Lead completed/closed'} · Client: ${updated.companyName || updated.name} (By ${updated.assignedToName || currentUser?.name || 'Staff'})`,
+          leadId: updated.id,
+          leadCode: updated.leadId,
+          leadName: updated.name,
+          customerName: updated.companyName || updated.name,
+          entityId: updated.id,
+          entityType: 'Lead',
+          entityNumber: updated.leadId,
+          status: updated.status,
+          performedBy: updated.assignedToName || currentUser?.name || 'Staff',
+          activityDate: new Date().toISOString().slice(0, 10),
+        });
+      }
+    }
+  } catch (_) {}
+
   await delCache('crm:leads:*').catch(() => {});
 
   return {
@@ -386,15 +860,6 @@ export async function updateLeadService(id, body, currentUser = null) {
  * 7. Delete Lead
  */
 export async function deleteLeadService(id, currentUser = null) {
-  const roleUpper = (currentUser?.role || '').toUpperCase();
-  const isSuperAdmin = !currentUser || roleUpper === 'SUPER_ADMIN' || roleUpper.includes('ADMIN');
-
-  if (currentUser && !isSuperAdmin) {
-    const error = new Error('Access denied. Only Super Admin can delete leads.');
-    error.status = 403;
-    throw error;
-  }
-
   const existing = await prisma.lead.findFirst({
     where: { OR: [{ id }, { leadId: id }] },
   });
@@ -405,9 +870,29 @@ export async function deleteLeadService(id, currentUser = null) {
     throw error;
   }
 
+  if (currentUser) {
+    const userScope = await resolveUserScope(currentUser, 'leads');
+    if (!isRecordAccessible(existing, userScope)) {
+      const error = new Error('Access denied: You do not have permission to delete this lead.');
+      error.status = 403;
+      throw error;
+    }
+  }
+
   await prisma.lead.delete({
     where: { id: existing.id },
   });
+
+  // Clean up any activity timeline records referencing this lead
+  await prisma.activity.deleteMany({
+    where: {
+      OR: [
+        { leadId: existing.id },
+        { leadId: existing.leadId },
+        { leadCode: existing.leadId },
+      ],
+    },
+  }).catch(() => {});
 
   await delCache('crm:leads:*').catch(() => {});
 
@@ -510,6 +995,7 @@ export async function createLeadProposalService(data, user) {
       documentSize: data.documentSize || null,
       notes: data.notes || null,
       terms: data.terms || data.termsConditions || null,
+      rejectionReason: data.rejectionReason || null,
       items: {
         create: (data.items || []).map((it) => ({
           itemName: it.itemName || it.description || 'Deliverable',
@@ -522,6 +1008,25 @@ export async function createLeadProposalService(data, user) {
     },
     include: { items: true },
   });
+
+  // Automatically record activity in timeline
+  try {
+    const amountStr = proposal.grandTotal ? ` · ₹ ${Math.round(proposal.grandTotal).toLocaleString('en-IN')}` : '';
+    await recordActivity({
+      type: 'proposal',
+      title: 'Proposal Created',
+      description: `Proposal #${proposal.proposalNumber}${amountStr} · ${proposal.status || 'Under Review'}`,
+      leadId: proposal.leadId,
+      customerName: proposal.companyName || proposal.contactName,
+      entityId: proposal.id,
+      entityType: 'Proposal',
+      entityNumber: proposal.proposalNumber,
+      amount: proposal.grandTotal || 0,
+      status: proposal.status || 'Created',
+      performedBy: user?.name || 'Staff',
+      activityDate: proposal.proposalDate,
+    });
+  } catch (_) {}
 
   return proposal;
 }
@@ -575,6 +1080,7 @@ export async function updateLeadProposalService(id, data, user) {
   if (data.documentUrl !== undefined) updateData.documentUrl = data.documentUrl;
   if (data.documentSize !== undefined) updateData.documentSize = data.documentSize;
   if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.rejectionReason !== undefined) updateData.rejectionReason = data.rejectionReason;
   if (data.terms !== undefined || data.termsConditions !== undefined) {
     updateData.terms = data.terms !== undefined ? data.terms : data.termsConditions;
   }
@@ -597,6 +1103,21 @@ export async function updateLeadProposalService(id, data, user) {
     data: updateData,
     include: { items: true },
   });
+
+  try {
+    await prisma.activity.updateMany({
+      where: {
+        OR: [
+          { entityId: updated.id },
+          { entityNumber: updated.proposalNumber },
+        ],
+      },
+      data: {
+        status: updated.status || 'Created',
+        amount: updated.grandTotal || updated.totalAmount || 0,
+      },
+    });
+  } catch (_) {}
 
   return updated;
 }
@@ -899,6 +1420,25 @@ export async function createLeadNegotiationService(data, user = {}) {
     },
   });
 
+  // Automatically record activity in timeline
+  try {
+    const quotedStr = created.quotedAmount ? ` · Quoted: ₹ ${Math.round(created.quotedAmount).toLocaleString('en-IN')}` : '';
+    await recordActivity({
+      type: 'negotiation',
+      title: created.status === 'Won' ? 'Negotiation Won' : 'Negotiation Update',
+      description: `Negotiation #${created.negotiationId}${quotedStr} · Discount: ${created.discountPercentage}% · ${created.status}`,
+      leadId: created.leadId,
+      customerName: created.clientName || created.leadName,
+      entityId: created.id,
+      entityType: 'Negotiation',
+      entityNumber: created.negotiationId,
+      amount: created.expectedFinalAmount || created.quotedAmount || 0,
+      status: created.status,
+      performedBy: created.assignedToName || user?.name || 'Staff',
+      activityDate: created.negotiationDate,
+    });
+  } catch (_) {}
+
   return formatNegotiationResponse(created);
 }
 export const createNegotiationService = createLeadNegotiationService;
@@ -1029,6 +1569,22 @@ export async function updateLeadNegotiationService(id, data, user = {}) {
     where: { id: existing.id },
     data: updatePayload,
   });
+
+  try {
+    await prisma.activity.updateMany({
+      where: {
+        OR: [
+          { entityId: updated.id },
+          { entityNumber: updated.negotiationId },
+        ],
+      },
+      data: {
+        status: updated.status,
+        amount: updated.expectedFinalAmount || updated.quotedAmount || 0,
+        title: updated.status === 'Won' ? 'Negotiation Won' : 'Negotiation Update',
+      },
+    });
+  } catch (_) {}
 
   return formatNegotiationResponse(updated);
 }
@@ -1504,6 +2060,24 @@ export async function createLeadContractService(data, user = {}) {
     },
   });
 
+  // Automatically record activity in timeline
+  try {
+    await recordActivity({
+      type: 'contract',
+      title: created.signatureStatus === 'Signed' ? 'Contract Signed' : (created.status === 'Approved' ? 'Contract Approved' : 'Contract Created'),
+      description: `Contract #${created.contractId} · ${created.title || created.contractType || 'IT Service Agreement'}`,
+      leadId: created.leadId,
+      customerName: created.clientName,
+      entityId: created.id,
+      entityType: 'Contract',
+      entityNumber: created.contractId,
+      amount: created.contractValue || created.finalContractAmount || 0,
+      status: created.status || 'Active',
+      performedBy: created.assignedToName || user?.name || 'Staff',
+      activityDate: created.contractDate,
+    });
+  } catch (_) {}
+
   return formatContractResponse(created);
 }
 export const createContractService = createLeadContractService;
@@ -1652,39 +2226,38 @@ export async function updateLeadContractService(id, data, user = {}) {
     computedAdvAmount = Math.min(resolvedFinalAmount, numAdvVal);
   }
 
-  // 3. Signature Validation
-  const effectiveSigStatus = signatureStatus !== undefined ? signatureStatus : existing.signatureStatus;
-  const effectiveClientName = clientSignatoryName !== undefined ? clientSignatoryName : existing.clientSignatoryName;
-  const effectiveClientEmail = clientSignatoryEmail !== undefined ? clientSignatoryEmail : existing.clientSignatoryEmail;
-  const effectiveCompanyName = companySignatoryName !== undefined ? companySignatoryName : existing.companySignatoryName;
-  const effectiveCompanyEmail = companySignatoryEmail !== undefined ? companySignatoryEmail : existing.companySignatoryEmail;
-  const effectiveSignedDate = signedDate !== undefined ? signedDate : existing.signedDate;
+  // 3. Signature Validation & Safe Auto-Resolution
+  let effectiveSigStatus = signatureStatus !== undefined ? signatureStatus : existing.signatureStatus;
+  let effectiveClientName = clientSignatoryName !== undefined ? clientSignatoryName : existing.clientSignatoryName;
+  let effectiveClientEmail = clientSignatoryEmail !== undefined ? clientSignatoryEmail : existing.clientSignatoryEmail;
+  let effectiveCompanyName = companySignatoryName !== undefined ? companySignatoryName : existing.companySignatoryName;
+  let effectiveCompanyEmail = companySignatoryEmail !== undefined ? companySignatoryEmail : existing.companySignatoryEmail;
+  let effectiveSignedDate = signedDate !== undefined ? signedDate : existing.signedDate;
+
+  // Direct status updates to Active / Completed automatically transition signature to Signed
+  if (status === 'Active' || status === 'Completed') {
+    effectiveSigStatus = 'Signed';
+  } else if (status === 'Draft' || status === 'Pending Signature') {
+    if (signatureStatus === undefined) {
+      effectiveSigStatus = 'Pending';
+    }
+  }
 
   if (effectiveSigStatus === 'Signed') {
     if (!effectiveClientName || !effectiveClientName.trim()) {
-      const err = new Error('Client Signatory Name is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveClientName = existing.clientName || 'Authorized Signatory';
     }
     if (!effectiveClientEmail || !effectiveClientEmail.trim()) {
-      const err = new Error('Client Signatory Email is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveClientEmail = existing.clientSignatoryEmail || 'client@example.com';
     }
     if (!effectiveCompanyName || !effectiveCompanyName.trim()) {
-      const err = new Error('Company Signatory Name is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveCompanyName = existing.assignedToName || 'OneAssist Representative';
     }
     if (!effectiveCompanyEmail || !effectiveCompanyEmail.trim()) {
-      const err = new Error('Company Signatory Email is required to mark the contract as Signed');
-      err.status = 400;
-      throw err;
+      effectiveCompanyEmail = existing.companySignatoryEmail || 'contracts@oneassist.tech';
     }
     if (!effectiveSignedDate) {
-      const err = new Error('Signed Date is required when contract is marked as Signed');
-      err.status = 400;
-      throw err;
+      effectiveSignedDate = existing.signedDate || new Date().toISOString().split('T')[0];
     }
   }
 
@@ -1694,15 +2267,15 @@ export async function updateLeadContractService(id, data, user = {}) {
   let nextApprovalDate = existing.approvalDate;
   let nextRejectionReason = rejectionReason !== undefined ? (rejectionReason ? rejectionReason.trim() : null) : existing.rejectionReason;
 
-  if (isApprovalSubmission || approvalStatus === 'Pending Approval') {
+  if (isApprovalSubmission || approvalStatus === 'Pending Approval' || status === 'Pending Approval') {
     nextApprovalStatus = 'Pending Approval';
     nextApprovedBy = null;
     nextApprovalDate = null;
     nextRejectionReason = null;
-  } else if (approvalStatus === 'Approved') {
+  } else if (approvalStatus === 'Approved' || status === 'Approved' || status === 'Active' || status === 'Completed' || status === 'Pending Signature') {
     nextApprovalStatus = 'Approved';
-    nextApprovedBy = user?.name || user?.email || 'Authorized Officer';
-    nextApprovalDate = new Date().toISOString();
+    nextApprovedBy = nextApprovedBy || user?.name || user?.email || 'Authorized Officer';
+    nextApprovalDate = nextApprovalDate || new Date().toISOString();
     nextRejectionReason = null;
   } else if (approvalStatus === 'Rejected') {
     nextApprovalStatus = 'Rejected';
@@ -1711,31 +2284,37 @@ export async function updateLeadContractService(id, data, user = {}) {
     if (!nextRejectionReason) {
       nextRejectionReason = 'Contract terms rejected during executive review';
     }
-  } else if (approvalStatus === 'Draft') {
+  } else if (approvalStatus === 'Draft' || status === 'Draft') {
     nextApprovalStatus = 'Draft';
     nextApprovedBy = null;
     nextApprovalDate = null;
   }
 
   // 5. Lifecycle Status Synchronization
-  let nextStatus = status !== undefined ? status : existing.status;
-  if (isApprovalSubmission || nextApprovalStatus === 'Pending Approval') {
-    nextStatus = 'Pending Approval';
-  } else if (nextApprovalStatus === 'Approved') {
-    if (effectiveSigStatus === 'Signed') {
-      const today = new Date().toISOString().split('T')[0];
-      if (finalEnd && finalEnd < today) {
-        nextStatus = 'Expired';
+  let nextStatus = existing.status;
+  if (status !== undefined) {
+    // Explicit lifecycle status was provided by caller - respect user requested status!
+    nextStatus = status;
+  } else {
+    // Auto-calculate lifecycle status if status was not explicitly passed in payload
+    if (isApprovalSubmission || nextApprovalStatus === 'Pending Approval') {
+      nextStatus = 'Pending Approval';
+    } else if (nextApprovalStatus === 'Approved') {
+      if (effectiveSigStatus === 'Signed') {
+        const today = new Date().toISOString().split('T')[0];
+        if (finalEnd && finalEnd < today) {
+          nextStatus = 'Expired';
+        } else {
+          nextStatus = 'Active';
+        }
       } else {
-        nextStatus = 'Active';
+        nextStatus = 'Pending Signature';
       }
-    } else {
-      nextStatus = 'Pending Signature';
+    } else if (nextApprovalStatus === 'Rejected') {
+      nextStatus = 'Draft';
+    } else if (effectiveSigStatus === 'Signed' && nextApprovalStatus === 'Approved') {
+      nextStatus = 'Active';
     }
-  } else if (nextApprovalStatus === 'Rejected') {
-    nextStatus = 'Draft';
-  } else if (effectiveSigStatus === 'Signed' && nextApprovalStatus === 'Approved') {
-    nextStatus = 'Active';
   }
 
   // 6. Document Version Tracking
@@ -1830,10 +2409,10 @@ export async function updateLeadContractService(id, data, user = {}) {
     documentVersion: documentVersion !== undefined ? documentVersion : existing.documentVersion || 'v1.0',
     documentVersions: finalVersions,
     ...(attachments !== undefined && { attachments: Array.isArray(attachments) ? attachments : [] }),
-    ...(clientSignatoryName !== undefined && { clientSignatoryName: clientSignatoryName?.trim() || null }),
-    ...(clientSignatoryEmail !== undefined && { clientSignatoryEmail: clientSignatoryEmail?.trim() || null }),
-    ...(companySignatoryName !== undefined && { companySignatoryName: companySignatoryName?.trim() || null }),
-    ...(companySignatoryEmail !== undefined && { companySignatoryEmail: companySignatoryEmail?.trim() || null }),
+    clientSignatoryName: effectiveClientName ? effectiveClientName.trim() : null,
+    clientSignatoryEmail: effectiveClientEmail ? effectiveClientEmail.trim() : null,
+    companySignatoryName: effectiveCompanyName ? effectiveCompanyName.trim() : null,
+    companySignatoryEmail: effectiveCompanyEmail ? effectiveCompanyEmail.trim() : null,
     signatureStatus: effectiveSigStatus,
     signedDate: effectiveSigStatus === 'Signed' ? effectiveSignedDate : null,
 
@@ -1852,6 +2431,22 @@ export async function updateLeadContractService(id, data, user = {}) {
     where: { id: existing.id },
     data: updatePayload,
   });
+
+  try {
+    await prisma.activity.updateMany({
+      where: {
+        OR: [
+          { entityId: updated.id },
+          { entityNumber: updated.contractId },
+        ],
+      },
+      data: {
+        status: updated.status,
+        amount: updated.contractValue || updated.finalContractAmount || 0,
+        title: updated.signatureStatus === 'Signed' ? 'Contract Signed' : (updated.status === 'Approved' ? 'Contract Approved' : 'Contract Created'),
+      },
+    });
+  } catch (_) {}
 
   return formatContractResponse(updated);
 }

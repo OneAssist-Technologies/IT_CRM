@@ -64,13 +64,19 @@ export interface LeadOption {
 export interface Contact {
   id: string;
   contactId: string;
+  bulkId?: string | null;
+  batchId?: string | null;
+  importedContactId?: string | null;
+  isImportedToContact?: boolean | null;
 
   // 1. Basic Contact Information
   name: string;
   email?: string | null;
   phone: string; // Mobile Number
   address?: string | null;
+  location?: string | null;
   source?: string | null;
+  website?: string | null;
   customSource?: string | null;
 
   // 2. Professional & Company Information
@@ -104,11 +110,51 @@ export interface Contact {
 
   // 4. Interaction & Follow-up Details
   contactMode?: ContactMode | string | null;
+  callType?: string | null;
+  callDate?: string | null;
+  callFromTime?: string | null;
+  callToTime?: string | null;
+  callDuration?: string | null;
+  callStatus?: string | null;
   customContactMode?: string | null;
   meetingType?: MeetingType | string | null;
   nextFollowDate?: string | null;
   remarks?: string | null;
   notes?: string | null;
+
+  // WhatsApp Interaction Details
+  whatsappMessageType?: string | null;
+  whatsappStatus?: string | null;
+  whatsappDate?: string | null;
+  whatsappTime?: string | null;
+
+  // Email Interaction Details
+  emailType?: string | null;
+  emailStatus?: string | null;
+  emailDate?: string | null;
+  emailTime?: string | null;
+
+  // Other Activity Details
+  activityType?: string | null;
+  activityStatus?: string | null;
+  activityDate?: string | null;
+  activityTime?: string | null;
+
+  // Meeting Interaction Details
+  meetingTitle?: string | null;
+  meetingPurpose?: string | null;
+  meetingHostId?: string | null;
+  meetingHostName?: string | null;
+  meetingDate?: string | null;
+  meetingFromTime?: string | null;
+  meetingToTime?: string | null;
+  meetingDuration?: string | null;
+  meetingLocation?: string | null;
+  meetingStatus?: string | null;
+  rescheduleDate?: string | null;
+  rescheduleTime?: string | null;
+  rescheduledDate?: string | null;
+  rescheduledTime?: string | null;
 
   // 5. Qualification Details
   status: ContactStatus | string;
@@ -119,6 +165,7 @@ export interface Contact {
   purchaseTimeline?: string | null;
   interestedService?: string | null;
   priority?: ContactPriority | string | null;
+  tagPriority?: string | null;
   qualificationStatus?: QualificationStatus | string | null;
   qualifiedBy?: string | null;
   qualificationDate?: string | null;
@@ -158,13 +205,17 @@ export interface Contact {
 export interface ContactFormData {
   id?: string;
   contactId?: string;
+  leadId?: string;
+  leadCode?: string;
 
   // 1. Basic Contact Information
-  name: string;
+  name?: string;
   email?: string;
-  phone: string;
+  phone?: string;
   address?: string;
+  location?: string;
   source?: string;
+  website?: string;
   customSource?: string;
 
   // 2. Professional & Company Information
@@ -197,11 +248,51 @@ export interface ContactFormData {
 
   // 4. Interaction & Follow-up Details
   contactMode?: ContactMode | string;
+  callType?: string;
+  callDate?: string;
+  callFromTime?: string;
+  callToTime?: string;
+  callDuration?: string;
+  callStatus?: string;
   customContactMode?: string;
   meetingType?: MeetingType | string;
-  nextFollowDate?: string;
+  nextFollowDate?: string | null;
   remarks?: string;
   notes?: string;
+
+  // WhatsApp Interaction Details
+  whatsappMessageType?: string;
+  whatsappStatus?: string;
+  whatsappDate?: string;
+  whatsappTime?: string;
+
+  // Email Interaction Details
+  emailType?: string;
+  emailStatus?: string;
+  emailDate?: string;
+  emailTime?: string;
+
+  // Other Activity Details
+  activityType?: string;
+  activityStatus?: string;
+  activityDate?: string;
+  activityTime?: string;
+
+  // Meeting Interaction Details
+  meetingTitle?: string;
+  meetingPurpose?: string;
+  meetingHostId?: string;
+  meetingHostName?: string;
+  meetingDate?: string;
+  meetingFromTime?: string;
+  meetingToTime?: string;
+  meetingDuration?: string;
+  meetingLocation?: string;
+  meetingStatus?: string;
+  rescheduleDate?: string;
+  rescheduleTime?: string;
+  rescheduledDate?: string;
+  rescheduledTime?: string;
 
   // 5. Qualification & Status
   status?: ContactStatus | string;
@@ -212,6 +303,7 @@ export interface ContactFormData {
   purchaseTimeline?: string;
   interestedService?: string;
   priority?: ContactPriority | string;
+  tagPriority?: string;
   qualificationStatus?: QualificationStatus | string;
   qualifiedBy?: string;
   qualificationDate?: string;
@@ -226,7 +318,9 @@ export interface ContactFormData {
 
   // 6. Assignment
   assignedTo?: string;
+  assignedToName?: string;
   assignedBy?: string;
+  assignmentStatus?: AssignmentStatus | string;
   createdBy?: string;
 
   // 7. Verified Odoo ERP Contact Fields
@@ -244,6 +338,8 @@ export interface ContactFormData {
 }
 
 export interface ContactFilter {
+  tab?: string;
+  section?: string;
   search?: string;
   companyName?: string;
   contactType?: string;
@@ -275,10 +371,13 @@ export interface ContactStats {
   new: number;
   active: number;
   qualified: number;
+  qualification?: number;
   disqualified: number;
   assigned: number;
   unassigned: number;
   highPriority: number;
+  bulkImport?: number;
+  bulkBatches?: number;
 }
 
 export interface ContactMetadata {
@@ -287,6 +386,8 @@ export interface ContactMetadata {
   categories: string[];
   productOptions: string[];
   serviceOptions: string[];
+  catalogProducts?: string[];
+  catalogServices?: string[];
   contactModes: string[];
   meetingTypes: string[];
   statuses: string[];
@@ -303,3 +404,59 @@ export interface ContactMetadata {
   paymentTermOptions?: string[];
   countries?: string[];
 }
+
+export interface BulkUploadContact {
+  id: string;
+  bulkId?: string | null;
+  batchId?: string | null;
+  fileName?: string | null;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  companyName?: string | null;
+  contactPerson?: string | null;
+  designation?: string | null;
+  profession?: string | null;
+  category?: string | null;
+  source?: string | null;
+  remarks?: string | null;
+  status?: string | null;
+  stage?: string | null;
+  priority?: string | null;
+  assignedTo?: string | null;
+  assignedToName?: string | null;
+  assignmentStatus?: string | null;
+  isImportedToContact?: boolean;
+  importedContactId?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FailedRowInfo {
+  row: number;
+  name?: string;
+  phone?: string;
+  email?: string;
+  message?: string;
+  reason?: string;
+}
+
+export interface ImportBatch {
+  id: string;
+  batchId: string;
+  fileName: string;
+  fileSize?: number;
+  totalRows: number;
+  importedCount: number;
+  failedCount: number;
+  status: 'Completed' | 'Partial' | 'Failed' | string;
+  failedRows?: FailedRowInfo[] | null;
+  assignedTo?: string | null;
+  assignedToName?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+

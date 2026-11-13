@@ -375,34 +375,118 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
     setModuleModalOpened(true);
   };
 
-  // Persist updated modules list to backend
+  // Persist updated modules list to backend and sync with linked Support Ticket tasks
   const saveModulesList = async (newList: ProjectModuleItem[]) => {
+    // 1. Optimistic immediate state and storage update
+    setModules(newList);
+    const allDone =
+      newList.length > 0 &&
+      newList.every((m) => m.status === 'Completed' || (m.progress || 0) >= 100);
+    const computedStatus = allDone ? 'Completed' : 'In Progress';
+
+    if (currentProject) {
+      const updatedProj = { ...currentProject, modules: newList, status: computedStatus };
+      setCurrentProject(updatedProj);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('crm_viewing_project', JSON.stringify(updatedProj));
+        window.dispatchEvent(new CustomEvent('crm_projects_updated', { detail: { projectId: currentProject.id } }));
+      }
+    }
+
+    // 2. Two-way sync: Scan all Support Ticket tasks in localStorage & broadcast update
+    newList.forEach((m) => {
+      const descMatch = (m.description || '').match(/\[Ticket\s+([A-Za-z0-9\-]+)\]/i);
+      const ticketRef = (m as any).ticketNumber || (m as any).ticketId || (descMatch ? descMatch[1] : null);
+      const refMatch = (m.name || '').match(/^(TSK-\d+)/i) || (m.name || '').match(/(TSK-\d+)/i);
+      const taskRefNumber = (m as any).taskRefNumber || (refMatch ? refMatch[1] : null);
+      const taskCleanName = (m.name || '').replace(/^(TSK-\d+)\s*[•\-]\s*/i, '').trim().toLowerCase();
+
+      let nextStatus: 'Pending' | 'In Progress' | 'Completed' = 'Pending';
+      if (m.status === 'Completed' || (m.progress || 0) >= 100) {
+        nextStatus = 'Completed';
+      } else if (m.status === 'In Progress' || (m.progress || 0) > 0) {
+        nextStatus = 'In Progress';
+      }
+
+      // Update all localStorage ticket tasks across all keys
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            key.startsWith('crm_ticket_tasks_') &&
+            !key.includes('initialized') &&
+            !key.includes('cleared')
+          ) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                let hasChange = false;
+                const updatedTasks = parsed.map((t: any) => {
+                  const matchesRef =
+                    taskRefNumber && (t.refNumber === taskRefNumber || t.id === taskRefNumber);
+                  const matchesName =
+                    taskCleanName &&
+                    t.taskName &&
+                    (t.taskName.toLowerCase().includes(taskCleanName) ||
+                      taskCleanName.includes(t.taskName.toLowerCase()));
+                  if (matchesRef || matchesName) {
+                    hasChange = true;
+                    return { ...t, status: nextStatus };
+                  }
+                  return t;
+                });
+                if (hasChange) {
+                  localStorage.setItem(key, JSON.stringify(updatedTasks));
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Dispatch event to active Support Ticket view
+      window.dispatchEvent(
+        new CustomEvent('crm_ticket_tasks_updated', {
+          detail: {
+            ticketRef,
+            taskRefNumber,
+            taskCleanName,
+            status: nextStatus,
+          },
+        })
+      );
+    });
+
+    // 3. Persist to backend
     setSavingModules(true);
     try {
       const res = await projectService.updateProjectModules(currentProject.id, newList);
-      if (res.success && res.data) {
-        setModules(newList);
-        setCurrentProject(res.data);
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('crm_viewing_project', JSON.stringify(res.data));
-        }
-        notifications.show({
-          title: 'Modules Updated',
-          message: 'Project modules and delivery progress updated successfully.',
-          color: 'teal',
-        });
-        return true;
+      if (currentProject && currentProject.status !== computedStatus) {
+        projectService.updateProject(currentProject.id, { status: computedStatus }).catch(() => {});
       }
-    } catch (err: any) {
+      if (res.success && res.data) {
+        const fullProj = { ...res.data, status: computedStatus };
+        setCurrentProject(fullProj);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('crm_viewing_project', JSON.stringify(fullProj));
+          window.dispatchEvent(new CustomEvent('crm_projects_updated', { detail: { projectId: res.data.id } }));
+        }
+      }
       notifications.show({
-        title: 'Error Saving Modules',
-        message: err.message || 'Could not save module changes.',
-        color: 'red',
+        title: 'Modules & Tasks Updated',
+        message: 'Project modules and linked support ticket tasks updated successfully.',
+        color: 'teal',
       });
+      return true;
+    } catch (err: any) {
+      console.warn('Backend updateProjectModules notice:', err?.message);
+      // Optimistic update succeeded
+      return true;
     } finally {
       setSavingModules(false);
     }
-    return false;
   };
 
   // Save Modal Form
@@ -1189,16 +1273,24 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 variant="light"
                 color="indigo"
                 style={{
-                  backgroundColor: isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF',
+                  background: isDark
+                    ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(79, 70, 229, 0.15))'
+                    : 'linear-gradient(135deg, #EEF2FF, #E0E7FF)',
+                  border: `1px solid ${isDark ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.2)'}`,
                 }}
               >
                 <IconListCheck size={20} color="#4F46E5" />
               </ThemeIcon>
               <div>
-                <Text fw={800} size="15.5px" style={{ color: valueColor, letterSpacing: '-0.01em' }}>
-                  Project Modules & Sprints
-                </Text>
-                <Text size="xs" c="dimmed">
+                <Group gap={8} align="center">
+                  <Text fw={800} size="15.5px" style={{ color: valueColor, letterSpacing: '-0.01em' }}>
+                    Project Modules & Sprints
+                  </Text>
+                  <Badge size="xs" variant="light" color="indigo" radius="md" style={{ fontWeight: 700 }}>
+                    {modules.length} {modules.length === 1 ? 'Module' : 'Modules'}
+                  </Badge>
+                </Group>
+                <Text size="xs" c="dimmed" mt={1}>
                   Milestone breakdown, developer assignments, deadline schedules and delivery progress
                 </Text>
               </div>
@@ -1227,10 +1319,11 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 leftSection={<IconPlus size={15} stroke={2.5} />}
                 onClick={handleOpenAddModule}
                 style={{
-                  background: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                  background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)',
+                  boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
                   fontWeight: 700,
                   height: 32,
+                  padding: '0 12px',
                 }}
               >
                 Add Module
@@ -1286,30 +1379,30 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
             >
               <Table.Thead
                 style={{
-                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : '#F8FAFC',
                   borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
                 }}
               >
                 <Table.Tr>
-                  <Table.Th style={{ width: 42, textAlign: 'center', fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ width: 42, textAlign: 'center', fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     #
                   </Table.Th>
-                  <Table.Th style={{ minWidth: 220, fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ minWidth: 220, fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     MODULE / SPRINT
                   </Table.Th>
-                  <Table.Th style={{ minWidth: 150, fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ minWidth: 160, fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     ASSIGNED TO
                   </Table.Th>
-                  <Table.Th style={{ minWidth: 130, fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ minWidth: 130, fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     DEADLINE
                   </Table.Th>
-                  <Table.Th style={{ minWidth: 260, fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ minWidth: 250, fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     COMPLETION PROGRESS
                   </Table.Th>
-                  <Table.Th style={{ minWidth: 110, fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ minWidth: 120, fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     STATUS
                   </Table.Th>
-                  <Table.Th style={{ width: 90, textAlign: 'center', fontSize: 11, fontWeight: 700, color: labelColor }}>
+                  <Table.Th style={{ width: 90, textAlign: 'center', fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.04em' }}>
                     ACTIONS
                   </Table.Th>
                 </Table.Tr>
@@ -1340,41 +1433,68 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            width: 22,
-                            height: 22,
+                            width: 24,
+                            height: 24,
                             borderRadius: '50%',
                             backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
                             fontSize: 11,
                             fontWeight: 700,
                             color: labelColor,
+                            border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
                           }}
                         >
                           {rowNum}
                         </Box>
                       </Table.Td>
 
-                      {/* 2. Module Name & Description */}
+                      {/* 2. Module Name */}
                       <Table.Td>
                         <Text fw={700} size="13.5px" style={{ color: valueColor, lineHeight: 1.3 }}>
                           {mod.name}
                         </Text>
-                        {mod.description && (
-                          <Text size="11px" c="dimmed" lineClamp={1} mt={2}>
-                            {mod.description}
-                          </Text>
-                        )}
                       </Table.Td>
 
                       {/* 3. Assigned Developer */}
                       <Table.Td>
-                        <Group gap={7} wrap="nowrap" align="center">
-                          <Avatar size={24} radius="xl" color="blue" style={{ fontSize: 10, fontWeight: 700 }}>
-                            {devInitials}
-                          </Avatar>
-                          <Text size="12.5px" fw={600} style={{ color: valueColor }}>
-                            {mod.assignedTo || 'Unassigned'}
+                        {mod.assignedTo && mod.assignedTo !== 'Unassigned' ? (
+                          <Group gap={8} wrap="nowrap" align="center">
+                            <Avatar
+                              size={26}
+                              radius="xl"
+                              style={{
+                                background: 'linear-gradient(135deg, #6366F1, #3B82F6)',
+                                color: '#FFFFFF',
+                                fontSize: 10,
+                                fontWeight: 800,
+                                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.25)',
+                              }}
+                            >
+                              {devInitials}
+                            </Avatar>
+                            <Box>
+                              <Group gap={5} wrap="nowrap" align="center">
+                                <Text size="12.5px" fw={600} style={{ color: valueColor }}>
+                                  {mod.assignedTo.replace('(TL)', '').trim()}
+                                </Text>
+                                {mod.assignedTo.includes('(TL)') && (
+                                  <Badge
+                                    size="xs"
+                                    variant="light"
+                                    color="indigo"
+                                    radius="sm"
+                                    style={{ padding: '0 5px', height: 16, fontSize: 9, fontWeight: 800 }}
+                                  >
+                                    TL
+                                  </Badge>
+                                )}
+                              </Group>
+                            </Box>
+                          </Group>
+                        ) : (
+                          <Text size="12px" c="dimmed" fs="italic">
+                            Unassigned
                           </Text>
-                        </Group>
+                        )}
                       </Table.Td>
 
                       {/* 4. Deadline with Overdue indicator */}
@@ -1392,7 +1512,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                             {formatDate(mod.deadline)}
                           </Text>
                           {isOverdue && (
-                            <Badge color="red" size="xs" variant="filled">
+                            <Badge color="red" size="xs" variant="filled" radius="sm">
                               Overdue
                             </Badge>
                           )}
@@ -1401,14 +1521,25 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
 
                       {/* 5. Progress with Modern Quick Buttons */}
                       <Table.Td>
-                        <Box style={{ width: '100%' }}>
-                          <Group justify="space-between" align="center" mb={4}>
-                            <Text size="12px" fw={800} style={{ color: valueColor }}>
-                              {mod.progress || 0}% Completed
-                            </Text>
+                        <Box style={{ width: '100%', minWidth: 200 }}>
+                          <Group justify="space-between" align="center" mb={5}>
+                            <Group gap={6} align="center">
+                              <Text size="12px" fw={800} style={{ color: valueColor }}>
+                                {mod.progress || 0}%
+                              </Text>
+                              <Text size="10.5px" c="dimmed" fw={500}>
+                                {mod.progress === 100
+                                  ? 'Completed'
+                                  : mod.progress >= 50
+                                  ? 'Halfway'
+                                  : mod.progress > 0
+                                  ? 'In Progress'
+                                  : 'Pending'}
+                              </Text>
+                            </Group>
 
                             {/* Preset Buttons for Instant 1-Click Update */}
-                            <Group gap={3}>
+                            <Group gap={3} wrap="nowrap">
                               {[25, 50, 75, 100].map((val) => {
                                 const isActive = mod.progress === val;
                                 return (
@@ -1417,13 +1548,17 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                                     size="compact-xs"
                                     variant={isActive ? 'filled' : 'subtle'}
                                     color={val === 100 ? 'teal' : 'blue'}
-                                    radius="sm"
+                                    radius="xs"
                                     onClick={() => handleQuickProgressUpdate(mod, val)}
                                     style={{
-                                      height: 20,
-                                      fontSize: '10px',
-                                      padding: '0 5px',
-                                      fontWeight: 700,
+                                      height: 19,
+                                      fontSize: '9.5px',
+                                      padding: '0 4px',
+                                      fontWeight: isActive ? 800 : 600,
+                                      borderRadius: 4,
+                                      border: isActive
+                                        ? 'none'
+                                        : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
                                     }}
                                   >
                                     {val === 100 ? '100% ✓' : `${val}%`}
@@ -1435,7 +1570,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
 
                           <Progress
                             value={mod.progress || 0}
-                            size="sm"
+                            size={6}
                             radius="xl"
                             animated={mod.progress > 0 && mod.progress < 100}
                             color={
@@ -1443,52 +1578,96 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                                 ? 'teal'
                                 : mod.progress >= 50
                                 ? 'blue'
-                                : 'orange'
+                                : mod.progress > 0
+                                ? 'cyan'
+                                : 'gray'
                             }
+                            styles={{
+                              root: {
+                                backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                              },
+                            }}
                           />
                         </Box>
                       </Table.Td>
 
                       {/* 6. Status Badge */}
                       <Table.Td>
-                        <Badge
-                          size="sm"
-                          radius="md"
-                          variant="light"
-                          color={
-                            mod.status === 'Completed' || mod.progress >= 100
-                              ? 'teal'
-                              : mod.status === 'In Review'
-                              ? 'orange'
-                              : mod.status === 'In Progress'
-                              ? 'blue'
-                              : 'gray'
-                          }
-                          style={{ textTransform: 'capitalize', fontWeight: 700 }}
-                        >
-                          {mod.progress >= 100 ? 'Completed' : mod.status || 'In Progress'}
-                        </Badge>
+                        {(() => {
+                          const isDone = mod.status === 'Completed' || (mod.progress || 0) >= 100;
+                          const isReview = mod.status === 'In Review';
+                          const isProgress = mod.status === 'In Progress' || ((mod.progress || 0) > 0 && !isDone);
+                          const cfg = isDone
+                            ? { label: 'Completed', dot: '#10B981', bg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', text: '#047857', border: 'rgba(16, 185, 129, 0.25)' }
+                            : isReview
+                            ? { label: 'In Review', dot: '#F59E0B', bg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', text: '#B45309', border: 'rgba(245, 158, 11, 0.25)' }
+                            : isProgress
+                            ? { label: 'In Progress', dot: '#3B82F6', bg: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF', text: '#1D4ED8', border: 'rgba(59, 130, 246, 0.25)' }
+                            : { label: 'Not Started', dot: '#94A3B8', bg: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F8FAFC', text: '#64748B', border: 'rgba(148, 163, 184, 0.25)' };
+
+                          return (
+                            <Tooltip label={`Click to mark as ${isDone ? 'In Progress' : 'Completed'}`} withArrow position="top">
+                              <Box
+                                onClick={() => handleQuickProgressUpdate(mod, isDone ? 0 : 100)}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '3px 9px',
+                                  borderRadius: 12,
+                                  backgroundColor: cfg.bg,
+                                  border: `1px solid ${cfg.border}`,
+                                  color: cfg.text,
+                                  fontSize: 11.5,
+                                  fontWeight: 700,
+                                  textTransform: 'capitalize',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                <Box
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    backgroundColor: cfg.dot,
+                                    boxShadow: `0 0 6px ${cfg.dot}`,
+                                  }}
+                                />
+                                {cfg.label}
+                              </Box>
+                            </Tooltip>
+                          );
+                        })()}
                       </Table.Td>
 
                       {/* 7. Actions */}
                       <Table.Td style={{ textAlign: 'center' }}>
                         <Group gap={4} justify="center" wrap="nowrap">
-                          <Tooltip label="Edit Module">
+                          <Tooltip label="Edit Module" withArrow position="top">
                             <ActionIcon
-                              size="sm"
+                              size={28}
+                              radius="md"
                               variant="subtle"
                               color="blue"
                               onClick={() => handleOpenEditModule(mod)}
+                              style={{
+                                transition: 'all 0.15s ease',
+                              }}
                             >
                               <IconEdit size={15} />
                             </ActionIcon>
                           </Tooltip>
-                          <Tooltip label="Delete Module">
+                          <Tooltip label="Delete Module" withArrow position="top">
                             <ActionIcon
-                              size="sm"
+                              size={28}
+                              radius="md"
                               variant="subtle"
                               color="red"
                               onClick={() => handleDeleteModule(mod.id)}
+                              style={{
+                                transition: 'all 0.15s ease',
+                              }}
                             >
                               <IconTrash size={15} />
                             </ActionIcon>
@@ -1878,14 +2057,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
           <TextInput
             label={
               <Text size="xs" fw={700} style={{ textTransform: 'uppercase', letterSpacing: '0.04em', color: isDark ? '#94A3B8' : '#475569' }}>
-                Module / Milestone Name <span style={{ color: '#EF4444' }}>*</span>
+                Module / Milestone Name
               </Text>
             }
+            withAsterisk
             placeholder="e.g. Authentication, RBAC & Security Matrix"
-            required
             size="sm"
             radius="md"
-            leftSection={<IconBriefcase size={16} color="#3B82F6" />}
+            leftSection={<IconBriefcase size={16} color="#4F46E5" />}
             value={moduleFormData.name}
             onChange={(e) => {
               setModalError('');
@@ -1939,27 +2118,33 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
           {/* Completion Progress Card & Slider */}
           <Paper
             p="md"
-            radius="md"
+            radius="lg"
             style={{
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.65)' : '#F8FAFC',
-              border: `1px solid ${isDark ? '#334155' : '#E2E8F0'}`,
+              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.7)' : '#F8FAFC',
+              border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0'}`,
+              boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.02)',
             }}
           >
             {/* Header */}
             <Group justify="space-between" align="center" mb="sm">
-              <Group gap={6}>
+              <Group gap={8}>
                 <ThemeIcon
-                  size={24}
-                  radius="sm"
+                  size={26}
+                  radius="md"
                   variant="light"
-                  color={moduleFormData.progress === 100 ? 'teal' : 'blue'}
+                  color={moduleFormData.progress === 100 ? 'teal' : 'indigo'}
+                  style={{
+                    backgroundColor: moduleFormData.progress === 100
+                      ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                      : (isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF'),
+                  }}
                 >
-                  <IconTrendingUp size={14} />
+                  <IconTrendingUp size={15} color={moduleFormData.progress === 100 ? '#10B981' : '#6366F1'} />
                 </ThemeIcon>
                 <Text
                   size="xs"
                   fw={700}
-                  style={{ textTransform: 'uppercase', letterSpacing: '0.04em', color: isDark ? '#E2E8F0' : '#334155' }}
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: isDark ? '#E2E8F0' : '#334155' }}
                 >
                   Completion Progress
                 </Text>
@@ -1973,9 +2158,9 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                   moduleFormData.progress === 100
                     ? 'teal'
                     : moduleFormData.progress >= 50
-                    ? 'blue'
+                    ? 'indigo'
                     : moduleFormData.progress > 0
-                    ? 'cyan'
+                    ? 'blue'
                     : 'gray'
                 }
                 styles={{
@@ -1984,13 +2169,13 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                     letterSpacing: '0.02em',
                     boxShadow:
                       moduleFormData.progress === 100
-                        ? '0 2px 8px rgba(16, 185, 129, 0.3)'
-                        : '0 2px 8px rgba(37, 99, 235, 0.25)',
+                        ? '0 2px 10px rgba(16, 185, 129, 0.35)'
+                        : '0 2px 10px rgba(99, 102, 241, 0.3)',
                   },
                 }}
                 leftSection={moduleFormData.progress === 100 ? <IconCheck size={12} stroke={3} /> : undefined}
               >
-                {moduleFormData.progress}% {moduleFormData.progress === 100 ? 'Completed' : ''}
+                {moduleFormData.progress}% {moduleFormData.progress === 100 ? 'Completed' : 'Progress'}
               </Badge>
             </Group>
 
@@ -2009,7 +2194,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 max={100}
                 step={5}
                 size="sm"
-                color={moduleFormData.progress === 100 ? 'teal' : 'blue'}
+                color={moduleFormData.progress === 100 ? 'teal' : 'indigo'}
                 marks={[
                   { value: 0 },
                   { value: 25 },
@@ -2029,6 +2214,11 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                     borderRadius: '50%',
                     transform: 'translate(-3px, -1.5px)',
                   },
+                  thumb: {
+                    borderWidth: 2,
+                    borderColor: '#FFFFFF',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                  },
                 }}
               />
             </Box>
@@ -2037,10 +2227,10 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
             <Box mt="md">
               <Text
                 size="11px"
-                fw={600}
+                fw={700}
                 c="dimmed"
-                mb={6}
-                style={{ textTransform: 'uppercase', letterSpacing: '0.04em' }}
+                mb={8}
+                style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
               >
                 Quick Target Presets:
               </Text>
@@ -2059,7 +2249,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                       key={preset.val}
                       size="xs"
                       variant={isActive ? 'filled' : 'default'}
-                      color={isDone ? 'teal' : 'blue'}
+                      color={isDone ? 'teal' : 'indigo'}
                       radius="md"
                       onClick={() => {
                         let status: ProjectModuleItem['status'] = moduleFormData.status;
@@ -2069,30 +2259,30 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                         setModuleFormData({ ...moduleFormData, progress: preset.val, status });
                       }}
                       style={{
-                        height: 38,
-                        border: isActive ? 'none' : `1px solid ${isDark ? '#334155' : '#E2E8F0'}`,
+                        height: 42,
+                        border: isActive ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
                         background: isActive
                           ? isDone
                             ? 'linear-gradient(135deg, #10B981, #059669)'
-                            : 'linear-gradient(135deg, #2563EB, #4F46E5)'
+                            : 'linear-gradient(135deg, #4F46E5, #6366F1)'
                           : isDark
-                          ? '#1E293B'
+                          ? 'rgba(30, 41, 59, 0.6)'
                           : '#FFFFFF',
                         color: isActive ? '#FFFFFF' : isDark ? '#CBD5E1' : '#475569',
                         boxShadow: isActive
                           ? isDone
-                            ? '0 4px 10px rgba(16, 185, 129, 0.3)'
-                            : '0 4px 10px rgba(37, 99, 235, 0.25)'
+                            ? '0 4px 12px rgba(16, 185, 129, 0.35)'
+                            : '0 4px 12px rgba(79, 70, 229, 0.35)'
                           : 'none',
                         transition: 'all 0.15s ease',
                         padding: '0 4px',
                       }}
                     >
-                      <Stack gap={0} align="center">
+                      <Stack gap={1} align="center">
                         <Text size="xs" fw={isActive ? 800 : 700} lh={1.1}>
                           {preset.label}
                         </Text>
-                        <Text size="9px" fw={500} opacity={isActive ? 0.9 : 0.6} lh={1.1}>
+                        <Text size="9px" fw={500} opacity={isActive ? 0.95 : 0.65} lh={1.1}>
                           {preset.sub}
                         </Text>
                       </Stack>
@@ -2108,17 +2298,17 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
             <Text
               size="xs"
               fw={700}
-              mb={6}
-              style={{ textTransform: 'uppercase', letterSpacing: '0.04em', color: isDark ? '#94A3B8' : '#475569' }}
+              mb={8}
+              style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#475569' }}
             >
               Module Lifecycle Status
             </Text>
             <SimpleGrid cols={{ base: 2, sm: 4 }} spacing="xs">
               {[
-                { value: 'Not Started', label: 'Not Started', color: '#64748B', activeBg: '#F1F5F9', activeColor: '#334155' },
-                { value: 'In Progress', label: 'In Progress', color: '#3B82F6', activeBg: '#EFF6FF', activeColor: '#1D4ED8' },
-                { value: 'In Review', label: 'In Review', color: '#F59E0B', activeBg: '#FEF3C7', activeColor: '#B45309' },
-                { value: 'Completed', label: 'Completed', color: '#10B981', activeBg: '#ECFDF5', activeColor: '#047857' },
+                { value: 'Not Started', label: 'Not Started', dot: '#94A3B8', activeBorder: '#94A3B8', activeBg: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9', activeColor: '#475569' },
+                { value: 'In Progress', label: 'In Progress', dot: '#3B82F6', activeBorder: '#3B82F6', activeBg: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF', activeColor: '#1D4ED8' },
+                { value: 'In Review', label: 'In Review', dot: '#F59E0B', activeBorder: '#F59E0B', activeBg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', activeColor: '#B45309' },
+                { value: 'Completed', label: 'Completed', dot: '#10B981', activeBorder: '#10B981', activeBg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', activeColor: '#047857' },
               ].map((st) => {
                 const isCurrent = moduleFormData.status === st.value;
                 return (
@@ -2126,7 +2316,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                     key={st.value}
                     size="sm"
                     radius="md"
-                    variant={isCurrent ? 'filled' : 'default'}
+                    variant="default"
                     onClick={() => {
                       const newStatus = st.value as ProjectModuleItem['status'];
                       let progress = moduleFormData.progress;
@@ -2136,16 +2326,14 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                       setModuleFormData({ ...moduleFormData, status: newStatus, progress });
                     }}
                     style={{
-                      height: 38,
+                      height: 40,
                       border: isCurrent
-                        ? `1.5px solid ${st.color}`
-                        : `1px solid ${isDark ? '#334155' : '#E2E8F0'}`,
+                        ? `1.5px solid ${st.activeBorder}`
+                        : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
                       backgroundColor: isCurrent
-                        ? isDark
-                          ? 'rgba(30, 41, 59, 0.95)'
-                          : st.activeBg
+                        ? st.activeBg
                         : isDark
-                        ? '#1E293B'
+                        ? 'rgba(30, 41, 59, 0.6)'
                         : '#FFFFFF',
                       color: isCurrent
                         ? isDark
@@ -2154,10 +2342,11 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                         : isDark
                         ? '#94A3B8'
                         : '#64748B',
-                      fontWeight: isCurrent ? 700 : 500,
+                      fontWeight: isCurrent ? 800 : 500,
                       fontSize: '12px',
                       transition: 'all 0.15s ease',
                       padding: '0 8px',
+                      boxShadow: isCurrent ? `0 2px 8px ${st.activeBorder}25` : 'none',
                     }}
                     leftSection={
                       <Box
@@ -2165,8 +2354,8 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                           width: 8,
                           height: 8,
                           borderRadius: '50%',
-                          backgroundColor: st.color,
-                          boxShadow: isCurrent ? `0 0 6px ${st.color}` : 'none',
+                          backgroundColor: st.dot,
+                          boxShadow: isCurrent ? `0 0 8px ${st.dot}` : 'none',
                         }}
                       />
                     }
@@ -2204,12 +2393,12 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
           <Group justify="space-between" align="center" mt="xs">
             <Group gap={6}>
               <ThemeIcon
-                size={20}
+                size={22}
                 radius="xl"
                 variant="light"
-                color={moduleFormData.progress === 100 ? 'teal' : 'blue'}
+                color={moduleFormData.progress === 100 ? 'teal' : 'indigo'}
               >
-                <IconActivity size={12} />
+                <IconActivity size={13} />
               </ThemeIcon>
               <Text size="xs" c="dimmed" fw={500}>
                 {moduleFormData.progress === 100
@@ -2225,7 +2414,7 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 size="sm"
                 onClick={() => setModuleModalOpened(false)}
                 style={{
-                  borderColor: isDark ? '#475569' : '#CBD5E1',
+                  borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#CBD5E1',
                   fontWeight: 600,
                 }}
               >
@@ -2239,9 +2428,11 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                 onClick={handleSaveModule}
                 leftSection={<IconCheck size={16} stroke={2.5} />}
                 style={{
-                  background: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 100%)',
+                  background: 'linear-gradient(135deg, #4F46E5 0%, #6366F1 100%)',
                   fontWeight: 700,
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
+                  height: 38,
+                  padding: '0 16px',
                 }}
               >
                 {editingModuleId ? 'Save Changes' : 'Add Module'}

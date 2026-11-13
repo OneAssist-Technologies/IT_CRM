@@ -46,12 +46,7 @@ export class LeadModel {
   }
 
   static async getDynamicStatuses() {
-    const dbStatuses = await prisma.lead.findMany({
-      select: { status: true },
-      distinct: ['status'],
-    });
-    const fallbackStatuses = ['New', 'In Progress', 'Qualified', 'Proposal Sent', 'In Negotiation', 'Complete', 'Lost'];
-    return Array.from(new Set([...dbStatuses.map(s => s.status === 'Contacted' ? 'In Progress' : ((s.status === 'Won' || s.status === 'Completed') ? 'Complete' : s.status)).filter(Boolean), ...fallbackStatuses]));
+    return ['New', 'In Progress', 'Completed', 'Lost'];
   }
 
   static async getDynamicMetadata() {
@@ -63,6 +58,8 @@ export class LeadModel {
       dbContactTypes,
       dbLeads,
       dbContacts,
+      dbBillingProducts,
+      dbMasterProjects,
     ] = await Promise.all([
       prisma.lead.findMany({ select: { source: true }, distinct: ['source'] }),
       prisma.lead.findMany({ select: { status: true }, distinct: ['status'] }),
@@ -71,10 +68,49 @@ export class LeadModel {
       prisma.lead.findMany({ select: { contactType: true }, distinct: ['contactType'] }),
       prisma.lead.findMany({ select: { productList: true, serviceList: true } }),
       prisma.contact.findMany({ select: { productList: true, serviceList: true, interestedService: true, customProduct: true, category: true } }),
+      prisma.billingProduct.findMany({
+        where: { status: 'Active' },
+        select: { name: true, type: true, modules: true },
+      }),
+      prisma.masterProject.findMany({
+        where: { status: 'Active' },
+        select: { name: true, category: true, modules: true },
+      }),
     ]);
 
-    const dynamicProducts = new Set();
-    const dynamicServices = new Set();
+    const catalogProducts = new Set();
+    const catalogServices = new Set();
+
+    dbBillingProducts.forEach((bp) => {
+      if (bp.name) {
+        if (bp.type === 'Service') {
+          catalogServices.add(bp.name.trim());
+        } else {
+          catalogProducts.add(bp.name.trim());
+        }
+      }
+      if (Array.isArray(bp.modules)) {
+        bp.modules.forEach((m) => {
+          const mName = typeof m === 'string' ? m : m?.name;
+          if (mName) catalogServices.add(mName.trim());
+        });
+      }
+    });
+
+    dbMasterProjects.forEach((mp) => {
+      if (mp.name) {
+        catalogProducts.add(mp.name.trim());
+      }
+      if (Array.isArray(mp.modules)) {
+        mp.modules.forEach((m) => {
+          const mName = typeof m === 'string' ? m : m?.name;
+          if (mName) catalogServices.add(mName.trim());
+        });
+      }
+    });
+
+    const dynamicProducts = new Set([...catalogProducts]);
+    const dynamicServices = new Set([...catalogServices]);
 
     dbLeads.forEach((l) => {
       if (Array.isArray(l.productList)) l.productList.forEach((p) => p && dynamicProducts.add(p.trim()));
@@ -125,7 +161,7 @@ export class LeadModel {
     };
 
     const sources = Array.from(new Set([...dbSources.map(s => s.source).filter(Boolean), ...fallbackSources]));
-    const statuses = Array.from(new Set([...dbStatuses.map(s => (s.status === 'Contacted' || s.status === 'Active') ? 'In Progress' : ((s.status === 'Won' || s.status === 'Completed') ? 'Complete' : s.status)).filter(Boolean), ...fallbackStatuses]));
+    const statuses = ['New', 'In Progress', 'Completed', 'Lost'];
     const stages = Array.from(new Set([...fallbackStages, ...dbStages.map(s => normalizeStage(s.stage)).filter(Boolean)]));
     const categories = Array.from(new Set([...dbCategories.map(c => c.category).filter(Boolean), ...fallbackCategories]));
     const contactTypes = Array.from(new Set([...dbContactTypes.map(c => c.contactType).filter(Boolean), ...fallbackContactTypes]));
@@ -136,6 +172,8 @@ export class LeadModel {
       stages,
       categories,
       contactTypes,
+      catalogProducts: Array.from(catalogProducts).filter(Boolean),
+      catalogServices: Array.from(catalogServices).filter(Boolean),
       productOptions: Array.from(dynamicProducts).filter(Boolean),
       serviceOptions: Array.from(dynamicServices).filter(Boolean),
     };

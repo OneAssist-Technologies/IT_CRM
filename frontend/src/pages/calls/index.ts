@@ -1,1 +1,1 @@
-export { CallLogsPage } from './CallLogsPage';
+export { CallLogsPage, CallLogsPage as ActivityLogsPage } from './CallLogsPage';

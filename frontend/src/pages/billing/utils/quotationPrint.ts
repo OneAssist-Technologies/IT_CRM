@@ -1,4 +1,4 @@
-import { Quotation } from '../../../types/billing';
+import { Quotation, BillingSettings } from '../../../types/billing';
 
 /**
  * Converts Indian Rupee number into words (Crores, Lakhs, Thousands, Hundreds)
@@ -69,7 +69,7 @@ export function formatInr(val: number): string {
 /**
  * Generates standalone, print-perfect HTML for a Quotation document
  */
-export function generateQuotationPrintHtml(quotation: Quotation): string {
+export function generateQuotationPrintHtml(quotation: Quotation, settings?: BillingSettings | null): string {
   const quotationDateFormatted = quotation.quotationDate
     ? new Date(quotation.quotationDate)
         .toLocaleDateString('en-US', {
@@ -83,6 +83,11 @@ export function generateQuotationPrintHtml(quotation: Quotation): string {
   const cleanQuotationNumber = quotation.quotationNumber
     ? quotation.quotationNumber.replace(/^QUO-/, '')
     : '001';
+
+  const companyName = settings?.companyName || 'OneAssist Technologies';
+  const companyAddress = settings?.companyAddress || '';
+  const companyGst = settings?.companyGst || '';
+  const companyPan = settings?.companyPan || (companyGst && companyGst.length >= 12 ? companyGst.substring(2, 12) : '');
 
   let computedGrossSubtotal = 0;
   let computedTotalItemDiscount = 0;
@@ -173,8 +178,8 @@ export function generateQuotationPrintHtml(quotation: Quotation): string {
 
 
   const clientName = quotation.companyName || quotation.contactName || 'Client';
-  const clientAddr = quotation.clientAddress || 'Client Registered Address';
-  const clientPanGst = quotation.clientGst || '—';
+  const clientAddr = quotation.clientAddress || '';
+  const clientPanGst = quotation.clientGst || 'Unregistered';
 
   const rowsHtml = processedItems.map((item, idx) => `
     <tr style="background-color: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'};">
@@ -406,11 +411,23 @@ export function generateQuotationPrintHtml(quotation: Quotation): string {
     <!-- Header -->
     <div class="header-row">
       <div>
-        <div class="quotation-title">Quotation</div>
+        <div class="quotation-title">Quotation ${quotation.revisionName ? `<span style="font-size: 18px; color: #7C3AED; font-weight: 700; margin-left: 6px;">[${escapeHtml(quotation.revisionName)}]</span>` : ''}</div>
         <div class="meta-row">
           <span class="meta-label">Quotation#</span>
-          <span class="meta-value">${escapeHtml(cleanQuotationNumber)}</span>
+          <span class="meta-value">${escapeHtml(quotation.quotationNumber || cleanQuotationNumber)}</span>
         </div>
+        ${quotation.version && quotation.version > 1 ? `
+        <div class="meta-row" style="margin-top: 3px;">
+          <span class="meta-label">Revision</span>
+          <span class="meta-value" style="color: #7C3AED;">${escapeHtml(quotation.revisionName || `V${quotation.version}`)} (Original: ${escapeHtml(quotation.originalQuotationNumber || cleanQuotationNumber)})</span>
+        </div>
+        ` : ''}
+        ${quotation.projectName ? `
+        <div class="meta-row" style="margin-top: 3px;">
+          <span class="meta-label">Project</span>
+          <span class="meta-value">${escapeHtml(quotation.projectName)}</span>
+        </div>
+        ` : ''}
         <div class="meta-row" style="margin-top: 3px;">
           <span class="meta-label">Quotation Date</span>
           <span class="meta-value">${escapeHtml(quotationDateFormatted)}</span>
@@ -433,20 +450,24 @@ export function generateQuotationPrintHtml(quotation: Quotation): string {
       <div class="info-card">
         <div class="info-card-row">
           <span class="info-card-label">Quotation by</span>
-          <span class="info-card-value">OneAssist Technologies Pvt Ltd</span>
+          <span class="info-card-value">${escapeHtml(companyName)}</span>
         </div>
+        ${companyAddress ? `
         <div class="info-card-row">
           <span class="info-card-label">Address</span>
-          <span style="color: #334155;">104, Tech Park, Guindy, Chennai, Tamil Nadu, India - 600032</span>
+          <span style="color: #334155;">${escapeHtml(companyAddress)}</span>
         </div>
+        ` : ''}
         <div class="info-card-row">
           <span class="info-card-label">GSTIN</span>
-          <span class="info-card-value">33AAAAA0000A1Z5</span>
+          <span class="info-card-value">${escapeHtml(companyGst || 'Unregistered')}</span>
         </div>
+        ${companyPan ? `
         <div class="info-card-row">
           <span class="info-card-label">PAN</span>
-          <span class="info-card-value">AAAAA0000A</span>
+          <span class="info-card-value">${escapeHtml(companyPan)}</span>
         </div>
+        ` : ''}
       </div>
 
       <div class="info-card">
@@ -456,7 +477,7 @@ export function generateQuotationPrintHtml(quotation: Quotation): string {
         </div>
         <div class="info-card-row">
           <span class="info-card-label">Address</span>
-          <span style="color: #334155;">${escapeHtml(clientAddr)}</span>
+          <span style="color: #334155;">${escapeHtml(clientAddr || '—')}</span>
         </div>
         <div class="info-card-row">
           <span class="info-card-label">GSTIN / PAN</span>
@@ -578,7 +599,7 @@ function escapeHtml(text?: string | null): string {
  * Triggers browser print directly for the given Quotation
  * Opens the native Save as PDF / Print preview dialog directly with the full quotation in it
  */
-export function printQuotationDirect(quotation: Quotation): void {
+export function printQuotationDirect(quotation: Quotation, settings?: BillingSettings | null): void {
   // 1. Clean up previous print iframe if present
   const existingFrame = document.getElementById('crm-quotation-print-frame');
   if (existingFrame) {
@@ -597,7 +618,7 @@ export function printQuotationDirect(quotation: Quotation): void {
     return;
   }
 
-  const html = generateQuotationPrintHtml(quotation);
+  const html = generateQuotationPrintHtml(quotation, settings);
   doc.open();
   doc.write(html);
   doc.close();

@@ -10,6 +10,7 @@ import {
   SimpleGrid,
   ThemeIcon,
   Modal,
+  Menu,
   TextInput,
   Textarea,
   NumberInput,
@@ -92,6 +93,17 @@ import {
   DEFAULT_DATE_FILTER,
   isDateMatchingFilter,
 } from '../../../components/common/DateFilterControl';
+
+export const CONTRACT_STATUS_OPTIONS = [
+  { value: 'Draft', label: 'Draft', color: '#64748B' },
+  { value: 'Pending Approval', label: 'Pending Approval', color: '#3B82F6' },
+  { value: 'Approved', label: 'Approved', color: '#06B6D4' },
+  { value: 'Pending Signature', label: 'Pending Signature', color: '#6366F1' },
+  { value: 'Active', label: 'Active', color: '#10B981' },
+  { value: 'Completed', label: 'Completed', color: '#059669' },
+  { value: 'On Hold', label: 'On Hold', color: '#F59E0B' },
+  { value: 'Terminated', label: 'Terminated', color: '#EF4444' },
+];
 
 type ActiveContractTabType =
   | 'ALL'
@@ -309,7 +321,17 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
 
       setContracts(contractsRes.data || []);
       if (statsRes) setStats(statsRes);
-      if (Array.isArray(quotesRes)) setQuotations(quotesRes);
+      if (Array.isArray(quotesRes)) {
+        const flattenedQuotes: Quotation[] = [];
+        quotesRes.forEach((q) => {
+          if (q.allRevisions && q.allRevisions.length > 0) {
+            flattenedQuotes.push(...q.allRevisions);
+          } else {
+            flattenedQuotes.push(q);
+          }
+        });
+        setQuotations(flattenedQuotes);
+      }
       if (negsRes && negsRes.data) setNegotiations(negsRes.data);
     } catch (err: any) {
       notifications.show({
@@ -397,10 +419,8 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
 
   const contractStatusOptions: ComboboxItem[] = [
     { value: 'Draft', label: 'Draft' },
-    { value: 'Pending Approval', label: 'Pending Approval' },
-    { value: 'Approved', label: 'Approved' },
-    { value: 'Pending Signature', label: 'Pending Signature' },
     { value: 'Active', label: 'Active' },
+    { value: 'Pending Signature', label: 'Pending Signature' },
     { value: 'On Hold', label: 'On Hold' },
     { value: 'Completed', label: 'Completed' },
     { value: 'Terminated', label: 'Terminated' },
@@ -444,10 +464,13 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
   const quotationSelectOptions: ComboboxItem[] = useMemo(() => {
     return quotations.map((q) => {
       const isAccepted = (q.status || '').toLowerCase() === 'accepted';
-      const statusBadge = isAccepted ? '⭐ ACCEPTED' : q.status;
+      const isSuperseded = (q.status || '').toLowerCase() === 'superseded';
+      const verTag = q.revisionName || (q.version ? `V${q.version}` : '');
+      const statusBadge = isAccepted ? '⭐ ACCEPTED' : isSuperseded ? '⚠️ SUPERSEDED' : q.status;
       return {
         value: q.id,
-        label: `${q.quotationNumber} — ${q.companyName || q.contactName || 'Client'} [${statusBadge}] (₹${Number(q.grandTotal || 0).toLocaleString('en-IN')})`,
+        label: `${q.quotationNumber} ${verTag ? `[${verTag}]` : ''} — ${q.companyName || q.contactName || 'Client'} [${statusBadge}] (₹${Number(q.grandTotal || 0).toLocaleString('en-IN')})`,
+        disabled: isSuperseded,
       };
     });
   }, [quotations]);
@@ -513,6 +536,15 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
 
     const quote = quotations.find((q) => q.id === val);
     if (!quote) return;
+
+    if ((quote.status || '').toLowerCase() === 'superseded') {
+      notifications.show({
+        title: 'Superseded Quotation',
+        message: 'This quotation revision has been superseded by a newer version and cannot be linked to a contract. Please select the accepted active revision.',
+        color: 'red',
+      });
+      return;
+    }
 
     setSelectedQuotation(quote);
     setFormQuotationId(quote.id);
@@ -970,23 +1002,18 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
     if (formDiscountAmount < 0) newErrors.discountAmount = 'Discount Amount cannot be negative';
     if (formTaxAmount < 0) newErrors.taxAmount = 'Tax Amount cannot be negative';
 
-    // Quotation mismatch check
-    if (hasQuotationValueMismatch && !quotationMismatchConfirmed) {
-      newErrors.quotationMismatch = 'Confirmation is required because the contract value differs from the accepted quotation.';
-    }
-
-    // Signature validation if marking as Signed
-    if (formSignatureStatus === 'Signed') {
-      if (!formClientSignatoryName.trim()) newErrors.clientSignatoryName = 'Client Signatory Name is required for signed contracts';
-      if (!formCompanySignatoryName.trim()) newErrors.companySignatoryName = 'Company Signatory Name is required for signed contracts';
-      if (!formSignedDate) newErrors.signedDate = 'Signed Date is required when contract is marked as Signed';
+    // Signature validation if marking as Signed or Active
+    if (formStatus === 'Active' || formSignatureStatus === 'Signed') {
+      if (!formClientSignatoryName.trim()) newErrors.clientSignatoryName = 'Client Signatory Name is required for signed/active contracts';
+      if (!formCompanySignatoryName.trim()) newErrors.companySignatoryName = 'Company Signatory Name is required for signed/active contracts';
+      if (!formSignedDate) newErrors.signedDate = 'Signed Date is required when contract is active/signed';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSaveContract = async (actionType: 'draft' | 'submit_approval' | 'approve' | 'reject') => {
+  const handleSaveContract = async (actionType: 'draft' | 'submit_approval' | 'approve' | 'reject' | 'save' = 'save') => {
     const isApprovalSubmission = actionType === 'submit_approval';
     if (!validateForm(isApprovalSubmission)) {
       notifications.show({
@@ -1009,6 +1036,13 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
     } else if (actionType === 'approve') {
       targetApprovalStatus = 'Approved';
       targetStatus = formSignatureStatus === 'Signed' ? 'Active' : 'Pending Signature';
+    } else if (actionType === 'save') {
+      targetStatus = formStatus;
+      if (formStatus === 'Active' || formStatus === 'Completed') {
+        targetApprovalStatus = 'Approved';
+      } else if (formStatus === 'Draft') {
+        targetApprovalStatus = 'Draft';
+      }
     }
 
     const payload: Partial<ContractFormData> = {
@@ -1059,7 +1093,7 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
       advancePaymentType: formAdvancePaymentType,
       advancePaymentValue: Number(formAdvancePaymentValue) || 0,
       advancePaymentAmount: computedAdvancePayable,
-      quotationValueMismatchConfirmed: Boolean(quotationMismatchConfirmed),
+      quotationValueMismatchConfirmed: true,
 
       // Documents & Signatures
       documentName: formContractDocument.trim() || undefined,
@@ -1228,6 +1262,80 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
     }
   };
 
+  // Status Update Handler with dropdown options
+  const handleStatusChange = async (cnt: Contract, newStatus: string) => {
+    try {
+      setLoading(true);
+      const todayStr = new Date().toISOString().split('T')[0];
+      const patchData: Partial<ContractFormData> = {
+        status: newStatus as ContractStatus,
+      };
+
+      if (newStatus === 'Active' || newStatus === 'Completed') {
+        patchData.status = newStatus as ContractStatus;
+        patchData.approvalStatus = 'Approved';
+        patchData.signatureStatus = 'Signed';
+        patchData.signedDate = cnt.signedDate || todayStr;
+        patchData.clientSignatoryName = (cnt.clientSignatoryName && cnt.clientSignatoryName.trim()) || cnt.clientName || lead?.name || 'Authorized Client';
+        patchData.clientSignatoryEmail = (cnt.clientSignatoryEmail && cnt.clientSignatoryEmail.trim()) || (cnt as any).clientEmail || lead?.email || 'client@example.com';
+        patchData.companySignatoryName = (cnt.companySignatoryName && cnt.companySignatoryName.trim()) || cnt.assignedToName || 'OneAssist Representative';
+        patchData.companySignatoryEmail = (cnt.companySignatoryEmail && cnt.companySignatoryEmail.trim()) || 'contracts@oneassist.tech';
+      } else if (newStatus === 'Pending Signature') {
+        patchData.status = 'Pending Signature';
+        patchData.approvalStatus = 'Approved';
+        patchData.signatureStatus = 'Pending';
+      } else if (newStatus === 'Pending Approval') {
+        patchData.status = 'Pending Approval';
+        patchData.approvalStatus = 'Pending Approval';
+        patchData.isApprovalSubmission = true;
+      } else if (newStatus === 'Approved') {
+        patchData.status = 'Approved';
+        patchData.approvalStatus = 'Approved';
+        patchData.isApprovalAction = true;
+      } else if (newStatus === 'Draft') {
+        patchData.status = 'Draft';
+        patchData.approvalStatus = 'Draft';
+        patchData.signatureStatus = 'Pending';
+      } else {
+        patchData.status = newStatus as ContractStatus;
+      }
+
+      // Optimistic update so UI reflects immediately
+      setContracts((prev) =>
+        prev.map((c) => (c.id === cnt.id ? { ...c, ...patchData } : c))
+      );
+
+      const updated = await leadService.updateContract(cnt.id, patchData);
+
+      if (updated) {
+        setContracts((prev) =>
+          prev.map((c) => (c.id === cnt.id ? { ...c, ...updated } : c))
+        );
+      }
+
+      notifications.show({
+        title: 'Contract Status Updated',
+        message: `Contract ${cnt.contractId || cnt.title} status changed to ${newStatus}.`,
+        color: 'teal',
+        icon: <IconCheck size={16} />,
+      });
+
+      await loadData();
+      if (onUpdateContract) {
+        onUpdateContract({ ...cnt, ...patchData, ...(updated || {}) } as Contract);
+      }
+    } catch (err: any) {
+      notifications.show({
+        title: 'Update Failed',
+        message: err.message || 'Could not update contract status.',
+        color: 'red',
+      });
+      await loadData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Quick Sign toggle
   const handleQuickSign = async (cnt: Contract) => {
     const isNowSigned = cnt.signatureStatus !== 'Signed';
@@ -1282,7 +1390,19 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
     else if (st === 'rejected') color = 'pink';
 
     return (
-      <Badge size="xs" variant="light" color={color} style={{ fontWeight: 700, textTransform: 'capitalize' }}>
+      <Badge
+        size="md"
+        variant="light"
+        color={color}
+        radius="md"
+        style={{
+          fontWeight: 700,
+          fontSize: '12px',
+          padding: '6px 12px',
+          height: 26,
+          textTransform: 'capitalize',
+        }}
+      >
         {status || 'Draft'}
       </Badge>
     );
@@ -1374,16 +1494,42 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
           )}
         </Paper>
       ) : (
-        <Paper radius="md" withBorder style={{ background: isDark ? '#1F2937' : '#FFFFFF', overflow: 'hidden' }}>
-          <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
-            <Table.Thead style={{ background: isDark ? '#111827' : '#F8FAFC' }}>
+        <Paper
+          radius="lg"
+          withBorder
+          style={{
+            background: isDark ? '#1F2937' : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+            overflow: 'hidden',
+            boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 10px rgba(0, 0, 0, 0.04)',
+          }}
+        >
+          <Table verticalSpacing="md" horizontalSpacing="lg" highlightOnHover>
+            <Table.Thead
+              style={{
+                background: isDark ? '#111827' : '#F8FAFC',
+                borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+              }}
+            >
               <Table.Tr>
-                <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Title & Client</Table.Th>
-                <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Contract Type</Table.Th>
-                <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Contract Date</Table.Th>
-                <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Contract Value</Table.Th>
-                <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase' }}>Status</Table.Th>
-                <Table.Th style={{ fontSize: '11px', textTransform: 'uppercase', textAlign: 'right' }}>Actions</Table.Th>
+                <Table.Th style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase', padding: '14px 20px' }}>
+                  Title & Client
+                </Table.Th>
+                <Table.Th style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase', padding: '14px 16px' }}>
+                  Contract Type
+                </Table.Th>
+                <Table.Th style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase', padding: '14px 16px' }}>
+                  Contract Date
+                </Table.Th>
+                <Table.Th style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase', padding: '14px 16px' }}>
+                  Contract Value
+                </Table.Th>
+                <Table.Th style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase', padding: '14px 16px' }}>
+                  Status
+                </Table.Th>
+                <Table.Th style={{ fontSize: '11.5px', fontWeight: 700, letterSpacing: '0.05em', color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase', textAlign: 'right', padding: '14px 20px' }}>
+                  Actions
+                </Table.Th>
               </Table.Tr>
             </Table.Thead>
 
@@ -1398,97 +1544,212 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
                 </Table.Tr>
               ) : (
                 paginatedContracts.map((cnt) => (
-                <Table.Tr key={cnt.id}>
+                <Table.Tr
+                  key={cnt.id}
+                  style={{
+                    borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid #F1F5F9',
+                  }}
+                >
                   {/* Title & Client */}
-                  <Table.Td style={{ maxWidth: 220 }}>
-                    <Text
-                      fw={700}
-                      size="xs"
-                      truncate
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => setDetailsContract(cnt)}
-                    >
-                      {cnt.title}
-                    </Text>
-                    <Group gap={4} wrap="nowrap" mt={2}>
-                      <IconBuilding size={12} color="gray" />
-                      <Text size="11px" c="dimmed" truncate>
-                        {cnt.clientName || 'Client'}
-                      </Text>
-                      {cnt.quotationNumber && (
-                        <Badge size="10px" variant="outline" color="blue">
-                          {cnt.quotationNumber}
-                        </Badge>
-                      )}
+                  <Table.Td style={{ minWidth: 260, padding: '16px 20px' }}>
+                    <Group gap="md" wrap="nowrap" align="center">
+                      <Box
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 12,
+                          background: isDark ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5',
+                          color: isDark ? '#6EE7B7' : '#059669',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                          border: isDark ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid #A7F3D0',
+                        }}
+                      >
+                        <IconFileCheck size={22} stroke={1.9} />
+                      </Box>
+                      <Box style={{ minWidth: 0 }}>
+                        <Text
+                          fw={700}
+                          size="sm"
+                          style={{
+                            fontSize: '14.5px',
+                            color: isDark ? '#F8FAFC' : '#0F172A',
+                            cursor: 'pointer',
+                            lineHeight: 1.3,
+                          }}
+                          onClick={() => setDetailsContract(cnt)}
+                        >
+                          {cnt.title}
+                        </Text>
+                        <Group gap={6} wrap="nowrap" mt={4} align="center">
+                          <IconBuilding size={13} color={isDark ? '#94A3B8' : '#64748B'} />
+                          <Text size="xs" c="dimmed" fw={500} truncate>
+                            {cnt.clientName || lead?.name || 'Client'}
+                          </Text>
+                          {cnt.quotationNumber && (
+                            <Badge size="xs" variant="light" color="blue" radius="sm" style={{ fontWeight: 600 }}>
+                              {cnt.quotationNumber}
+                            </Badge>
+                          )}
+                          {cnt.contractId && (
+                            <Badge size="xs" variant="outline" color="gray" radius="sm">
+                              {cnt.contractId}
+                            </Badge>
+                          )}
+                        </Group>
+                      </Box>
                     </Group>
                   </Table.Td>
 
                   {/* Contract Type */}
-                  <Table.Td>
-                    <Text size="xs" fw={500}>
+                  <Table.Td style={{ padding: '16px 16px' }}>
+                    <Text size="sm" fw={600} style={{ color: isDark ? '#E2E8F0' : '#334155' }}>
                       {cnt.contractType || 'Software Development'}
+                    </Text>
+                    <Text size="11px" c="dimmed" mt={2}>
+                      Commercial Agreement
                     </Text>
                   </Table.Td>
 
                   {/* Dates */}
-                  <Table.Td style={{ whiteSpace: 'nowrap' }}>
-                    <Text size="xs" fw={500}>
-                      {cnt.contractDate || cnt.startDate || '—'}
-                    </Text>
+                  <Table.Td style={{ whiteSpace: 'nowrap', padding: '16px 16px' }}>
+                    <Group gap={6} align="center" wrap="nowrap">
+                      <IconCalendar size={15} color={isDark ? '#94A3B8' : '#64748B'} />
+                      <Text size="sm" fw={600} style={{ color: isDark ? '#E2E8F0' : '#1E293B' }}>
+                        {cnt.contractDate || cnt.startDate || '—'}
+                      </Text>
+                    </Group>
                   </Table.Td>
 
                   {/* Value */}
-                  <Table.Td>
-                    <Text fw={700} size="xs">
+                  <Table.Td style={{ padding: '16px 16px' }}>
+                    <Text fw={800} size="md" style={{ fontSize: '16px', color: isDark ? '#34D399' : '#059669', letterSpacing: '-0.02em' }}>
                       ₹{Number(cnt.finalContractAmount || cnt.contractValue || 0).toLocaleString('en-IN')}
+                    </Text>
+                    <Text size="11px" c="dimmed" mt={1}>
+                      {cnt.taxIncluded ? 'Incl. Tax' : 'Total Agreement Value'}
                     </Text>
                   </Table.Td>
 
                   {/* Lifecycle Status */}
-                  <Table.Td>{renderStatusBadge(cnt.status || 'Draft')}</Table.Td>
+                  <Table.Td style={{ padding: '16px 16px' }} onClick={(e) => e.stopPropagation()}>
+                    <Menu shadow="md" width={190} position="bottom-start" withinPortal radius="md">
+                      <Menu.Target>
+                        <Tooltip label="Click to update status" withArrow>
+                          <Box style={{ display: 'inline-block', cursor: 'pointer' }}>
+                            {renderStatusBadge(cnt.status || 'Draft')}
+                          </Box>
+                        </Tooltip>
+                      </Menu.Target>
+                      <Menu.Dropdown>
+                        <Menu.Label>Update Contract Status</Menu.Label>
+                        {CONTRACT_STATUS_OPTIONS.map((opt) => {
+                          const isSelected = (cnt.status || '').toLowerCase() === opt.value.toLowerCase();
+                          return (
+                            <Menu.Item
+                              key={opt.value}
+                              leftSection={
+                                <Box
+                                  style={{
+                                    width: 8,
+                                    height: 8,
+                                    borderRadius: '50%',
+                                    backgroundColor: opt.color,
+                                  }}
+                                />
+                              }
+                              rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                              onClick={() => handleStatusChange(cnt, opt.value)}
+                              style={{
+                                fontWeight: isSelected ? 700 : 500,
+                                backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                              }}
+                            >
+                              {opt.label}
+                            </Menu.Item>
+                          );
+                        })}
+                      </Menu.Dropdown>
+                    </Menu>
+                  </Table.Td>
 
                   {/* Actions */}
-                  <Table.Td style={{ textAlign: 'right' }}>
-                    <Group gap={4} justify="flex-end" wrap="nowrap">
-                      <Tooltip label="View Details">
-                        <ActionIcon size="sm" variant="subtle" color="blue" onClick={() => setDetailsContract(cnt)}>
-                          <IconEye size={15} />
+                  <Table.Td style={{ textAlign: 'right', padding: '16px 20px' }}>
+                    <Group gap={6} justify="flex-end" wrap="nowrap">
+                      <Tooltip label="View Details" withArrow>
+                        <ActionIcon size="md" radius="md" variant="light" color="blue" onClick={() => setDetailsContract(cnt)}>
+                          <IconEye size={17} />
                         </ActionIcon>
                       </Tooltip>
 
                       {canEdit && (
-                        <Tooltip label="Edit Contract">
-                          <ActionIcon size="sm" variant="subtle" color="gray" onClick={() => handleOpenEditModal(cnt)}>
-                            <IconEdit size={15} />
+                        <Tooltip label="Edit Contract" withArrow>
+                          <ActionIcon size="md" radius="md" variant="light" color="gray" onClick={() => handleOpenEditModal(cnt)}>
+                            <IconEdit size={17} />
                           </ActionIcon>
                         </Tooltip>
                       )}
 
                       {/* Submit for Approval Action if in Draft */}
                       {(cnt.approvalStatus === 'Draft' || !cnt.approvalStatus) && (
-                        <Tooltip label="Submit for Approval">
-                          <ActionIcon size="sm" variant="subtle" color="teal" onClick={() => handleSubmitForApproval(cnt)}>
-                            <IconSend size={15} />
+                        <Tooltip label="Submit for Approval" withArrow>
+                          <ActionIcon size="md" radius="md" variant="light" color="teal" onClick={() => handleSubmitForApproval(cnt)}>
+                            <IconSend size={17} />
                           </ActionIcon>
                         </Tooltip>
                       )}
 
-                      {/* Quick Sign Toggle */}
-                      <Tooltip label={cnt.signatureStatus === 'Signed' ? 'Reset Signature' : 'Mark as Signed'}>
-                        <ActionIcon
-                          size="sm"
-                          variant="subtle"
-                          color={cnt.signatureStatus === 'Signed' ? 'green' : 'gray'}
-                          onClick={() => handleQuickSign(cnt)}
-                        >
-                          <IconShieldCheck size={15} />
-                        </ActionIcon>
-                      </Tooltip>
+                      {/* Update Status Button with Options Dropdown */}
+                      <Menu shadow="md" width={190} position="bottom-end" withinPortal radius="md">
+                        <Menu.Target>
+                          <Tooltip label="Update Status" withArrow>
+                            <ActionIcon
+                              size="md"
+                              radius="md"
+                              variant="light"
+                              color="teal"
+                            >
+                              <IconRefresh size={17} />
+                            </ActionIcon>
+                          </Tooltip>
+                        </Menu.Target>
+                        <Menu.Dropdown>
+                          <Menu.Label>Update Status</Menu.Label>
+                          {CONTRACT_STATUS_OPTIONS.map((opt) => {
+                            const isSelected = (cnt.status || '').toLowerCase() === opt.value.toLowerCase();
+                            return (
+                              <Menu.Item
+                                key={opt.value}
+                                leftSection={
+                                  <Box
+                                    style={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: '50%',
+                                      backgroundColor: opt.color,
+                                    }}
+                                  />
+                                }
+                                rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                onClick={() => handleStatusChange(cnt, opt.value)}
+                                style={{
+                                  fontWeight: isSelected ? 700 : 500,
+                                  backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                                }}
+                              >
+                                {opt.label}
+                              </Menu.Item>
+                            );
+                          })}
+                        </Menu.Dropdown>
+                      </Menu>
 
                       {canDelete && (
-                        <Tooltip label="Delete Contract">
-                          <ActionIcon size="sm" variant="subtle" color="red" onClick={() => setDeleteTarget(cnt)}>
-                            <IconTrash size={15} />
+                        <Tooltip label="Delete Contract" withArrow>
+                          <ActionIcon size="md" radius="md" variant="light" color="red" onClick={() => setDeleteTarget(cnt)}>
+                            <IconTrash size={17} />
                           </ActionIcon>
                         </Tooltip>
                       )}
@@ -1994,38 +2255,6 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
               </Badge>
             </Group>
 
-            {/* Quotation Mismatch Alert */}
-            {hasQuotationValueMismatch && selectedQuotation && (
-              <Alert
-                icon={<IconAlertTriangle size={16} />}
-                title="Quotation Value Variance Detected"
-                color="orange"
-                variant="light"
-                radius="md"
-                mb="md"
-              >
-                <Text size="xs" mb="xs">
-                  The entered contract base value (<b>₹{Number(formContractValue).toLocaleString('en-IN')}</b>) differs from the accepted quotation value (<b>₹{Number(selectedQuotation.grandTotal || selectedQuotation.subtotal).toLocaleString('en-IN')}</b>).
-                  Authorized confirmation is required to proceed with this difference.
-                </Text>
-                <Checkbox
-                  label="I confirm and authorize that the contract value differs from the accepted quotation."
-                  checked={quotationMismatchConfirmed}
-                  onChange={(e) => {
-                    setQuotationMismatchConfirmed(e.currentTarget.checked);
-                    if (errors.quotationMismatch) setErrors((prev) => ({ ...prev, quotationMismatch: '' }));
-                  }}
-                  size="xs"
-                  color="orange"
-                />
-                {errors.quotationMismatch && (
-                  <Text size="xs" c="red" mt={4} fw={600}>
-                    {errors.quotationMismatch}
-                  </Text>
-                )}
-              </Alert>
-            )}
-
             {/* Commercial Inputs */}
             <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md" mb="md">
               <NumberInput
@@ -2298,14 +2527,19 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
               />
 
               <Select
-                label="Signature Status"
-                data={signatureStatusOptions}
-                value={formSignatureStatus}
+                label="Contract Status"
+                data={contractStatusOptions}
+                value={formStatus}
                 onChange={(v) => {
-                  const newSig = (v as ContractSignatureStatus) || 'Pending';
-                  setFormSignatureStatus(newSig);
-                  if (newSig === 'Signed' && !formSignedDate) {
-                    setFormSignedDate(new Date().toISOString().split('T')[0]);
+                  const newStatus = (v as ContractStatus) || 'Draft';
+                  setFormStatus(newStatus);
+                  if (newStatus === 'Active' || newStatus === 'Completed') {
+                    setFormSignatureStatus('Signed');
+                    if (!formSignedDate) {
+                      setFormSignedDate(new Date().toISOString().split('T')[0]);
+                    }
+                  } else if (newStatus === 'Pending Signature' || newStatus === 'Draft') {
+                    setFormSignatureStatus('Pending');
                   }
                 }}
                 radius="md"
@@ -2313,14 +2547,14 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
 
               <Box>
                 <MeetingDatePicker
-                  label={formSignatureStatus === 'Signed' ? 'Signed Date *' : 'Signed Date'}
+                  label={formStatus === 'Active' || formSignatureStatus === 'Signed' ? 'Signed Date *' : 'Signed Date'}
                   value={formSignedDate}
                   onChange={(d) => {
                     setFormSignedDate(d);
                     if (errors.signedDate) setErrors((prev) => ({ ...prev, signedDate: '' }));
                   }}
                   placeholder="YYYY-MM-DD"
-                  required={formSignatureStatus === 'Signed'}
+                  required={formStatus === 'Active' || formSignatureStatus === 'Signed'}
                 />
                 {errors.signedDate && (
                   <Text size="xs" c="red" mt={2}>
@@ -2329,69 +2563,8 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
                 )}
               </Box>
             </SimpleGrid>
-          </Paper>
 
-          {/* ===================================================================== */}
-          {/* SECTION 5: APPROVAL & CONTRACT STATUS                                 */}
-          {/* ===================================================================== */}
-          <Paper
-            p="md"
-            radius="md"
-            style={{
-              background: isDark ? '#111827' : '#F8FAFC',
-              border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
-            }}
-          >
-            <Group justify="space-between" align="center" mb="sm">
-              <Group gap={6}>
-                <ThemeIcon size="xs" color="pink" variant="light">
-                  <IconCheck size={12} />
-                </ThemeIcon>
-                <Text size="xs" fw={800} style={{ color: isDark ? '#F472B6' : '#DB2777', letterSpacing: '0.04em' }}>
-                  5. APPROVAL & CONTRACT STATUS
-                </Text>
-              </Group>
-              <Badge size="xs" variant="outline" color="pink">
-                Workflow Controlled
-              </Badge>
-            </Group>
-
-            {/* Rejection Alert if Rejected */}
-            {formApprovalStatus === 'Rejected' && formRejectionReason && (
-              <Alert icon={<IconAlertTriangle size={16} />} title="Contract Rejected" color="red" variant="light" mb="md" radius="md">
-                <Text size="xs">
-                  <b>Reason:</b> {formRejectionReason}
-                </Text>
-                <Text size="10px" c="dimmed" mt={2}>
-                  You may edit the contract terms and resubmit for approval using &quot;Submit for Approval&quot;.
-                </Text>
-              </Alert>
-            )}
-
-            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mb="md">
-              <Box>
-                <Text size="xs" fw={500} mb={4}>
-                  Approval Status
-                </Text>
-                <Group gap="xs" align="center">
-                  {renderStatusBadge(formApprovalStatus)}
-                  <Text size="xs" c="dimmed">
-                    {formApprovalStatus === 'Draft' && '(New contracts default to Draft)'}
-                    {formApprovalStatus === 'Pending Approval' && '(Awaiting executive sign-off)'}
-                    {formApprovalStatus === 'Approved' && `(Approved by ${formApprovedBy || 'Authorized Officer'} on ${formApprovalDate ? new Date(formApprovalDate).toLocaleDateString() : 'today'})`}
-                  </Text>
-                </Group>
-              </Box>
-
-              <Select
-                label="Contract Lifecycle Status"
-                data={contractStatusOptions}
-                value={formStatus}
-                onChange={(v) => setFormStatus((v as ContractStatus) || 'Draft')}
-                radius="md"
-              />
-            </SimpleGrid>
-
+            {/* Internal remarks / notes */}
             <Textarea
               label="Internal Notes"
               placeholder="Internal remarks, legal review notes, client negotiation considerations"
@@ -2446,28 +2619,16 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
                 Save as Draft
               </Button>
 
-              {/* Submit for Approval */}
+              {/* Save Contract / Save Changes */}
               <Button
                 radius="md"
                 color="blue"
                 loading={submitting}
-                leftSection={<IconSend size={15} />}
-                onClick={() => handleSaveContract('submit_approval')}
+                leftSection={<IconCheck size={15} />}
+                onClick={() => handleSaveContract('save')}
               >
-                Submit for Approval
+                {editingContract ? 'Save Changes ✓' : 'Save Contract'}
               </Button>
-
-              {/* If already approved / active, provide Save Changes */}
-              {editingContract && (editingContract.approvalStatus === 'Approved' || editingContract.status === 'Active') && (
-                <Button
-                  radius="md"
-                  color="teal"
-                  loading={submitting}
-                  onClick={() => handleSaveContract('draft')}
-                >
-                  Save Changes ✓
-                </Button>
-              )}
             </Group>
           </Group>
         </Stack>

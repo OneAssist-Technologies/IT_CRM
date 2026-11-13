@@ -53,6 +53,7 @@ model RolePermission {
   canDelete  Boolean  @default(false)
   canExport  Boolean  @default(false)
   canApprove Boolean  @default(false)
+  dataScope  String?  @default("All") // "All" | "Own"
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -175,6 +176,79 @@ model Contact {
   updatedAt              DateTime  @updatedAt
 }
 
+model BulkUploadContact {
+  id                     String    @id @default(uuid())
+  bulkId                 String?   // e.g. BLK-1001
+  batchId                String?   // Batch or upload session identifier
+  fileName               String?   // Original uploaded file name
+  name                   String
+  email                  String?
+  phone                  String?
+  companyName            String?
+  contactPerson          String?
+  designation            String?
+  profession             String?
+  category               String?   @default("Product")
+  source                 String?   @default("Bulk Import")
+  customSource           String?
+  contactType            String?   @default("Company Representative")
+  estimatedValue         String?
+  expectedCloseDate      String?
+  description            String?
+  remarks                String?
+  notes                  String?
+  gstNumber              String?
+  employeeCount          String?
+  companyPan             String?
+  cinNumber              String?
+  companyWebsite         String?
+  linkedinUrl            String?
+  annualTurnover         String?
+  verificationStatus     String?   @default("Unverified")
+  registeredState        String?
+  productList            String[]  @default([])
+  serviceList            String[]  @default([])
+  status                 String?   @default("New")
+  stage                  String?   @default("Initialization")
+  priority               String?   @default("Medium")
+  assignedTo             String?
+  assignedToName         String?
+  assignmentStatus       String?   @default("Unassigned")
+  contactMode            String?
+  street                 String?
+  city                   String?
+  zip                    String?
+  country                String?   @default("India")
+  isImportedToContact    Boolean   @default(false)
+  importedContactId      String?
+  createdBy              String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([batchId])
+}
+
+model ImportBatch {
+  id                   String    @id @default(uuid())
+  batchId              String    @unique
+  fileName             String
+  fileSize             Int?      @default(0)
+  totalRows            Int       @default(0)
+  importedCount        Int       @default(0)
+  failedCount          Int       @default(0)
+  status               String    @default("Completed") // "Completed" | "Partial" | "Failed"
+  failedRows           Json?     // [{ row: number, name?: string, phone?: string, email?: string, reason: string }]
+  assignedTo           String?
+  assignedToName       String?
+  createdBy            String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([batchId])
+  @@index([createdAt])
+}
+
+
 model Company {
   id             String   @id @default(uuid())
   name           String   @unique
@@ -203,6 +277,7 @@ model Lead {
   serviceList    String[]  @default([])
   status         String?   @default("New")
   stage          String?   @default("Initialization")
+  priority       String?   @default("Medium")
   assignedTo     String?
   assignedToName String?
   createdBy      String?
@@ -378,36 +453,49 @@ model BillingProduct {
 }
 
 model Quotation {
-  id                 String          @id @default(uuid())
-  quotationNumber    String          @unique // e.g. "QUO-2026-1001"
-  contactId          String?         // Reference to CRM Contact
-  contactName        String
-  contactEmail       String?
-  contactPhone       String?
-  companyName        String?
-  clientGst          String?
-  clientAddress      String?
-  leadId             String?         // Reference to CRM Lead
-  quotationDate      String          // YYYY-MM-DD
-  validUntil         String          // YYYY-MM-DD
-  status             String          @default("Draft") // "Draft" | "Sent" | "Accepted" | "Rejected" | "Expired"
-  currency           String          @default("INR")
-  subtotal           Float           @default(0)
-  discountType       String          @default("percentage") // "percentage" | "fixed"
-  discountValue      Float           @default(0)
-  discountAmount     Float           @default(0)
-  taxAmount          Float           @default(0)
-  grandTotal         Float           @default(0)
-  paymentTerms       String?         @default("Net 30")
-  notes              String?
-  termsConditions    String?
-  salesOwnerId       String?
-  salesOwnerName     String?
-  convertedToOrderId String?         // ID of SalesOrder converted to
-  convertedAt        DateTime?
-  items              QuotationItem[]
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  id                      String          @id @default(uuid())
+  quotationNumber         String          @unique // e.g. "QUO-2026-1001" or "QUO-2026-1001-V2"
+  originalQuotationNumber String?         // Base quotation number, e.g. "QUO-2026-1001"
+  version                 Int             @default(1) // 1 for V1, 2 for V2, 3 for V3...
+  revisionNumber          Int             @default(1)
+  revisionName            String?         @default("V1") // "V1", "V2", "V3"...
+  isLatest                Boolean         @default(true)
+  projectName             String?         // Project name
+  revisionNotes           String?         // Notes/reason for revision
+  parentQuotationId       String?         // Reference to parent/original Quotation
+  parentQuotation         Quotation?      @relation("QuotationRevisions", fields: [parentQuotationId], references: [id], onDelete: Cascade)
+  revisions               Quotation[]     @relation("QuotationRevisions")
+  contactId               String?         // Reference to CRM Contact
+  contactName             String
+  contactEmail            String?
+  contactPhone            String?
+  companyName             String?
+  clientGst               String?
+  clientAddress           String?
+  leadId                  String?         // Reference to CRM Lead
+  quotationDate           String          // YYYY-MM-DD
+  validUntil              String          // YYYY-MM-DD
+  status                  String          @default("Draft") // "Draft" | "Sent" | "Accepted" | "Rejected" | "Changes Required" | "Superseded" | "Expired"
+  currency                String          @default("INR")
+  subtotal                Float           @default(0)
+  discountType            String          @default("percentage") // "percentage" | "fixed"
+  discountValue           Float           @default(0)
+  discountAmount          Float           @default(0)
+  taxAmount               Float           @default(0)
+  grandTotal              Float           @default(0)
+  paymentTerms            String?         @default("Net 30")
+  notes                   String?
+  termsConditions         String?
+  salesOwnerId            String?
+  salesOwnerName          String?
+  convertedToOrderId      String?         // ID of SalesOrder converted to
+  convertedAt             DateTime?
+  sentAt                  DateTime?
+  acceptedAt              DateTime?
+  supersededAt            DateTime?
+  items                   QuotationItem[]
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
 }
 
 model QuotationItem {
@@ -461,6 +549,7 @@ model Proposal {
   documentSize    String?
   notes           String?
   terms           String?
+  rejectionReason String?
   items           ProposalItem[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -821,4 +910,173 @@ model Contract {
 
   @@map("contracts")
 }
+
+// =============================================================================
+// ACTIVITY TIMELINE ENTITY
+// =============================================================================
+
+model Activity {
+  id             String   @id @default(uuid())
+  activityNumber String?  @unique // e.g. "ACT-2026-1001"
+  type           String   // "meeting" | "proposal" | "quotation" | "contract" | "invoice" | "payment" | "progress" | "closure" | "negotiation"
+  title          String   // e.g. "Meeting Scheduled", "Quotation Sent", "Contract Signed"
+  description    String?  // Summary details of activity
+  leadId         String?  // Linked Lead ID
+  leadName       String?  // Linked Lead Name
+  leadCode       String?  // Linked Lead Code e.g. "LDN-2026-041"
+  customerId     String?  // Linked Customer ID
+  customerName   String?  // Linked Customer or Client Company Name
+  contactId      String?  // Linked Contact ID
+  contactName    String?  // Linked Contact Name
+  entityId       String?  // Source entity ID (meetingId, quotationId, etc.)
+  entityType     String?  // "Meeting" | "Quotation" | "Proposal" | "Contract" | "Invoice" | "Payment" | "Project" | "Lead" | "Negotiation"
+  entityNumber   String?  // Reference code e.g. "QTN-2026-015", "CNT-2026-008"
+  status         String?  // Status e.g. "Scheduled", "Sent", "Signed", "Created", "Received", "Handover", "Won", "Lost"
+  amount         Float?   @default(0)
+  performedBy    String?  // Performed by employee name e.g. "Priya M"
+  performedById  String?  // Performed by employee/user ID
+  activityDate   String   // YYYY-MM-DD
+  activityTime   String?  // e.g. "10:30 AM"
+  metadata       Json?    @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([type])
+  @@index([leadId])
+  @@index([customerId])
+  @@index([activityDate])
+  @@map("activities")
+}
+
+model SupportTicket {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketNumber          String    @unique @map("ticket_number") @db.VarChar(64)
+  subject               String    @db.VarChar(255)
+  description           String    @db.Text
+  source                String    @default("Customer") @db.VarChar(50)
+  customerId            String?   @map("customer_id") @db.VarChar(64)
+  contactId             String?   @map("contact_id") @db.VarChar(64)
+  contactName           String?   @map("contact_name") @db.VarChar(128)
+  projectId             String?   @map("project_id") @db.VarChar(64)
+  handoverId            String?   @map("handover_id") @db.VarChar(128)
+  contractId            String?   @map("contract_id") @db.VarChar(64)
+  affectedModule        String?   @map("affected_module") @db.VarChar(128)
+  issueType             String    @default("Bug") @map("issue_type") @db.VarChar(64)
+  priority              String    @default("Medium") @db.VarChar(32)
+  status                String    @default("New") @db.VarChar(32)
+  assignedTeam          String?   @map("assigned_team") @db.VarChar(128)
+  assignedTo            String?   @map("assigned_to") @db.VarChar(64)
+  teamLeadId            String?   @map("team_lead_id") @db.VarChar(64)
+  qaAssignedTo          String?   @map("qa_assigned_to") @db.VarChar(64)
+  reportedBy            String    @map("reported_by") @db.VarChar(128)
+  reportedById          String?   @map("reported_by_id") @db.VarChar(64)
+  reportedAt            DateTime  @default(now()) @map("reported_at") @db.Timestamptz
+  firstResponseAt       DateTime? @map("first_response_at") @db.Timestamptz
+  firstResponseDueAt    DateTime? @map("first_response_due_at") @db.Timestamptz
+  resolutionDueAt       DateTime? @map("resolution_due_at") @db.Timestamptz
+  resolvedAt            DateTime? @map("resolved_at") @db.Timestamptz
+  closedAt              DateTime? @map("closed_at") @db.Timestamptz
+  reopenedCount         Int       @default(0) @map("reopened_count")
+  stepsToReproduce      String?   @map("steps_to_reproduce") @db.Text
+  expectedResult        String?   @map("expected_result") @db.Text
+  actualResult          String?   @map("actual_result") @db.Text
+  environment           String?   @default("Production") @db.VarChar(64)
+  browserDevice         String?   @map("browser_device") @db.VarChar(128)
+  errorMessage          String?   @map("error_message") @db.Text
+  rootCause             String?   @map("root_cause") @db.Text
+  workaround            String?   @map("workaround") @db.Text
+  resolutionDescription String?   @map("resolution_description") @db.Text
+  createdBy             String?   @map("created_by") @db.VarChar(64)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status], map: "idx_support_tickets_status")
+  @@index([priority], map: "idx_support_tickets_priority")
+  @@index([customerId], map: "idx_support_tickets_customer")
+  @@index([projectId], map: "idx_support_tickets_project")
+  @@index([assignedTo], map: "idx_support_tickets_assigned_to")
+  @@map("support_tickets")
+}
+
+model SupportTicketAttachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId   String   @map("ticket_id") @db.Uuid
+  fileName   String   @map("file_name") @db.VarChar(255)
+  filePath   String   @map("file_path") @db.VarChar(512)
+  mimeType   String?  @map("mime_type") @db.VarChar(128)
+  fileSize   BigInt?  @map("file_size")
+  uploadedBy String?  @map("uploaded_by") @db.VarChar(128)
+  uploadedById String? @map("uploaded_by_id") @db.VarChar(64)
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_ticket_attachments_ticket_id")
+  @@map("support_ticket_attachments")
+}
+
+model SupportTicketHistory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId    String   @map("ticket_id") @db.Uuid
+  action      String   @db.VarChar(64)
+  fieldName   String?  @map("field_name") @db.VarChar(64)
+  oldValue    String?  @map("old_value") @db.Text
+  newValue    String?  @map("new_value") @db.Text
+  reason      String?  @db.Text
+  performedBy String   @map("performed_by") @db.VarChar(128)
+  performedById String? @map("performed_by_id") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_ticket_history_ticket_id")
+  @@map("support_ticket_history")
+}
+
+model SupportTicketAssignment {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId         String    @map("ticket_id") @db.Uuid
+  team             String?   @db.VarChar(128)
+  assignedTo       String?   @map("assigned_to") @db.VarChar(64)
+  assignedToName   String?   @map("assigned_to_name") @db.VarChar(128)
+  assignedBy       String?   @map("assigned_by") @db.VarChar(64)
+  assignedByName   String?   @map("assigned_by_name") @db.VarChar(128)
+  assignedAt       DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  unassignedAt     DateTime? @map("unassigned_at") @db.Timestamptz
+  assignmentReason String?   @map("assignment_reason") @db.Text
+
+  @@index([ticketId], map: "idx_ticket_assignments_ticket_id")
+  @@map("support_ticket_assignments")
+}
+
+model SupportTicketComment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId    String   @map("ticket_id") @db.Uuid
+  type        String   @default("public_reply") @db.VarChar(32)
+  message     String   @db.Text
+  authorId    String?  @map("author_id") @db.VarChar(64)
+  authorName  String   @map("author_name") @db.VarChar(128)
+  authorRole  String?  @map("author_role") @db.VarChar(64)
+  attachments Json?    @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_ticket_comments_ticket_id")
+  @@map("support_ticket_comments")
+}
+
+model SupportTicketTask {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId     String    @map("ticket_id") @db.Uuid
+  refNumber    String    @default("TSK-01") @map("ref_number") @db.VarChar(32)
+  taskName     String    @map("task_name") @db.VarChar(255)
+  assignedTo   String?   @map("assigned_to") @db.VarChar(128)
+  assignedToId String?   @map("assigned_to_id") @db.VarChar(64)
+  targetDate   String?   @map("target_date") @db.VarChar(32)
+  priority     String    @default("Medium") @db.VarChar(32)
+  status       String    @default("Pending") @db.VarChar(32)
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_support_ticket_tasks_ticket_id")
+  @@map("support_ticket_tasks")
+}
+
 

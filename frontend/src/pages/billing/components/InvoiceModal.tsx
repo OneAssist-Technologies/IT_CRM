@@ -49,7 +49,9 @@ import { Invoice, InvoiceItem, BillingProduct, SalesOrder, BillingMilestone, Bil
 import { billingService } from '../../../services/billingService';
 import { contactService } from '../../../services/contactService';
 import { projectService } from '../../../services/projectService';
+import { settingsService } from '../../../services/settingsService';
 import { Project, ProjectModuleItem } from '../../../types/project';
+import { MasterProject } from '../../../types/settings';
 import { Contact } from '../../../types/contact';
 import { Lead } from '../../../types/lead';
 
@@ -58,19 +60,63 @@ interface ParsedModule {
   description: string;
 }
 
-const getProductModules = (product?: BillingProduct | null): ParsedModule[] => {
-  if (!product || !product.modules || !Array.isArray(product.modules)) return [];
-  return product.modules
-    .map((m: any) => {
-      if (typeof m === 'string') {
-        return { name: m, description: '' };
+const getProductModules = (
+  product?: BillingProduct | null,
+  availableProjectsList: { name: string; modules?: any }[] = []
+): ParsedModule[] => {
+  if (!product) return [];
+  let rawModules: any = product.modules;
+  if (typeof rawModules === 'string') {
+    try {
+      rawModules = JSON.parse(rawModules);
+    } catch {
+      rawModules = [];
+    }
+  }
+  if (Array.isArray(rawModules) && rawModules.length > 0) {
+    return rawModules
+      .map((m: any) => {
+        if (typeof m === 'string') {
+          return { name: m, description: '' };
+        }
+        return {
+          name: m?.name || '',
+          description: m?.description || '',
+        };
+      })
+      .filter((m) => m.name && m.name.trim() !== '');
+  }
+
+  // Fallback: check matching project / master project by name
+  if (availableProjectsList && availableProjectsList.length > 0) {
+    const matched = availableProjectsList.find(
+      (p) => p.name && p.name.toLowerCase() === product.name.toLowerCase()
+    );
+    if (matched) {
+      let mods: any = matched.modules;
+      if (typeof mods === 'string') {
+        try {
+          mods = JSON.parse(mods);
+        } catch {
+          mods = [];
+        }
       }
-      return {
-        name: m?.name || '',
-        description: m?.description || '',
-      };
-    })
-    .filter((m) => m.name && m.name.trim() !== '');
+      if (Array.isArray(mods) && mods.length > 0) {
+        return mods
+          .map((m: any) => {
+            if (typeof m === 'string') return { name: m, description: '' };
+            return { name: m?.name || '', description: m?.description || '' };
+          })
+          .filter((m) => m.name && m.name.trim() !== '');
+      }
+    }
+  }
+
+  if (product && product.name) {
+    return [{ name: product.name, description: product.description || '' }];
+  }
+
+  return [];
 };
 
 const INDIAN_STATES = [
@@ -239,24 +285,26 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [products, setProducts] = useState<BillingProduct[]>([]);
   const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [masterProjects, setMasterProjects] = useState<MasterProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isManualProject, setIsManualProject] = useState<boolean>(false);
   const [billingSettings, setBillingSettings] = useState<BillingSettings | null>(null);
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
   const [customRowIndices, setCustomRowIndices] = useState<number[]>([]);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState<boolean>(false);
 
   // 1. Scenario: Project Billing vs Standard Product
   const [scenario, setScenario] = useState<'project' | 'standard'>('project');
 
   // Company Information (Seller) - Pre-loaded from settings in background
-  const [companyName, setCompanyName] = useState<string>('OmniTech Solutions Pvt Ltd');
-  const [companyGstin, setCompanyGstin] = useState<string>('33AAAAA0000A1Z5');
-  const [companyPincode, setCompanyPincode] = useState<string>('600001');
-  const [companyCity, setCompanyCity] = useState<string>('Chennai');
-  const [companyState, setCompanyState] = useState<string>('Tamil Nadu');
-  const [companyAddress, setCompanyAddress] = useState<string>('Tech Boulevard, Guindy Industrial Estate');
-  const [companyPhone, setCompanyPhone] = useState<string>('+91 98458 64510');
-  const [companyEmail, setCompanyEmail] = useState<string>('billing@omnitech.com');
+  const [companyName, setCompanyName] = useState<string>('OneAssist Technologies');
+  const [companyGstin, setCompanyGstin] = useState<string>('');
+  const [companyPincode, setCompanyPincode] = useState<string>('');
+  const [companyCity, setCompanyCity] = useState<string>('');
+  const [companyState, setCompanyState] = useState<string>('');
+  const [companyAddress, setCompanyAddress] = useState<string>('');
+  const [companyPhone, setCompanyPhone] = useState<string>('');
+  const [companyEmail, setCompanyEmail] = useState<string>('');
 
   // Invoice Details
   const [invoiceNumber, setInvoiceNumber] = useState<string>('');
@@ -279,12 +327,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [clientGst, setClientGst] = useState<string>('');
 
   // Bank Details - Pre-loaded from settings in background
-  const [bankAccountHolder, setBankAccountHolder] = useState<string>('OmniTech Solutions Pvt Ltd');
-  const [bankAccountNumber, setBankAccountNumber] = useState<string>('50200012345678');
-  const [bankIfsc, setBankIfsc] = useState<string>('HDFC0001234');
-  const [bankName, setBankName] = useState<string>('HDFC Bank');
-  const [bankBranch, setBankBranch] = useState<string>('Guindy Branch, Chennai');
-  const [bankUpi, setBankUpi] = useState<string>('omnitech@okhdfcbank');
+  const [bankAccountHolder, setBankAccountHolder] = useState<string>('');
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>('');
+  const [bankIfsc, setBankIfsc] = useState<string>('');
+  const [bankName, setBankName] = useState<string>('');
+  const [bankBranch, setBankBranch] = useState<string>('');
+  const [bankUpi, setBankUpi] = useState<string>('');
 
   // Additional IDs & Relations
   const [salesOrderId, setSalesOrderId] = useState<string>('');
@@ -314,20 +362,102 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     },
   ]);
 
-  const selectedCatalogueProduct = products.find((p) => p.id === selectedCatalogueId);
-  const selectedProductModules = getProductModules(selectedCatalogueProduct);
+  // Combined available projects list: from Project Management + Master Projects configured in Settings
+  const availableProjects = useMemo(() => {
+    const combined: {
+      id: string;
+      name: string;
+      modules?: any;
+      estimatedBudget?: number | null;
+      clientName?: string | null;
+      clientEmail?: string | null;
+      clientPhone?: string | null;
+    }[] = [];
+    const seenNames = new Set<string>();
 
-  // Resolves the selected Project from Project Management (only when explicitly chosen by user)
+    for (const p of projects) {
+      if (p.id && !seenNames.has(p.name.toLowerCase())) {
+        seenNames.add(p.name.toLowerCase());
+        combined.push(p);
+      }
+    }
+
+    for (const mp of masterProjects) {
+      if (mp.id && !seenNames.has(mp.name.toLowerCase())) {
+        seenNames.add(mp.name.toLowerCase());
+        combined.push({
+          id: mp.id,
+          name: mp.name,
+          modules: mp.modules,
+          estimatedBudget: mp.basePrice,
+        });
+      }
+    }
+    return combined;
+  }, [projects, masterProjects]);
+
+  const selectedCatalogueProduct = products.find((p) => p.id === selectedCatalogueId);
+  const selectedProductModules = useMemo(() => {
+    return getProductModules(selectedCatalogueProduct, availableProjects);
+  }, [selectedCatalogueProduct, availableProjects]);
+
+  // Resolves the selected Project from Project Management or Master Projects
   const selectedProject = useMemo(() => {
     if (selectedProjectId) {
-      return projects.find((p) => p.id === selectedProjectId) || null;
+      const found = availableProjects.find((p) => p.id === selectedProjectId);
+      if (found) return found;
+    }
+    if (projectTitle && projectTitle.trim()) {
+      const titleLower = projectTitle.trim().toLowerCase();
+      const found = availableProjects.find(
+        (p) =>
+          p.name.toLowerCase() === titleLower ||
+          titleLower.includes(p.name.toLowerCase()) ||
+          p.name.toLowerCase().includes(titleLower)
+      );
+      if (found) return found;
+    }
+    if (selectedCatalogueProduct) {
+      const found = availableProjects.find(
+        (p) => p.name.toLowerCase() === selectedCatalogueProduct.name.toLowerCase()
+      );
+      if (found) return found;
     }
     return null;
-  }, [selectedProjectId, projects]);
+  }, [selectedProjectId, projectTitle, selectedCatalogueProduct, availableProjects]);
 
   const selectedProjectModules: ProjectModuleItem[] = useMemo(() => {
-    if (!selectedProject || !Array.isArray(selectedProject.modules)) return [];
-    return selectedProject.modules;
+    if (!selectedProject) return [];
+    let mods: any = selectedProject.modules;
+    if (typeof mods === 'string') {
+      try {
+        mods = JSON.parse(mods);
+      } catch {
+        mods = [];
+      }
+    }
+    if (!Array.isArray(mods)) return [];
+    return mods
+      .map((m: any, idx: number) => {
+        if (typeof m === 'string') {
+          return {
+            id: `mod-${idx}`,
+            name: m,
+            description: '',
+            progress: 0,
+            status: 'Not Started' as const,
+          };
+        }
+        return {
+          id: m.id || `mod-${idx}`,
+          name: m.name || '',
+          description: m.description || '',
+          price: m.price ? Number(m.price) : undefined,
+          progress: typeof m.progress === 'number' ? m.progress : 0,
+          status: (m.status || 'Not Started') as ProjectModuleItem['status'],
+        };
+      })
+      .filter((m: any) => m.name && m.name.trim() !== '');
   }, [selectedProject]);
 
   const handleSelectProject = (projId: string | null) => {
@@ -336,7 +466,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setProjectTitle('');
       return;
     }
-    const found = projects.find((p) => p.id === projId);
+    const found = availableProjects.find((p) => p.id === projId);
     if (found) {
       setProjectTitle(found.name);
 
@@ -351,33 +481,53 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         setClientPhone(found.clientPhone);
       }
 
+      let modCount = 0;
+      if (Array.isArray(found.modules)) {
+        modCount = found.modules.length;
+      } else if (typeof found.modules === 'string') {
+        try {
+          modCount = JSON.parse(found.modules).length;
+        } catch {}
+      }
+
       notifications.show({
         color: 'indigo',
         title: `Project: ${found.name}`,
-        message: `${found.modules?.length || 0} module(s) available for line items.`,
+        message: `${modCount} module(s) available for line items.`,
       });
     }
   };
 
-  const handleAddAllProjectModules = (proj: Project) => {
-    if (!proj.modules || proj.modules.length === 0) {
+  const handleAddAllProjectModules = (proj: any) => {
+    let mods: any = proj.modules;
+    if (typeof mods === 'string') {
+      try {
+        mods = JSON.parse(mods);
+      } catch {
+        mods = [];
+      }
+    }
+    if (!Array.isArray(mods) || mods.length === 0) {
       notifications.show({ color: 'yellow', message: 'No modules found for this project in Project Management' });
       return;
     }
 
     const unitBudget =
       proj.estimatedBudget && proj.estimatedBudget > 0
-        ? Math.round(proj.estimatedBudget / proj.modules.length)
+        ? Math.round(proj.estimatedBudget / mods.length)
         : (items[0]?.unitPrice && items[0]?.unitPrice > 0 ? items[0].unitPrice : 0);
 
-    const newItems: InvoiceItem[] = proj.modules.map((m) => {
-      const price = unitBudget;
+    const newItems: InvoiceItem[] = mods.map((m: any) => {
+      const mName = typeof m === 'string' ? m : m.name;
+      const mDesc = typeof m === 'string' ? '' : m.description;
+      const mPrice = typeof m !== 'string' && m.price && Number(m.price) > 0 ? Number(m.price) : unitBudget;
+      const price = mPrice;
       const tax = Number(((price * 18) / 100).toFixed(2));
       const total = Number((price + tax).toFixed(2));
       return {
-        itemName: m.name,
+        itemName: mName,
         itemType: 'Service',
-        description: m.description || `Project scope deliverables & milestone deployment for ${m.name} (${proj.name})`,
+        description: mDesc || `Project scope deliverables & milestone deployment for ${mName} (${proj.name})`,
         hsnCode: '998314',
         quantity: 1,
         unit: 'Nos',
@@ -407,7 +557,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     );
   };
 
-  // Load Contacts, Products, Projects, Orders, and Settings in background
+  // Load Contacts, Products, Projects, Master Projects, Orders, and Settings in background
   useEffect(() => {
     if (opened) {
       contactService.getContacts({ limit: 100 }).then((res) => {
@@ -417,6 +567,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       projectService.getProjects({ limit: 100 }).then((res) => {
         if (res?.data && Array.isArray(res.data)) {
           setProjects(res.data);
+        }
+      }).catch(() => {});
+
+      settingsService.getMasterProjects().then((res) => {
+        if (res && res.success && Array.isArray(res.data)) {
+          setMasterProjects(res.data);
         }
       }).catch(() => {});
 
@@ -431,17 +587,17 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       billingService.getSettings().then((s) => {
         if (s) {
           setBillingSettings(s);
-          if (s.companyName) setCompanyName(s.companyName);
-          if (s.companyGst) setCompanyGstin(s.companyGst);
-          if (s.companyAddress) setCompanyAddress(s.companyAddress);
-          if (s.companyPhone) setCompanyPhone(s.companyPhone);
-          if (s.companyEmail) setCompanyEmail(s.companyEmail);
-          if (s.accountHolderName) setBankAccountHolder(s.accountHolderName);
-          if (s.accountNumber) setBankAccountNumber(s.accountNumber);
-          if (s.ifscCode) setBankIfsc(s.ifscCode);
-          if (s.bankName) setBankName(s.bankName);
-          if (s.branchName) setBankBranch(s.branchName);
-          if (s.upiId) setBankUpi(s.upiId);
+          setCompanyName(s.companyName || 'OneAssist Technologies');
+          setCompanyGstin(s.companyGst || '');
+          setCompanyAddress(s.companyAddress || '');
+          setCompanyPhone(s.companyPhone || '');
+          setCompanyEmail(s.companyEmail || '');
+          setBankAccountHolder(s.accountHolderName || '');
+          setBankAccountNumber(s.accountNumber || '');
+          setBankIfsc(s.ifscCode || '');
+          setBankName(s.bankName || '');
+          setBankBranch(s.branchName || '');
+          setBankUpi(s.upiId || '');
         }
       }).catch(() => {});
     }
@@ -561,8 +717,31 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             : '')
       );
       setPlaceOfSupply(initialLead.registeredState || matchedContact?.registeredState || 'Tamil Nadu');
-      setSelectedProjectId(null);
-      setProjectTitle('');
+
+      const leadItem =
+        initialLead.product ||
+        initialLead.service ||
+        initialLead.productList?.[0] ||
+        initialLead.serviceList?.[0];
+
+      if (leadItem) {
+        setProjectTitle(leadItem);
+        const matched = availableProjects.find(
+          (p) =>
+            p.name.toLowerCase() === leadItem.toLowerCase() ||
+            p.name.toLowerCase().includes(leadItem.toLowerCase()) ||
+            leadItem.toLowerCase().includes(p.name.toLowerCase())
+        );
+        if (matched) {
+          setSelectedProjectId(matched.id);
+        } else {
+          setSelectedProjectId(null);
+        }
+      } else {
+        setSelectedProjectId(null);
+        setProjectTitle('');
+      }
+
       setInvoiceDate(new Date().toISOString().split('T')[0]);
       setDueDate(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
       setStatus('Issued');
@@ -631,6 +810,31 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
   }, [invoice, defaultMilestone, defaultSalesOrderId, initialLead, contacts, opened]);
 
+  // Reactive auto-matching when availableProjects loads asynchronously for an initialLead
+  useEffect(() => {
+    if (initialLead && !selectedProjectId && availableProjects.length > 0) {
+      const leadItem =
+        initialLead.product ||
+        initialLead.service ||
+        initialLead.productList?.[0] ||
+        initialLead.serviceList?.[0];
+      if (leadItem) {
+        const matched = availableProjects.find(
+          (p) =>
+            p.name.toLowerCase() === leadItem.toLowerCase() ||
+            p.name.toLowerCase().includes(leadItem.toLowerCase()) ||
+            leadItem.toLowerCase().includes(p.name.toLowerCase())
+        );
+        if (matched) {
+          setSelectedProjectId(matched.id);
+          if (!projectTitle.trim()) {
+            setProjectTitle(matched.name);
+          }
+        }
+      }
+    }
+  }, [initialLead, availableProjects, selectedProjectId, projectTitle]);
+
   const handleSelectContact = (val: string | null) => {
     setContactId(val || '');
     if (!val) return;
@@ -671,7 +875,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     const seen = new Set<string>();
     const options: { value: string; label: string }[] = [];
 
-    // 1. Modules from Selected Project Management Project (clean label, no project suffix or emoji)
+    // 1. Modules from Selected Project (clean label, highest priority)
     if (selectedProject && selectedProjectModules.length > 0) {
       for (const m of selectedProjectModules) {
         if (m.name && !seen.has(m.name)) {
@@ -679,36 +883,56 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           options.push({ value: m.name, label: m.name });
         }
       }
-    } else {
-      // 2. Modules from Projects in Project Management
-      for (const prj of projects) {
-        if (Array.isArray(prj.modules)) {
-          for (const m of prj.modules) {
-            if (m.name && !seen.has(m.name)) {
-              seen.add(m.name);
-              options.push({ value: m.name, label: `${m.name} (${prj.name})` });
-            }
+    }
+
+    // 2. Modules from Selected Catalogue Product
+    if (selectedCatalogueProduct && selectedProductModules.length > 0) {
+      for (const m of selectedProductModules) {
+        if (m.name && !seen.has(m.name)) {
+          seen.add(m.name);
+          options.push({ value: m.name, label: m.name });
+        }
+      }
+    }
+
+    // 3. Products & Services directly from Catalogue (Highest Utility)
+    for (const p of products) {
+      if (p.name && !seen.has(p.name)) {
+        seen.add(p.name);
+        options.push({ value: p.name, label: `${p.name} (${p.type || 'Product'})` });
+      }
+    }
+
+    // 4. Modules from other available projects (Master Projects + Delivery Projects)
+    for (const prj of availableProjects) {
+      if (selectedProject && prj.id === selectedProject.id) continue;
+      let mods: any = prj.modules;
+      if (typeof mods === 'string') {
+        try {
+          mods = JSON.parse(mods);
+        } catch {
+          mods = [];
+        }
+      }
+      if (Array.isArray(mods)) {
+        for (const m of mods) {
+          const mName = typeof m === 'string' ? m : m?.name;
+          if (mName && !seen.has(mName)) {
+            seen.add(mName);
+            options.push({ value: mName, label: `${mName} (${prj.name})` });
           }
         }
       }
+    }
 
-      // 3. Modules from Catalogue
-      if (selectedCatalogueProduct && selectedProductModules.length > 0) {
-        for (const m of selectedProductModules) {
-          if (m.name && !seen.has(m.name)) {
-            seen.add(m.name);
-            options.push({ value: m.name, label: `${m.name} (${selectedCatalogueProduct.name})` });
-          }
-        }
-      } else {
-        for (const p of products) {
-          const mods = getProductModules(p);
-          for (const m of mods) {
-            if (m.name && !seen.has(m.name)) {
-              seen.add(m.name);
-              options.push({ value: m.name, label: `${m.name} (${p.name})` });
-            }
-          }
+    // 5. Modules from Catalogue
+    for (const p of products) {
+      if (selectedCatalogueProduct && p.id === selectedCatalogueProduct.id) continue;
+      const mods = getProductModules(p, availableProjects);
+      for (const m of mods) {
+        if (m.name && !seen.has(m.name)) {
+          seen.add(m.name);
+          options.push({ value: m.name, label: `${m.name} (${p.name})` });
         }
       }
     }
@@ -761,13 +985,22 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     // 1. Check selected project modules
     let matchedProjectMod = selectedProjectModules.find((m) => m.name === val);
 
-    // 2. Check other projects
+    // 2. Check all available projects (Master Projects and Delivery Projects)
     if (!matchedProjectMod) {
-      for (const prj of projects) {
-        if (Array.isArray(prj.modules)) {
-          const mod = prj.modules.find((m) => m.name === val);
+      for (const prj of availableProjects) {
+        let mods: any = prj.modules;
+        if (typeof mods === 'string') {
+          try {
+            mods = JSON.parse(mods);
+          } catch {
+            mods = [];
+          }
+        }
+        if (Array.isArray(mods)) {
+          const mod = mods.find((m: any) => (typeof m === 'string' ? m : m.name) === val);
           if (mod) {
-            matchedProjectMod = mod;
+            matchedProjectMod =
+              typeof mod === 'string' ? { id: mod, name: mod, description: '' } : mod;
             break;
           }
         }
@@ -788,7 +1021,17 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       if (mod) foundDesc = mod.description;
     } else {
       for (const p of products) {
-        const mods = getProductModules(p);
+        if (p.name === val) {
+          foundProdId = p.id;
+          foundProdType = p.type;
+          foundTaxRate = Number(p.taxRate) || 18;
+          foundDesc = p.description || '';
+          if (p.unitPrice && Number(p.unitPrice) > 0) {
+            foundPrice = Number(p.unitPrice);
+          }
+          break;
+        }
+        const mods = getProductModules(p, availableProjects);
         const mod = mods.find((m) => m.name === val);
         if (mod) {
           foundProdId = p.id;
@@ -1016,15 +1259,97 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setHasAttemptedSubmit(true);
+
     if (!clientName.trim()) {
-      notifications.show({ color: 'red', message: 'Client or Receiver Name is required' });
+      notifications.show({
+        color: 'red',
+        title: 'Customer Name Required',
+        message: 'Customer / Client Name is mandatory (*). Please enter or select a customer name.',
+      });
       return;
     }
-    const validItems = items.filter((it) => it.itemName && it.itemName.trim().length > 0);
-    if (validItems.length === 0) {
-      notifications.show({ color: 'red', message: 'Please add at least one line item with a name' });
+
+    if (!projectTitle.trim() && !selectedProjectId) {
+      notifications.show({
+        color: 'red',
+        title: 'Project Title Required',
+        message: 'Project Title is mandatory (*). Please select a project or enter a title.',
+      });
       return;
     }
+
+    if (!invoiceDate || !invoiceDate.trim()) {
+      notifications.show({
+        color: 'red',
+        title: 'Invoice Date Required',
+        message: 'Date of Invoice is mandatory (*). Please choose an invoice date.',
+      });
+      return;
+    }
+
+    if (!dueDate || !dueDate.trim()) {
+      notifications.show({
+        color: 'red',
+        title: 'Due Date Required',
+        message: 'Payment Due Date is mandatory (*). Please choose a payment due date.',
+      });
+      return;
+    }
+
+    if (!items || items.length === 0) {
+      notifications.show({
+        color: 'red',
+        title: 'Line Item Required',
+        message: 'Please add at least one line item to the invoice.',
+      });
+      return;
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const rowNum = i + 1;
+      const name = it.itemName ? it.itemName.trim() : '';
+      const price = Number(it.unitPrice || 0);
+
+      if (!name) {
+        notifications.show({
+          color: 'red',
+          title: 'Item Name Required',
+          message: `Line Item #${rowNum}: Item Name / Service is mandatory (*). Please select from dropdown or click ✎ to type a custom name.`,
+        });
+        return;
+      }
+
+      if (price <= 0) {
+        notifications.show({
+          color: 'red',
+          title: 'Amount Required',
+          message: `Line Item #${rowNum} ("${name}"): Amount (₹) is mandatory (*) and must be greater than 0.`,
+        });
+        return;
+      }
+
+      if (scenario === 'standard' && (Number(it.quantity) || 0) <= 0) {
+        notifications.show({
+          color: 'red',
+          title: 'Quantity Required',
+          message: `Line Item #${rowNum} ("${name}"): Quantity must be at least 1.`,
+        });
+        return;
+      }
+    }
+
+    if (grandTotal <= 0) {
+      notifications.show({
+        color: 'red',
+        title: 'Invalid Grand Total',
+        message: 'Invoice Grand Total must be greater than ₹0.',
+      });
+      return;
+    }
+
+    const validItems = items;
 
     try {
       setSubmitting(true);
@@ -1307,6 +1632,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={clientName}
                       onChange={(e) => setClientName(e.currentTarget.value)}
                       required
+                      error={hasAttemptedSubmit && !clientName.trim() ? 'Customer name is required' : undefined}
                       size="xs"
                       radius="md"
                       leftSection={<IconUser size={14} color="#94A3B8" />}
@@ -1458,6 +1784,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                         placeholder="e.g. Venus Implementation"
                         value={projectTitle}
                         onChange={(e) => setProjectTitle(e.currentTarget.value)}
+                        error={hasAttemptedSubmit && !projectTitle.trim() ? 'Project Title is required' : undefined}
                         size="xs"
                         radius="md"
                         leftSection={<IconBriefcase size={14} color="#94A3B8" />}
@@ -1480,12 +1807,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           </Group>
                         }
                         placeholder="Select project..."
-                        data={projects.map((p) => ({
+                        data={availableProjects.map((p) => ({
                           value: p.id,
                           label: p.name,
                         }))}
                         value={selectedProjectId || null}
                         onChange={handleSelectProject}
+                        error={hasAttemptedSubmit && !selectedProjectId && !projectTitle.trim() ? 'Project Title is required' : undefined}
                         searchable
                         clearable
                         size="xs"
@@ -1501,6 +1829,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={parseDateString(invoiceDate)}
                       onChange={(d) => setInvoiceDate(formatDateToString(d))}
                       required
+                      error={hasAttemptedSubmit && !invoiceDate ? 'Date of Invoice is required' : undefined}
                       size="xs"
                       radius="md"
                       valueFormat="DD-MM-YYYY"
@@ -1516,6 +1845,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                       value={parseDateString(dueDate)}
                       onChange={(d) => handleDueDateChange(formatDateToString(d))}
                       required
+                      error={hasAttemptedSubmit && !dueDate ? 'Payment Due Date is required' : undefined}
                       size="xs"
                       radius="md"
                       valueFormat="DD-MM-YYYY"
@@ -1734,11 +2064,12 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               radius="sm"
                               style={{ flex: 1 }}
                               required
+                              error={hasAttemptedSubmit && (!item.itemName || !item.itemName.trim())}
                               autoFocus
                             />
                           ) : (
                             <Select
-                              placeholder="Select Module..."
+                              placeholder="Select Item or Module..."
                               data={getRowModuleOptions(item.itemName)}
                               value={item.itemName || null}
                               onChange={(val) => handleModuleSelect(idx, val)}
@@ -1747,7 +2078,11 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               size="xs"
                               radius="sm"
                               style={{ flex: 1 }}
-                              nothingFoundMessage="No matching module"
+                              error={
+                                (!item.itemName || !item.itemName.trim()) &&
+                                (Number(item.unitPrice || item.totalAmount || 0) > 0 || hasAttemptedSubmit)
+                              }
+                              nothingFoundMessage="No matching item (click ✎ pencil to type manually)"
                             />
                           )}
                           <ActionIcon
@@ -1771,6 +2106,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                               min={1}
                               size="xs"
                               radius="sm"
+                              error={hasAttemptedSubmit && Number(item.quantity || 0) <= 0}
                             />
                           </Table.Td>
                           <Table.Td>
@@ -1792,6 +2128,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                           min={0}
                           size="xs"
                           radius="sm"
+                          error={Number(item.unitPrice || 0) <= 0 && (hasAttemptedSubmit || !!item.itemName?.trim())}
                         />
                       </Table.Td>
                       <Table.Td>

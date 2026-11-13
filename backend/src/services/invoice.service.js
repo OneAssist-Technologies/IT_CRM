@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { io } from '../utils/socket.js';
+import { recordActivity } from './activity.service.js';
 
 /**
  * -----------------------------------------------------------------------------
@@ -15,19 +16,19 @@ export async function getBillingSettingsService() {
     settings = await prisma.billingSettings.create({
       data: {
         id: 'default_billing_settings',
-        companyName: 'OmniTech Solutions Pvt Ltd',
-        companyAddress: 'Tidel Park, Rajiv Gandhi Salai, Taramani, Chennai, Tamil Nadu 600113',
-        companyGst: '33AAAAA0000A1Z5',
-        companyPan: 'AAAAA0000A',
-        companyPhone: '+91 98765 43210',
-        companyEmail: 'billing@omnitech.io',
-        companyWebsite: 'https://omnitech.io',
-        bankName: 'HDFC Bank',
-        accountNumber: '50200012345678',
-        accountHolderName: 'OmniTech Solutions Pvt Ltd',
-        ifscCode: 'HDFC0001234',
-        branchName: 'Tidel Park Branch',
-        upiId: 'omnitech@hdfcbank',
+        companyName: 'OneAssist Technologies',
+        companyAddress: '',
+        companyGst: '',
+        companyPan: '',
+        companyPhone: '',
+        companyEmail: '',
+        companyWebsite: '',
+        bankName: '',
+        accountNumber: '',
+        accountHolderName: '',
+        ifscCode: '',
+        branchName: '',
+        upiId: '',
         invoicePrefix: 'INV-2026-',
         invoiceNextNumber: 1,
         quotationPrefix: 'QUO-2026-',
@@ -57,6 +58,20 @@ export async function getBillingSettingsService() {
 
   return {
     ...settings,
+    companyName: settings.companyName || profileVal.companyName || profileVal.legalName || 'OneAssist Technologies',
+    companyAddress: settings.companyAddress || profileVal.companyAddress || profileVal.address || '',
+    companyGst: settings.companyGst || profileVal.companyGst || profileVal.gstNumber || '',
+    companyPan: settings.companyPan || profileVal.companyPan || profileVal.panNumber || '',
+    companyPhone: settings.companyPhone || profileVal.companyPhone || profileVal.phone || '',
+    companyEmail: settings.companyEmail || profileVal.companyEmail || profileVal.email || '',
+    companyWebsite: settings.companyWebsite || profileVal.companyWebsite || profileVal.website || '',
+    companyLogoUrl: settings.companyLogoUrl || profileVal.companyLogoUrl || profileVal.logoUrl || '',
+    bankName: settings.bankName || profileVal.bankName || '',
+    accountNumber: settings.accountNumber || profileVal.accountNumber || '',
+    accountHolderName: settings.accountHolderName || profileVal.accountHolderName || '',
+    ifscCode: settings.ifscCode || profileVal.ifscCode || '',
+    branchName: settings.branchName || profileVal.branchName || '',
+    upiId: settings.upiId || profileVal.upiId || '',
     authorizedSignatory: profileVal.authorizedSignatory || 'Santhosh C',
     signatoryDesignation: profileVal.signatoryDesignation || 'Managing Director',
     signatureUrl: profileVal.signatureUrl || null,
@@ -156,6 +171,24 @@ export async function getProductsServicesService(query = {}) {
     orderBy: { createdAt: 'desc' },
   });
 
+  // Enrich products with modules from Master Project if empty
+  try {
+    const masters = await prisma.masterProject.findMany();
+    for (const item of items) {
+      const hasModules = Array.isArray(item.modules) && item.modules.length > 0;
+      if (!hasModules) {
+        const matched = masters.find(
+          (m) => m.name && m.name.toLowerCase() === item.name.toLowerCase()
+        );
+        if (matched && Array.isArray(matched.modules) && matched.modules.length > 0) {
+          item.modules = matched.modules;
+        }
+      }
+    }
+  } catch (err) {
+    // Non-blocking fallback
+  }
+
   return items;
 }
 
@@ -243,12 +276,9 @@ export async function deleteProductService(id, user) {
  * -----------------------------------------------------------------------------
  */
 export async function getQuotationsService(query = {}) {
-  const { status, search, contactId, leadId } = query;
+  const { status, search, contactId, leadId, flat } = query;
   const where = {};
 
-  if (status && status !== 'All') {
-    where.status = { equals: status, mode: 'insensitive' };
-  }
   if (contactId && contactId !== 'All') {
     where.contactId = contactId;
   }
@@ -259,25 +289,98 @@ export async function getQuotationsService(query = {}) {
     const q = search.trim();
     where.OR = [
       { quotationNumber: { contains: q, mode: 'insensitive' } },
+      { originalQuotationNumber: { contains: q, mode: 'insensitive' } },
       { contactName: { contains: q, mode: 'insensitive' } },
       { companyName: { contains: q, mode: 'insensitive' } },
+      { projectName: { contains: q, mode: 'insensitive' } },
       { notes: { contains: q, mode: 'insensitive' } },
     ];
   }
 
+  // If flat requested, return individual records
+  if (flat === 'true') {
+    if (status && status !== 'All') {
+      where.status = { equals: status, mode: 'insensitive' };
+    }
+    return await prisma.quotation.findMany({
+      where,
+      include: { items: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Hierarchical view: Find root quotations (parentQuotationId is null)
+  // and include all revisions ordered by version ascending
+  const rootWhere = {
+    ...where,
+    parentQuotationId: null,
+  };
+
   const quotes = await prisma.quotation.findMany({
-    where,
-    include: { items: true },
+    where: rootWhere,
+    include: {
+      items: true,
+      revisions: {
+        include: { items: true },
+        orderBy: { version: 'asc' },
+      },
+    },
     orderBy: { createdAt: 'desc' },
   });
 
-  return quotes;
+  // Normalize each quotation family
+  const formatted = quotes.map((q) => {
+    const childRevisions = q.revisions || [];
+    // The family includes parent (as V1) and all child revisions (V2, V3...)
+    const allRevisions = [q, ...childRevisions].sort((a, b) => (a.version || 1) - (b.version || 1));
+    const latestRevision = allRevisions[allRevisions.length - 1] || q;
+
+    return {
+      ...q,
+      allRevisions,
+      latestVersion: latestRevision.version || 1,
+      latestRevisionName: latestRevision.revisionName || `V${latestRevision.version || 1}`,
+      latestGrandTotal: latestRevision.grandTotal,
+      latestStatus: latestRevision.status,
+      latestQuotationDate: latestRevision.quotationDate,
+      latestQuotationId: latestRevision.id,
+      latestQuotationNumber: latestRevision.quotationNumber,
+      projectName: latestRevision.projectName || q.projectName || null,
+      revisionCount: allRevisions.length,
+      hasRevisions: allRevisions.length > 1,
+    };
+  });
+
+  // Filter by status if provided (match against latest or root status)
+  if (status && status !== 'All') {
+    const sLow = status.toLowerCase();
+    return formatted.filter((f) => 
+      f.latestStatus?.toLowerCase() === sLow || f.status?.toLowerCase() === sLow
+    );
+  }
+
+  return formatted;
 }
 
 export async function getQuotationByIdService(id) {
   const quote = await prisma.quotation.findFirst({
     where: { OR: [{ id }, { quotationNumber: id }] },
-    include: { items: true },
+    include: {
+      items: true,
+      revisions: {
+        include: { items: true },
+        orderBy: { version: 'asc' },
+      },
+      parentQuotation: {
+        include: {
+          items: true,
+          revisions: {
+            include: { items: true },
+            orderBy: { version: 'asc' },
+          },
+        },
+      },
+    },
   });
 
   if (!quote) {
@@ -286,7 +389,27 @@ export async function getQuotationByIdService(id) {
     throw err;
   }
 
-  return quote;
+  // Extract all revisions in the family
+  let allRevisions = [];
+  if (quote.parentQuotation) {
+    const root = quote.parentQuotation;
+    allRevisions = [root, ...(root.revisions || [])].sort((a, b) => (a.version || 1) - (b.version || 1));
+  } else {
+    allRevisions = [quote, ...(quote.revisions || [])].sort((a, b) => (a.version || 1) - (b.version || 1));
+  }
+
+  const latest = allRevisions[allRevisions.length - 1] || quote;
+
+  return {
+    ...quote,
+    allRevisions,
+    latestVersion: latest.version || 1,
+    latestRevisionName: latest.revisionName || `V${latest.version || 1}`,
+    latestGrandTotal: latest.grandTotal,
+    latestStatus: latest.status,
+    revisionCount: allRevisions.length,
+    hasRevisions: allRevisions.length > 1,
+  };
 }
 
 export async function createQuotationService(data, user) {
@@ -353,6 +476,13 @@ export async function createQuotationService(data, user) {
   const quote = await prisma.quotation.create({
     data: {
       quotationNumber,
+      originalQuotationNumber: quotationNumber,
+      version: 1,
+      revisionNumber: 1,
+      revisionName: 'V1',
+      isLatest: true,
+      projectName: data.projectName?.trim() || null,
+      parentQuotationId: null,
       contactId: data.contactId || null,
       contactName: data.contactName.trim(),
       contactEmail: data.contactEmail ? data.contactEmail.trim() : null,
@@ -384,6 +514,25 @@ export async function createQuotationService(data, user) {
   });
 
   await logBillingAudit('Quotation', quote.id, quote.quotationNumber, 'CREATED', user?.name || user?.email || 'User', `Created quote for ₹${quote.grandTotal}`);
+
+  // Automatically record activity in timeline
+  try {
+    const amountStr = quote.grandTotal ? ` · ₹ ${Math.round(quote.grandTotal).toLocaleString('en-IN')}` : '';
+    await recordActivity({
+      type: 'proposal',
+      title: quote.status === 'Accepted' ? 'Quotation Accepted' : 'Quotation Sent',
+      description: `Quotation #${quote.quotationNumber}${amountStr} · ${quote.status || 'Awaiting Client'}`,
+      leadId: quote.leadId,
+      customerName: quote.companyName || quote.contactName,
+      entityId: quote.id,
+      entityType: 'Quotation',
+      entityNumber: quote.quotationNumber,
+      amount: quote.grandTotal || 0,
+      status: quote.status || 'Sent',
+      performedBy: user?.name || quote.salesOwnerName || 'Staff',
+      activityDate: quote.quotationDate,
+    });
+  } catch (_) {}
 
   return quote;
 }
@@ -517,6 +666,274 @@ export async function deleteQuotationService(id, user) {
 }
 
 /**
+ * Create a new linked Revision for a Quotation (V2, V3, etc.)
+ */
+export async function createQuotationRevisionService(id, data = {}, user) {
+  // Find source quotation
+  const source = await prisma.quotation.findFirst({
+    where: { OR: [{ id }, { quotationNumber: id }] },
+    include: { items: true },
+  });
+
+  if (!source) {
+    const err = new Error('Original quotation record not found.');
+    err.status = 404;
+    throw err;
+  }
+
+  // Determine root quotation: if source has parentQuotationId, root is parent; else source is root
+  const rootId = source.parentQuotationId || source.id;
+  const root = await prisma.quotation.findUnique({
+    where: { id: rootId },
+    include: { revisions: true },
+  });
+
+  if (!root) {
+    const err = new Error('Root quotation record not found.');
+    err.status = 404;
+    throw err;
+  }
+
+  // All existing versions in family
+  const family = [root, ...(root.revisions || [])];
+  const maxVersion = Math.max(...family.map((q) => q.version || 1), 1);
+  const nextVersion = maxVersion + 1;
+  const revisionName = `V${nextVersion}`;
+  const baseQuotationNumber = root.originalQuotationNumber || root.quotationNumber;
+  const revisionQuotationNumber = `${baseQuotationNumber}-V${nextVersion}`;
+
+  // Line Items: use data.items if provided (and non-empty), otherwise clone from source.items
+  const rawItems = Array.isArray(data.items) && data.items.length > 0 ? data.items : source.items;
+  let subtotal = 0;
+  let totalTax = 0;
+
+  const itemsToCreate = rawItems.map((item) => {
+    const qty = Number(item.quantity) || 1;
+    const price = Number(item.unitPrice) || 0;
+    const itemDisc = Number(item.discount) || 0;
+    const lineSubtotal = Math.max(0, qty * price - itemDisc);
+    const taxRate = item.taxRate !== undefined ? Number(item.taxRate) : 18.0;
+    const taxAmt = Number(((lineSubtotal * taxRate) / 100).toFixed(2));
+    const totalAmount = lineSubtotal + taxAmt;
+
+    subtotal += lineSubtotal;
+    totalTax += taxAmt;
+
+    return {
+      productId: item.productId || null,
+      itemCode: item.itemCode || null,
+      itemName: item.itemName?.trim() || 'Item',
+      itemType: item.itemType || 'Product',
+      description: item.description ? item.description.trim() : null,
+      quantity: qty,
+      unitPrice: price,
+      discount: itemDisc,
+      taxRate: taxRate,
+      taxAmount: taxAmt,
+      totalAmount: totalAmount,
+    };
+  });
+
+  // Quotation-level Discount
+  const discType = data.discountType || source.discountType || 'percentage';
+  const discVal = data.discountValue !== undefined ? Number(data.discountValue) : Number(source.discountValue) || 0;
+  let discountAmount = discType === 'percentage' ? (subtotal * discVal) / 100 : discVal;
+  discountAmount = Math.min(subtotal, Math.max(0, discountAmount));
+  const grandTotal = Math.max(0, subtotal - discountAmount + totalTax);
+
+  const initialStatus = data.status || 'Draft';
+
+  // Mark all older revisions as isLatest = false
+  await prisma.quotation.updateMany({
+    where: {
+      OR: [{ id: root.id }, { parentQuotationId: root.id }],
+    },
+    data: { isLatest: false },
+  });
+
+  // If new revision is 'Sent', mark prior active versions (Sent / Changes Required) as Superseded
+  if (initialStatus === 'Sent') {
+    await prisma.quotation.updateMany({
+      where: {
+        OR: [{ id: root.id }, { parentQuotationId: root.id }],
+        status: { in: ['Sent', 'Changes Required'] },
+      },
+      data: {
+        status: 'Superseded',
+        supersededAt: new Date(),
+      },
+    });
+  }
+
+  // Create new revision record
+  const revision = await prisma.quotation.create({
+    data: {
+      quotationNumber: revisionQuotationNumber,
+      originalQuotationNumber: baseQuotationNumber,
+      version: nextVersion,
+      revisionNumber: nextVersion,
+      revisionName,
+      isLatest: true,
+      parentQuotationId: root.id,
+      projectName: data.projectName !== undefined ? data.projectName?.trim() : (source.projectName || root.projectName),
+      revisionNotes: data.revisionNotes?.trim() || `Revision ${revisionName} created from ${source.quotationNumber}`,
+      contactId: data.contactId || source.contactId,
+      contactName: data.contactName?.trim() || source.contactName,
+      contactEmail: data.contactEmail !== undefined ? data.contactEmail?.trim() : source.contactEmail,
+      contactPhone: data.contactPhone !== undefined ? data.contactPhone?.trim() : source.contactPhone,
+      companyName: data.companyName !== undefined ? data.companyName?.trim() : source.companyName,
+      clientGst: data.clientGst !== undefined ? data.clientGst?.trim() : source.clientGst,
+      clientAddress: data.clientAddress !== undefined ? data.clientAddress?.trim() : source.clientAddress,
+      leadId: data.leadId || source.leadId,
+      quotationDate: data.quotationDate || new Date().toISOString().split('T')[0],
+      validUntil: data.validUntil || source.validUntil || new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+      status: initialStatus,
+      sentAt: initialStatus === 'Sent' ? new Date() : null,
+      currency: data.currency || source.currency || 'INR',
+      subtotal: Number(subtotal.toFixed(2)),
+      discountType: discType,
+      discountValue: discVal,
+      discountAmount: Number(discountAmount.toFixed(2)),
+      taxAmount: Number(totalTax.toFixed(2)),
+      grandTotal: Number(grandTotal.toFixed(2)),
+      paymentTerms: data.paymentTerms || source.paymentTerms || 'Net 30',
+      notes: data.notes !== undefined ? data.notes?.trim() : source.notes,
+      termsConditions: data.termsConditions !== undefined ? data.termsConditions?.trim() : source.termsConditions,
+      salesOwnerId: user?.id || source.salesOwnerId,
+      salesOwnerName: user?.name || source.salesOwnerName,
+      items: {
+        create: itemsToCreate,
+      },
+    },
+    include: { items: true },
+  });
+
+  await logBillingAudit(
+    'Quotation',
+    revision.id,
+    revision.quotationNumber,
+    'REVISED',
+    user?.name || user?.email || 'User',
+    `Created revision ${revisionName} (${revision.quotationNumber}) for original quotation ${baseQuotationNumber}. Total: ₹${revision.grandTotal}`
+  );
+
+  return revision;
+}
+
+/**
+ * Update Quotation Status (with revision conflict and superseded management)
+ */
+export async function updateQuotationStatusService(id, status, user, notes = '') {
+  const quote = await prisma.quotation.findFirst({
+    where: { OR: [{ id }, { quotationNumber: id }] },
+    include: { items: true },
+  });
+
+  if (!quote) {
+    const err = new Error('Quotation not found.');
+    err.status = 404;
+    throw err;
+  }
+
+  // Prevent accepting or sending a superseded revision
+  if (quote.status === 'Superseded' && (status === 'Accepted' || status === 'Sent')) {
+    const err = new Error('Cannot accept or send a superseded quotation revision. Please work with the latest active revision.');
+    err.status = 400;
+    throw err;
+  }
+
+  // Root quotation id
+  const rootId = quote.parentQuotationId || quote.id;
+
+  // If status is being set to 'Accepted', prevent accepting an outdated revision if newer revision exists
+  if (status === 'Accepted') {
+    const newerRevisions = await prisma.quotation.findMany({
+      where: {
+        OR: [{ id: rootId }, { parentQuotationId: rootId }],
+        version: { gt: quote.version || 1 },
+      },
+    });
+    if (newerRevisions.length > 0) {
+      const err = new Error(
+        `Cannot accept an outdated revision (${quote.revisionName || 'V' + quote.version}). A newer revision (${newerRevisions[newerRevisions.length - 1].revisionName}) already exists.`
+      );
+      err.status = 400;
+      throw err;
+    }
+  }
+
+  const updatePayload = {
+    status,
+  };
+
+  if (status === 'Sent') {
+    updatePayload.sentAt = new Date();
+    // When marking this revision as Sent, mark all older revisions in the family as Superseded
+    await prisma.quotation.updateMany({
+      where: {
+        OR: [{ id: rootId }, { parentQuotationId: rootId }],
+        id: { not: quote.id },
+        status: { in: ['Sent', 'Changes Required', 'Draft'] },
+        version: { lt: quote.version || 1 },
+      },
+      data: {
+        status: 'Superseded',
+        supersededAt: new Date(),
+      },
+    });
+  } else if (status === 'Accepted') {
+    updatePayload.acceptedAt = new Date();
+  }
+
+  if (notes) {
+    updatePayload.revisionNotes = notes;
+  }
+
+  const updated = await prisma.quotation.update({
+    where: { id: quote.id },
+    data: updatePayload,
+    include: { items: true },
+  });
+
+  await logBillingAudit(
+    'Quotation',
+    updated.id,
+    updated.quotationNumber,
+    'STATUS_CHANGE',
+    user?.name || user?.email || 'User',
+    `Quotation ${updated.quotationNumber} (${updated.revisionName || 'V' + updated.version}) status changed to ${status}. ${notes ? `Notes: ${notes}` : ''}`
+  );
+
+  return updated;
+}
+
+/**
+ * Fetch all linked revisions in a quotation family
+ */
+export async function getQuotationRevisionsService(id) {
+  const quote = await prisma.quotation.findFirst({
+    where: { OR: [{ id }, { quotationNumber: id }] },
+  });
+
+  if (!quote) {
+    const err = new Error('Quotation not found.');
+    err.status = 404;
+    throw err;
+  }
+
+  const rootId = quote.parentQuotationId || quote.id;
+  const revisions = await prisma.quotation.findMany({
+    where: {
+      OR: [{ id: rootId }, { parentQuotationId: rootId }],
+    },
+    include: { items: true },
+    orderBy: { version: 'asc' },
+  });
+
+  return revisions;
+}
+
+/**
  * Convert Accepted Quotation to Sales Order / Contract
  */
 export async function convertQuotationToOrderService(id, data = {}, user) {
@@ -528,6 +945,12 @@ export async function convertQuotationToOrderService(id, data = {}, user) {
   if (!quote) {
     const err = new Error('Quotation record not found.');
     err.status = 404;
+    throw err;
+  }
+
+  if (quote.status === 'Superseded') {
+    const err = new Error('Cannot convert a superseded quotation revision to a Sales Order / Contract. Please use the accepted revision.');
+    err.status = 400;
     throw err;
   }
 
@@ -1206,6 +1629,45 @@ export async function createInvoiceService(data, user) {
     throw err;
   }
 
+  if (!data.projectName?.trim() && !data.projectTitle?.trim()) {
+    const err = new Error('Project Title is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!data.invoiceDate) {
+    const err = new Error('Date of Invoice is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  if (!data.dueDate) {
+    const err = new Error('Payment Due Date is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  const rawItems = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
+  if (rawItems.length === 0) {
+    const err = new Error('At least one line item is required.');
+    err.status = 400;
+    throw err;
+  }
+
+  for (let i = 0; i < rawItems.length; i++) {
+    const it = rawItems[i];
+    if (!it.itemName?.trim()) {
+      const err = new Error(`Line Item #${i + 1}: Item Name / Service is required.`);
+      err.status = 400;
+      throw err;
+    }
+    if (Number(it.unitPrice || 0) <= 0) {
+      const err = new Error(`Line Item #${i + 1} (${it.itemName}): Amount is required and must be greater than 0.`);
+      err.status = 400;
+      throw err;
+    }
+  }
+
   const settings = await getBillingSettingsService();
   let invoiceNumber = data.invoiceNumber?.trim();
 
@@ -1235,7 +1697,6 @@ export async function createInvoiceService(data, user) {
   );
 
   // Line Items Calculation
-  const rawItems = Array.isArray(data.items) && data.items.length > 0 ? data.items : [];
   let subtotal = 0;
   let totalLineDiscounts = 0;
   let totalTax = 0;
@@ -1303,12 +1764,12 @@ export async function createInvoiceService(data, user) {
     : (initialPaymentAmount > 0 ? 'Partially Paid' : 'Unpaid');
 
   const bankDetails = {
-    bankName: data.bankDetails?.bankName || settings.bankName || 'HDFC Bank',
-    accountNumber: data.bankDetails?.accountNumber || settings.accountNumber || '50200012345678',
-    accountHolderName: data.bankDetails?.accountHolderName || settings.accountHolderName || 'OmniTech Solutions Pvt Ltd',
-    ifscCode: data.bankDetails?.ifscCode || settings.ifscCode || 'HDFC0001234',
-    branchName: data.bankDetails?.branchName || settings.branchName || 'Tidel Park Branch',
-    upiId: data.bankDetails?.upiId || settings.upiId || 'omnitech@hdfcbank',
+    bankName: data.bankDetails?.bankName || settings.bankName || '',
+    accountNumber: data.bankDetails?.accountNumber || settings.accountNumber || '',
+    accountHolderName: data.bankDetails?.accountHolderName || settings.accountHolderName || '',
+    ifscCode: data.bankDetails?.ifscCode || settings.ifscCode || '',
+    branchName: data.bankDetails?.branchName || settings.branchName || '',
+    upiId: data.bankDetails?.upiId || settings.upiId || '',
     invoiceType: data.invoiceType || 'One-Time',
     currency: data.currency || 'INR',
     paymentStatus,
@@ -1410,6 +1871,25 @@ export async function createInvoiceService(data, user) {
     `Created ${status} invoice for ${invoice.companyName || invoice.contactName} - Grand Total: ₹${invoice.grandTotal}`
   );
 
+  // Automatically record activity in timeline
+  try {
+    const amountStr = invoice.grandTotal ? ` · ₹ ${Math.round(invoice.grandTotal).toLocaleString('en-IN')}` : '';
+    await recordActivity({
+      type: 'invoice',
+      title: invoice.status === 'Paid' ? 'Invoice Paid' : 'Invoice Created',
+      description: `Invoice #${invoice.invoiceNumber}${amountStr} · ${invoice.status || 'Issued'}`,
+      leadId: invoice.leadId,
+      customerName: invoice.companyName || invoice.contactName,
+      entityId: invoice.id,
+      entityType: 'Invoice',
+      entityNumber: invoice.invoiceNumber,
+      amount: invoice.grandTotal || 0,
+      status: invoice.status || 'Created',
+      performedBy: user?.name || invoice.createdBy || 'Staff',
+      activityDate: invoice.invoiceDate,
+    });
+  } catch (_) {}
+
   return invoice;
 }
 
@@ -1438,7 +1918,26 @@ export async function updateInvoiceService(id, data, user) {
   if (data.contactPerson !== undefined) meta.contactPerson = data.contactPerson;
 
   // Allow full re-calculation and saving of line items whenever items are provided
-  if (Array.isArray(data.items) && data.items.length > 0) {
+  if (Array.isArray(data.items)) {
+    if (data.items.length === 0) {
+      const err = new Error('At least one line item is required.');
+      err.status = 400;
+      throw err;
+    }
+    for (let i = 0; i < data.items.length; i++) {
+      const it = data.items[i];
+      if (!it.itemName?.trim()) {
+        const err = new Error(`Line Item #${i + 1}: Item Name / Service is required.`);
+        err.status = 400;
+        throw err;
+      }
+      if (Number(it.unitPrice || 0) <= 0) {
+        const err = new Error(`Line Item #${i + 1} (${it.itemName}): Amount is required and must be greater than 0.`);
+        err.status = 400;
+        throw err;
+      }
+    }
+
     const taxType = data.taxType || meta.taxType || 'INTRA_STATE';
     let subtotal = 0;
     let totalLineDiscounts = 0;
@@ -1945,6 +2444,24 @@ export async function recordPaymentService(data, user) {
   }
 
   await logBillingAudit('Payment', payment.id, payment.paymentNumber, 'PAYMENT_RECORDED', user?.name || user?.email || 'User', `Recorded payment ₹${payment.amountReceived} via ${payment.paymentMethod}`);
+
+  // Automatically record activity in timeline
+  try {
+    const amountStr = payment.amountReceived ? ` · ₹ ${Math.round(payment.amountReceived).toLocaleString('en-IN')}` : '';
+    await recordActivity({
+      type: 'payment',
+      title: 'Payment Received',
+      description: `Payment #${payment.paymentNumber}${amountStr} · ${payment.paymentMethod || 'UPI'}`,
+      customerName: payment.clientName,
+      entityId: payment.id,
+      entityType: 'Payment',
+      entityNumber: payment.paymentNumber,
+      amount: payment.amountReceived || 0,
+      status: payment.status || 'Completed',
+      performedBy: user?.name || payment.recordedBy || 'Staff',
+      activityDate: payment.paymentDate,
+    });
+  } catch (_) {}
 
   return payment;
 }

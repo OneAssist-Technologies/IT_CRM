@@ -160,6 +160,7 @@ exports.Prisma.RolePermissionScalarFieldEnum = {
   canDelete: 'canDelete',
   canExport: 'canExport',
   canApprove: 'canApprove',
+  dataScope: 'dataScope',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -263,6 +264,73 @@ exports.Prisma.ContactScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.BulkUploadContactScalarFieldEnum = {
+  id: 'id',
+  bulkId: 'bulkId',
+  batchId: 'batchId',
+  fileName: 'fileName',
+  name: 'name',
+  email: 'email',
+  phone: 'phone',
+  companyName: 'companyName',
+  contactPerson: 'contactPerson',
+  designation: 'designation',
+  profession: 'profession',
+  category: 'category',
+  source: 'source',
+  customSource: 'customSource',
+  contactType: 'contactType',
+  estimatedValue: 'estimatedValue',
+  expectedCloseDate: 'expectedCloseDate',
+  description: 'description',
+  remarks: 'remarks',
+  notes: 'notes',
+  gstNumber: 'gstNumber',
+  employeeCount: 'employeeCount',
+  companyPan: 'companyPan',
+  cinNumber: 'cinNumber',
+  companyWebsite: 'companyWebsite',
+  linkedinUrl: 'linkedinUrl',
+  annualTurnover: 'annualTurnover',
+  verificationStatus: 'verificationStatus',
+  registeredState: 'registeredState',
+  productList: 'productList',
+  serviceList: 'serviceList',
+  status: 'status',
+  stage: 'stage',
+  priority: 'priority',
+  assignedTo: 'assignedTo',
+  assignedToName: 'assignedToName',
+  assignmentStatus: 'assignmentStatus',
+  contactMode: 'contactMode',
+  street: 'street',
+  city: 'city',
+  zip: 'zip',
+  country: 'country',
+  isImportedToContact: 'isImportedToContact',
+  importedContactId: 'importedContactId',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ImportBatchScalarFieldEnum = {
+  id: 'id',
+  batchId: 'batchId',
+  fileName: 'fileName',
+  fileSize: 'fileSize',
+  totalRows: 'totalRows',
+  importedCount: 'importedCount',
+  failedCount: 'failedCount',
+  status: 'status',
+  failedRows: 'failedRows',
+  assignedTo: 'assignedTo',
+  assignedToName: 'assignedToName',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.CompanyScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -291,6 +359,7 @@ exports.Prisma.LeadScalarFieldEnum = {
   serviceList: 'serviceList',
   status: 'status',
   stage: 'stage',
+  priority: 'priority',
   assignedTo: 'assignedTo',
   assignedToName: 'assignedToName',
   createdBy: 'createdBy',
@@ -448,6 +517,14 @@ exports.Prisma.BillingProductScalarFieldEnum = {
 exports.Prisma.QuotationScalarFieldEnum = {
   id: 'id',
   quotationNumber: 'quotationNumber',
+  originalQuotationNumber: 'originalQuotationNumber',
+  version: 'version',
+  revisionNumber: 'revisionNumber',
+  revisionName: 'revisionName',
+  isLatest: 'isLatest',
+  projectName: 'projectName',
+  revisionNotes: 'revisionNotes',
+  parentQuotationId: 'parentQuotationId',
   contactId: 'contactId',
   contactName: 'contactName',
   contactEmail: 'contactEmail',
@@ -473,6 +550,9 @@ exports.Prisma.QuotationScalarFieldEnum = {
   salesOwnerName: 'salesOwnerName',
   convertedToOrderId: 'convertedToOrderId',
   convertedAt: 'convertedAt',
+  sentAt: 'sentAt',
+  acceptedAt: 'acceptedAt',
+  supersededAt: 'supersededAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -835,6 +915,33 @@ exports.Prisma.ContractScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ActivityScalarFieldEnum = {
+  id: 'id',
+  activityNumber: 'activityNumber',
+  type: 'type',
+  title: 'title',
+  description: 'description',
+  leadId: 'leadId',
+  leadName: 'leadName',
+  leadCode: 'leadCode',
+  customerId: 'customerId',
+  customerName: 'customerName',
+  contactId: 'contactId',
+  contactName: 'contactName',
+  entityId: 'entityId',
+  entityType: 'entityType',
+  entityNumber: 'entityNumber',
+  status: 'status',
+  amount: 'amount',
+  performedBy: 'performedBy',
+  performedById: 'performedById',
+  activityDate: 'activityDate',
+  activityTime: 'activityTime',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -873,6 +980,8 @@ exports.Prisma.ModelName = {
   AccessAuditLog: 'AccessAuditLog',
   Employee: 'Employee',
   Contact: 'Contact',
+  BulkUploadContact: 'BulkUploadContact',
+  ImportBatch: 'ImportBatch',
   Company: 'Company',
   Lead: 'Lead',
   ScheduledMeeting: 'ScheduledMeeting',
@@ -896,7 +1005,8 @@ exports.Prisma.ModelName = {
   BillingAuditLog: 'BillingAuditLog',
   BillingSettings: 'BillingSettings',
   Negotiation: 'Negotiation',
-  Contract: 'Contract'
+  Contract: 'Contract',
+  Activity: 'Activity'
 };
 
 /**

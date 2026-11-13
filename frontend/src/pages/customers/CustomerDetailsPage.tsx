@@ -30,6 +30,7 @@ import {
   IconCurrencyRupee,
   IconEdit,
   IconTrash,
+  IconTicket,
   IconCopy,
   IconCheck,
   IconExternalLink,
@@ -42,6 +43,8 @@ import {
   IconClock,
 } from '@tabler/icons-react';
 import { Customer } from '../../types/customer';
+import { fetchTicketsApi } from '../../services/supportTicketService';
+import { SupportTicket } from '../../types/supportTicket';
 import { CRM_COLORS } from '../../theme/colors';
 
 export interface CustomerProjectItem {
@@ -161,6 +164,14 @@ export const CustomerDetailsPage: React.FC<CustomerDetailsPageProps> = ({
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
+  const [customerTickets, setCustomerTickets] = useState<SupportTicket[]>([]);
+  useEffect(() => {
+    if (customer && customer.id) {
+      fetchTicketsApi({ customerId: customer.id }, 1, 10)
+        .then((res: any) => setCustomerTickets(res.tickets || []))
+        .catch(() => {});
+    }
+  }, [customer]);
 
   const [selectedFilter, setSelectedFilter] = useState<number | 'all'>('all');
   const [updateTrigger, setUpdateTrigger] = useState(0);

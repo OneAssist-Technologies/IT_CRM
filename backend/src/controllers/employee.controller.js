@@ -189,7 +189,7 @@ export async function createEmployee(req, res) {
         const passwordHash = await bcrypt.hash(password, 10);
         const assignedRole = newEmployee.role || 'STAFF';
 
-        const matchedRole = await prisma.role.findFirst({
+        let matchedRole = await prisma.role.findFirst({
           where: {
             OR: [
               { name: { equals: assignedRole, mode: 'insensitive' } },
@@ -197,6 +197,17 @@ export async function createEmployee(req, res) {
             ],
           },
         });
+
+        if (!matchedRole) {
+          matchedRole = await prisma.role.findFirst({
+            where: {
+              OR: [
+                { slug: 'employee' },
+                { name: { equals: 'Employee', mode: 'insensitive' } },
+              ],
+            },
+          });
+        }
 
         await prisma.user.upsert({
           where: { email: cleanEmail },
@@ -345,7 +356,7 @@ export async function updateEmployee(req, res) {
         const userEmail = updated.email.toLowerCase().trim();
         const assignedRole = updated.role || 'STAFF';
 
-        const matchedRole = await prisma.role.findFirst({
+        let matchedRole = await prisma.role.findFirst({
           where: {
             OR: [
               { name: { equals: assignedRole, mode: 'insensitive' } },
@@ -353,6 +364,17 @@ export async function updateEmployee(req, res) {
             ],
           },
         });
+
+        if (!matchedRole) {
+          matchedRole = await prisma.role.findFirst({
+            where: {
+              OR: [
+                { slug: 'employee' },
+                { name: { equals: 'Employee', mode: 'insensitive' } },
+              ],
+            },
+          });
+        }
 
         await prisma.user.upsert({
           where: { email: userEmail },

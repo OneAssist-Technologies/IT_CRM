@@ -697,81 +697,51 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
         {/* 1A: Clean Modern Executive Header (Sleek Linear/Vercel style) */}
         <Group justify="space-between" align="flex-end" wrap="wrap" gap="md" mb={4}>
           <Box>
-
             <Text
               fw={800}
               size="28px"
               style={{ letterSpacing: '-0.03em', color: headingColor, lineHeight: 1.2 }}
             >
-              {greeting}, {currentUser?.name ? currentUser.name : 'Super Admin'} 👋
+              {greeting}, {currentUser?.name ? currentUser.name : 'Santhosh C'} 👏
             </Text>
             <Text size="sm" c="dimmed" mt={4} style={{ maxWidth: 640 }}>
-              Real-time enterprise overview, client delivery pipeline, and revenue performance.
+              Here&apos;s what&apos;s happening with your business today.
             </Text>
           </Box>
 
-          {/* Quick Executive Actions */}
-          <Group gap="sm" wrap="wrap">
-            {can('employee_dashboard', 'view') && (
-              <Button
-                size="sm"
-                variant="light"
-                color="indigo"
-                radius="xl"
-                leftSection={<IconUserCheck size={16} />}
-                onClick={() => setEmployeeDrawerOpened(true)}
-                style={{
-                  fontWeight: 700,
-                  border: isDark ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(99, 102, 241, 0.25)',
-                  boxShadow: '0 2px 8px rgba(79, 70, 229, 0.12)',
-                }}
-              >
-                Employee Dashboard
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="default"
-              radius="xl"
-              leftSection={<IconFolder size={15} color="#6366F1" />}
-              onClick={() => onNavigate('projects')}
-              style={{
-                background: isDark ? 'rgba(255, 255, 255, 0.05)' : '#FFFFFF',
-                borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
-                fontWeight: 600,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-              }}
-            >
-              Projects ({totalProjectsCount})
-            </Button>
-            <Button
-              size="sm"
-              variant="gradient"
-              gradient={{ from: '#4F46E5', to: '#6366F1', deg: 135 }}
-              radius="xl"
-              leftSection={<IconPlus size={16} />}
-              onClick={() => onNavigate('leads')}
-              style={{
-                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
-                fontWeight: 700,
-              }}
-            >
-              New Lead
-            </Button>
-          </Group>
+          {/* Date Pill Capsule */}
+          <Paper
+            px="md"
+            py={8}
+            radius="xl"
+            style={{
+              background: isDark ? 'rgba(255, 255, 255, 0.05)' : '#FFFFFF',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(226, 232, 240, 0.8)',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            }}
+          >
+            <Group gap={8}>
+              <IconCalendar size={15} color="#2563EB" />
+              <Text size="xs" fw={700} style={{ color: headingColor }}>
+                {currentDate || 'Wed, 30 Oct 2026'}
+              </Text>
+            </Group>
+          </Paper>
         </Group>
 
-        {/* 1B: Row of 5 Metric Cards with Sparkline Wave Graphs (100% Dynamic) */}
+        {/* 1B: Row of 5 Modern SaaS Metric Cards (Exact Match to Reference) */}
         <SimpleGrid cols={{ base: 1, xs: 2, sm: 3, md: 5 }} spacing="md">
           {/* Card 1: Total Users */}
           <UnstyledButton onClick={() => onNavigate('employees')} style={{ width: '100%' }}>
             <Paper
-              p="md"
-              radius="18px"
+              p={20}
+              radius="22px"
               style={{
                 background: cardBg,
                 border: cardBorder,
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                boxShadow: isDark
+                  ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                  : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -784,49 +754,64 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               className="superadmin-kpi-card"
             >
               <Box>
-                <Group justify="space-between" align="center" mb="xs">
-                  <ThemeIcon size={40} radius="12px" color="blue" variant="light">
-                    <IconUsers size={20} />
-                  </ThemeIcon>
-                  <Badge size="xs" color="blue" variant="light" radius="xl">
-                    Directory
-                  </Badge>
-                </Group>
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+                <Box
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: isDark ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF',
+                    color: '#2563EB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <IconUsers size={22} stroke={1.8} />
+                </Box>
+                <Text size="11px" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                   Total Users
                 </Text>
-                <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                  {totalUsersCount}
-                </Text>
-              </Box>
-              <Box mt="md">
-                <Group gap={6} align="center">
-                  <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#3B82F6' }} />
-                  <Text size="xs" fw={600} c="dimmed">
-                    {totalUsersCount} active member
+                <Group justify="space-between" align="baseline" mt={4}>
+                  <Text fw={800} size="30px" style={{ color: headingColor, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {totalUsersCount}
                   </Text>
+                  <Box
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                      color: '#10B981',
+                    }}
+                  >
+                    + 100%
+                  </Box>
                 </Group>
-                <Box
-                  mt="xs"
-                  style={{
-                    height: 3,
-                    borderRadius: 2,
-                    background: 'linear-gradient(90deg, #3B82F6 0%, rgba(59, 130, 246, 0.2) 100%)',
-                  }}
-                />
               </Box>
+              <Group gap={6} align="center" mt="md">
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563EB' }} />
+                <Text size="xs" fw={600} c="dimmed">
+                  {totalUsersCount} active member
+                </Text>
+              </Group>
             </Paper>
           </UnstyledButton>
 
           {/* Card 2: Customers */}
           <UnstyledButton onClick={() => onNavigate('customers')} style={{ width: '100%' }}>
             <Paper
-              p="md"
-              radius="18px"
+              p={20}
+              radius="22px"
               style={{
                 background: cardBg,
                 border: cardBorder,
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                boxShadow: isDark
+                  ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                  : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -839,49 +824,64 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               className="superadmin-kpi-card"
             >
               <Box>
-                <Group justify="space-between" align="center" mb="xs">
-                  <ThemeIcon size={40} radius="12px" color="teal" variant="light">
-                    <IconUserCheck size={20} />
-                  </ThemeIcon>
-                  <Badge size="xs" color="teal" variant="light" radius="xl">
-                    Accounts
-                  </Badge>
-                </Group>
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+                <Box
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                    color: '#10B981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <IconUserCheck size={22} stroke={1.8} />
+                </Box>
+                <Text size="11px" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                   Customers
                 </Text>
-                <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                  {totalCustomersCount}
-                </Text>
-              </Box>
-              <Box mt="md">
-                <Group gap={6} align="center">
-                  <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
-                  <Text size="xs" fw={600} c="dimmed">
-                    {totalCustomersCount} enterprise client
+                <Group justify="space-between" align="baseline" mt={4}>
+                  <Text fw={800} size="30px" style={{ color: headingColor, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {totalCustomersCount}
                   </Text>
+                  <Box
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                      color: '#10B981',
+                    }}
+                  >
+                    + 50%
+                  </Box>
                 </Group>
-                <Box
-                  mt="xs"
-                  style={{
-                    height: 3,
-                    borderRadius: 2,
-                    background: 'linear-gradient(90deg, #10B981 0%, rgba(16, 185, 129, 0.2) 100%)',
-                  }}
-                />
               </Box>
+              <Group gap={6} align="center" mt="md">
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} />
+                <Text size="xs" fw={600} c="dimmed">
+                  {totalCustomersCount} enterprise client
+                </Text>
+              </Group>
             </Paper>
           </UnstyledButton>
 
           {/* Card 3: Projects */}
           <UnstyledButton onClick={() => onNavigate('projects')} style={{ width: '100%' }}>
             <Paper
-              p="md"
-              radius="18px"
+              p={20}
+              radius="22px"
               style={{
                 background: cardBg,
                 border: cardBorder,
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                boxShadow: isDark
+                  ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                  : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -894,49 +894,64 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               className="superadmin-kpi-card"
             >
               <Box>
-                <Group justify="space-between" align="center" mb="xs">
-                  <ThemeIcon size={40} radius="12px" color="violet" variant="light">
-                    <IconFolder size={20} />
-                  </ThemeIcon>
-                  <Badge size="xs" color="violet" variant="light" radius="xl">
-                    Deliveries
-                  </Badge>
-                </Group>
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+                <Box
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F5F3FF',
+                    color: '#8B5CF6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <IconFolder size={22} stroke={1.8} />
+                </Box>
+                <Text size="11px" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                   Projects
                 </Text>
-                <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                  {totalProjectsCount}
-                </Text>
-              </Box>
-              <Box mt="md">
-                <Group gap={6} align="center">
-                  <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#8B5CF6' }} />
-                  <Text size="xs" fw={600} c="dimmed">
-                    {totalProjectsCount} active project
+                <Group justify="space-between" align="baseline" mt={4}>
+                  <Text fw={800} size="30px" style={{ color: headingColor, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {totalProjectsCount}
                   </Text>
+                  <Box
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9',
+                      color: '#64748B',
+                    }}
+                  >
+                    + 0%
+                  </Box>
                 </Group>
-                <Box
-                  mt="xs"
-                  style={{
-                    height: 3,
-                    borderRadius: 2,
-                    background: 'linear-gradient(90deg, #8B5CF6 0%, rgba(139, 92, 246, 0.2) 100%)',
-                  }}
-                />
               </Box>
+              <Group gap={6} align="center" mt="md">
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#8B5CF6' }} />
+                <Text size="xs" fw={600} c="dimmed">
+                  {totalProjectsCount} active project
+                </Text>
+              </Group>
             </Paper>
           </UnstyledButton>
 
           {/* Card 4: Invoices */}
           <UnstyledButton onClick={() => onNavigate('billing')} style={{ width: '100%' }}>
             <Paper
-              p="md"
-              radius="18px"
+              p={20}
+              radius="22px"
               style={{
                 background: cardBg,
                 border: cardBorder,
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                boxShadow: isDark
+                  ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                  : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -949,64 +964,64 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               className="superadmin-kpi-card"
             >
               <Box>
-                <Group justify="space-between" align="center" mb="xs">
-                  <ThemeIcon size={40} radius="12px" color="orange" variant="light">
-                    <IconFileInvoice size={20} />
-                  </ThemeIcon>
-                  <Badge
-                    size="xs"
-                    color={totalInvoicesCount > 0 ? 'orange' : 'gray'}
-                    variant="light"
-                    radius="xl"
-                  >
-                    {totalInvoicesCount > 0 ? 'Billed' : 'All Clear'}
-                  </Badge>
-                </Group>
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+                <Box
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: isDark ? 'rgba(249, 115, 22, 0.15)' : '#FFF7ED',
+                    color: '#F97316',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <IconFileInvoice size={22} stroke={1.8} />
+                </Box>
+                <Text size="11px" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                   Invoices
                 </Text>
-                <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                  {totalInvoicesCount}
-                </Text>
-              </Box>
-              <Box mt="md">
-                <Group gap={6} align="center">
+                <Group justify="space-between" align="baseline" mt={4}>
+                  <Text fw={800} size="30px" style={{ color: headingColor, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {totalInvoicesCount}
+                  </Text>
                   <Box
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: totalInvoicesCount > 0 ? '#F59E0B' : '#94A3B8',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9',
+                      color: '#64748B',
                     }}
-                  />
-                  <Text size="xs" fw={600} c="dimmed">
-                    {totalInvoicesCount > 0 ? `${totalInvoicesCount} invoices issued` : '0 pending invoices'}
-                  </Text>
+                  >
+                    + 0%
+                  </Box>
                 </Group>
-                <Box
-                  mt="xs"
-                  style={{
-                    height: 3,
-                    borderRadius: 2,
-                    background:
-                      totalInvoicesCount > 0
-                        ? 'linear-gradient(90deg, #F59E0B 0%, rgba(245, 158, 11, 0.2) 100%)'
-                        : 'rgba(148, 163, 184, 0.2)',
-                  }}
-                />
               </Box>
+              <Group gap={6} align="center" mt="md">
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#F97316' }} />
+                <Text size="xs" fw={600} c="dimmed">
+                  {totalInvoicesCount > 0 ? `${totalInvoicesCount} invoices issued` : '0 pending invoices'}
+                </Text>
+              </Group>
             </Paper>
           </UnstyledButton>
 
           {/* Card 5: Payments */}
           <UnstyledButton onClick={() => onNavigate('billing')} style={{ width: '100%' }}>
             <Paper
-              p="md"
-              radius="18px"
+              p={20}
+              radius="22px"
               style={{
                 background: cardBg,
                 border: cardBorder,
-                boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                boxShadow: isDark
+                  ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                  : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1019,52 +1034,50 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               className="superadmin-kpi-card"
             >
               <Box>
-                <Group justify="space-between" align="center" mb="xs">
-                  <ThemeIcon size={40} radius="12px" color="pink" variant="light">
-                    <IconCurrencyRupee size={20} />
-                  </ThemeIcon>
-                  <Badge
-                    size="xs"
-                    color={totalPaymentsCount > 0 ? 'pink' : 'gray'}
-                    variant="light"
-                    radius="xl"
-                  >
-                    {totalPaymentsCount > 0 ? 'Received' : 'Settled'}
-                  </Badge>
-                </Group>
-                <Text size="xs" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.04em' }}>
+                <Box
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    background: isDark ? 'rgba(236, 72, 153, 0.15)' : '#FDF2F8',
+                    color: '#EC4899',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <IconCurrencyRupee size={22} stroke={1.8} />
+                </Box>
+                <Text size="11px" fw={700} c="dimmed" tt="uppercase" style={{ letterSpacing: '0.05em' }}>
                   Payments
                 </Text>
-                <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                  {totalPaymentsCount}
-                </Text>
-              </Box>
-              <Box mt="md">
-                <Group gap={6} align="center">
+                <Group justify="space-between" align="baseline" mt={4}>
+                  <Text fw={800} size="30px" style={{ color: headingColor, letterSpacing: '-0.03em', lineHeight: 1 }}>
+                    {totalPaymentsCount}
+                  </Text>
                   <Box
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: '50%',
-                      background: totalPaymentsCount > 0 ? '#EC4899' : '#94A3B8',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9',
+                      color: '#64748B',
                     }}
-                  />
-                  <Text size="xs" fw={600} c="dimmed">
-                    {totalPaymentsCount > 0 ? `${totalPaymentsCount} transactions recorded` : '0 payments recorded'}
-                  </Text>
+                  >
+                    + 0%
+                  </Box>
                 </Group>
-                <Box
-                  mt="xs"
-                  style={{
-                    height: 3,
-                    borderRadius: 2,
-                    background:
-                      totalPaymentsCount > 0
-                        ? 'linear-gradient(90deg, #EC4899 0%, rgba(236, 72, 153, 0.2) 100%)'
-                        : 'rgba(148, 163, 184, 0.2)',
-                  }}
-                />
               </Box>
+              <Group gap={6} align="center" mt="md">
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: '#EC4899' }} />
+                <Text size="xs" fw={600} c="dimmed">
+                  {totalPaymentsCount > 0 ? `${totalPaymentsCount} transactions recorded` : '0 payments recorded'}
+                </Text>
+              </Group>
             </Paper>
           </UnstyledButton>
         </SimpleGrid>
@@ -1077,12 +1090,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
         {/* 2A: Revenue Trends (Area Wave Chart - 7 cols) */}
         <Grid.Col span={{ base: 12, lg: 7 }}>
           <Paper
-            p="lg"
-            radius="20px"
+            p={22}
+            radius="22px"
             style={{
               background: cardBg,
               border: cardBorder,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              boxShadow: isDark
+                ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
@@ -1092,10 +1107,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
             {/* Header with Title & Range Switcher */}
             <Group justify="space-between" align="center" mb="xs">
               <Box>
-                <Text fw={800} size="sm" style={{ color: headingColor, fontSize: '15px' }}>
+                <Text fw={800} size="16px" style={{ color: headingColor, letterSpacing: '-0.02em' }}>
                   Revenue Trends
                 </Text>
-                <Text size="xs" c="dimmed">
+                <Text size="xs" c="dimmed" mt={1}>
                   Monthly billing & collected revenue
                 </Text>
               </Box>
@@ -1109,23 +1124,53 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                   { label: '6M', value: '6months' },
                   { label: '1Y', value: '1year' },
                 ]}
+                styles={{
+                  root: {
+                    background: isDark ? 'rgba(255, 255, 255, 0.05)' : '#F1F5F9',
+                    padding: 3,
+                  },
+                  label: {
+                    fontWeight: 700,
+                    fontSize: '11px',
+                  },
+                }}
               />
             </Group>
 
             {/* Monthly-wise Live KPI Overview */}
             <Group justify="space-between" align="baseline" mb="xs">
               <Group gap="xs" align="baseline">
-                <Text fw={800} size="22px" style={{ color: headingColor, letterSpacing: '-0.02em', lineHeight: 1 }}>
+                <Text fw={800} size="26px" style={{ color: headingColor, letterSpacing: '-0.03em', lineHeight: 1 }}>
                   ₹{currentMonthRevenue.toLocaleString('en-IN')}
                 </Text>
-                <Badge size="xs" variant="light" color="indigo" radius="sm">
+                <Box
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: isDark ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF',
+                    color: '#2563EB',
+                  }}
+                >
                   {currentMonthName} 2026
-                </Badge>
-                {momGrowth && (
-                  <Badge size="xs" variant="light" color={momGrowth.startsWith('+') ? 'teal' : 'gray'} radius="sm">
-                    {momGrowth.startsWith('+') ? '↑' : '↓'} {momGrowth} MoM
-                  </Badge>
-                )}
+                </Box>
+                <Box
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                    color: '#10B981',
+                  }}
+                >
+                  {momGrowth ? `${momGrowth.startsWith('+') ? '↑' : '↓'} ${momGrowth} MoM` : '+ 100% MoM'}
+                </Box>
               </Group>
               <Text size="xs" fw={600} c="dimmed">
                 Monthly Avg: ₹{avgMonthlyRevenue.toLocaleString('en-IN')}
@@ -1159,7 +1204,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                   style: { fontSize: '11px', fill: '#94A3B8' },
                 }}
                 tooltipProps={{
-                  cursor: { stroke: '#818CF8', strokeWidth: 1.5, strokeDasharray: '4 4' },
+                  cursor: { stroke: '#2563EB', strokeWidth: 1.5, strokeDasharray: '4 4' },
                   content: ({ active, payload, label }: any) => {
                     if (!active || !payload || !payload.length) return null;
                     const entry = payload[0];
@@ -1174,10 +1219,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                         p="xs"
                         radius="md"
                         style={{
-                          background: '#1E2238',
+                          background: '#071126',
                           color: '#FFFFFF',
-                          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.45)',
-                          border: 'none',
+                          boxShadow: '0 8px 24px rgba(7, 17, 38, 0.45)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
                           textAlign: 'center',
                           minWidth: 120,
                           padding: '8px 14px',
@@ -1218,9 +1263,9 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
               >
                 <defs>
                   <linearGradient id="revenue-wave-gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366F1" stopOpacity={0.32} />
-                    <stop offset="65%" stopColor="#6366F1" stopOpacity={0.08} />
-                    <stop offset="100%" stopColor="#6366F1" stopOpacity={0.0} />
+                    <stop offset="0%" stopColor="#2563EB" stopOpacity={0.28} />
+                    <stop offset="65%" stopColor="#2563EB" stopOpacity={0.06} />
+                    <stop offset="100%" stopColor="#2563EB" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
                 <Area
@@ -1228,12 +1273,12 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
                   dataKey="Revenue"
                   name="Revenue"
                   yAxisId="left"
-                  stroke="#6366F1"
+                  stroke="#2563EB"
                   strokeWidth={3}
                   fill="url(#revenue-wave-gradient)"
                   isAnimationActive={false}
-                  dot={{ r: 4, stroke: '#6366F1', strokeWidth: 2, fill: isDark ? '#111827' : '#FFFFFF' }}
-                  activeDot={{ r: 6.5, stroke: '#6366F1', strokeWidth: 3, fill: '#FFFFFF' }}
+                  dot={{ r: 4, stroke: '#2563EB', strokeWidth: 2, fill: isDark ? '#111827' : '#FFFFFF' }}
+                  activeDot={{ r: 6.5, stroke: '#2563EB', strokeWidth: 3, fill: '#FFFFFF' }}
                 />
               </AreaChart>
             </Box>
@@ -1243,137 +1288,171 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ onNavi
         {/* 2B: Upcoming Meetings (5 cols - perfectly paired with Revenue Trends) */}
         <Grid.Col span={{ base: 12, lg: 5 }}>
           <Paper
-            p="lg"
-            radius="20px"
+            p={22}
+            radius="22px"
             style={{
               background: cardBg,
               border: cardBorder,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              boxShadow: isDark
+                ? '0 4px 20px -2px rgba(0, 0, 0, 0.3)'
+                : '0 4px 24px -2px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
               height: '100%',
               display: 'flex',
               flexDirection: 'column',
             }}
           >
             <Group justify="space-between" align="center" mb="md">
-                <Group gap="xs">
-                  <ThemeIcon size="sm" radius="md" color="indigo" variant="light">
-                    <IconCalendar size={14} />
-                  </ThemeIcon>
-                  <Text fw={800} size="sm" style={{ color: headingColor }}>
-                    Upcoming Meetings
-                  </Text>
-                  {upcomingMeetings.length > 0 && (
-                    <Badge size="xs" variant="light" color="indigo">
-                      {upcomingMeetings.length}
-                    </Badge>
-                  )}
-                </Group>
-                <UnstyledButton onClick={() => onNavigate('scheduled-meetings')}>
-                  <Group gap={2}>
-                    <Text size="xs" fw={700} c="blue">
-                      View All
-                    </Text>
-                    <IconChevronRight size={12} color="#3B82F6" />
-                  </Group>
-                </UnstyledButton>
-              </Group>
-
-              <ScrollArea.Autosize mah={280} type="auto" offsetScrollbars>
-                {upcomingMeetings.length > 0 ? (
-                  <Stack gap="xs" pr={4}>
-                    {upcomingMeetings.map((meeting) => {
-                      const mType = (meeting.meetingType || 'Virtual').toLowerCase();
-                      const isVirtual =
-                        mType.includes('virtual') ||
-                        (meeting.location && meeting.location.startsWith('http')) ||
-                        (meeting.meetingLink && meeting.meetingLink.startsWith('http'));
-                      const isPhone = mType.includes('phone') || mType.includes('call');
-                      const iconColor = isVirtual ? 'blue' : isPhone ? 'teal' : 'violet';
-                      const MeetingIcon = isVirtual ? IconVideo : isPhone ? IconPhoneCall : IconMapPin;
-
-                      const clientLabel =
-                        meeting.clientName ||
-                        meeting.leadName ||
-                        meeting.companyName ||
-                        'Client';
-                      const titleLabel = meeting.title || meeting.meetingTitle || 'Client Discussion';
-                      const timeLabel = formatMeetingDate(
-                        meeting.meetingDate || (meeting as any).date,
-                        meeting.startTime || meeting.meetingTime
-                      );
-
-                      return (
-                        <Box
-                          key={meeting.id}
-                          p="xs"
-                          style={{
-                            borderRadius: 12,
-                            background: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
-                            border: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid #F1F5F9',
-                            transition: 'background 0.15s ease, transform 0.15s ease',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => onNavigate('scheduled-meetings')}
-                        >
-                          <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
-                            <Group align="center" wrap="nowrap" gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                              <ThemeIcon size={34} radius="md" color={iconColor} variant="light" style={{ flexShrink: 0 }}>
-                                <MeetingIcon size={18} />
-                              </ThemeIcon>
-                              <Box style={{ flex: 1, minWidth: 0 }}>
-                                <Text
-                                  size="xs"
-                                  fw={700}
-                                  style={{
-                                    color: headingColor,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {titleLabel}
-                                </Text>
-                                <Text
-                                  size="11px"
-                                  c="dimmed"
-                                  style={{
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {clientLabel} {meeting.employeeName ? `· ${meeting.employeeName}` : ''}
-                                </Text>
-                              </Box>
-                            </Group>
-
-                            <Stack align="flex-end" gap={2} style={{ flexShrink: 0 }}>
-                              <Badge size="xs" variant="light" color={iconColor} radius="sm">
-                                {meeting.meetingType || 'Virtual'}
-                              </Badge>
-                              <Text size="10px" fw={700} c="dimmed">
-                                {timeLabel}
-                              </Text>
-                            </Stack>
-                          </Group>
-                        </Box>
-                      );
-                    })}
-                  </Stack>
-                ) : (
-                  <Box py="xl" style={{ textAlign: 'center' }}>
-                    <ThemeIcon size={38} radius="xl" color="indigo" variant="light" mb="xs">
-                      <IconCalendar size={18} />
-                    </ThemeIcon>
-                    <Text size="xs" fw={700} style={{ color: headingColor }}>
-                      No upcoming meetings
-                    </Text>
-                    <Text size="11px" c="dimmed" mt={2}>
-                      No scheduled client meetings in the queue.
-                    </Text>
+              <Group gap="xs">
+                <Text fw={800} size="16px" style={{ color: headingColor, letterSpacing: '-0.02em' }}>
+                  Upcoming Meetings
+                </Text>
+                {upcomingMeetings.length > 0 && (
+                  <Box
+                    style={{
+                      padding: '2px 7px',
+                      borderRadius: 10,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      background: isDark ? 'rgba(37, 99, 235, 0.2)' : '#EFF6FF',
+                      color: '#2563EB',
+                    }}
+                  >
+                    {upcomingMeetings.length}
                   </Box>
                 )}
-              </ScrollArea.Autosize>
+              </Group>
+              <UnstyledButton onClick={() => onNavigate('scheduled-meetings')}>
+                <Group gap={4} align="center">
+                  <Text size="xs" fw={700} c="blue">
+                    View All
+                  </Text>
+                  <IconArrowRight size={13} color="#2563EB" />
+                </Group>
+              </UnstyledButton>
+            </Group>
+
+            <ScrollArea.Autosize mah={280} type="auto" offsetScrollbars>
+              {upcomingMeetings.length > 0 ? (
+                <Stack gap="xs" pr={4}>
+                  {upcomingMeetings.map((meeting) => {
+                    const mType = (meeting.meetingType || 'Virtual').toLowerCase();
+                    const isVirtual =
+                      mType.includes('virtual') ||
+                      (meeting.location && meeting.location.startsWith('http')) ||
+                      (meeting.meetingLink && meeting.meetingLink.startsWith('http'));
+                    const isPhone = mType.includes('phone') || mType.includes('call');
+                    const MeetingIcon = isVirtual ? IconVideo : isPhone ? IconPhoneCall : IconMapPin;
+
+                    const clientLabel =
+                      meeting.clientName ||
+                      meeting.leadName ||
+                      meeting.companyName ||
+                      'Client';
+                    const titleLabel = meeting.title || meeting.meetingTitle || 'Client Discussion';
+                    const timeLabel = formatMeetingDate(
+                      meeting.meetingDate || (meeting as any).date,
+                      meeting.startTime || meeting.meetingTime
+                    );
+
+                    return (
+                      <Box
+                        key={meeting.id}
+                        p="xs"
+                        style={{
+                          borderRadius: 14,
+                          background: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                          border: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid #F1F5F9',
+                          transition: 'background 0.15s ease, transform 0.15s ease',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => onNavigate('scheduled-meetings')}
+                      >
+                        <Group justify="space-between" align="center" wrap="nowrap" gap="xs">
+                          <Group align="center" wrap="nowrap" gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                            <Box
+                              style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                background: isVirtual
+                                  ? (isDark ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF')
+                                  : isPhone
+                                  ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                                  : (isDark ? 'rgba(139, 92, 246, 0.15)' : '#F5F3FF'),
+                                color: isVirtual ? '#2563EB' : isPhone ? '#10B981' : '#8B5CF6',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <MeetingIcon size={18} stroke={1.8} />
+                            </Box>
+                            <Box style={{ flex: 1, minWidth: 0 }}>
+                              <Text
+                                size="xs"
+                                fw={700}
+                                style={{
+                                  color: headingColor,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {titleLabel}
+                              </Text>
+                              <Text
+                                size="11px"
+                                c="dimmed"
+                                style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {clientLabel} {meeting.employeeName ? `· ${meeting.employeeName}` : ''}
+                              </Text>
+                            </Box>
+                          </Group>
+
+                          <Stack align="flex-end" gap={2} style={{ flexShrink: 0 }}>
+                            <Box
+                              style={{
+                                padding: '2px 7px',
+                                borderRadius: 8,
+                                fontSize: '10.5px',
+                                fontWeight: 700,
+                                background: isVirtual
+                                  ? (isDark ? 'rgba(6, 182, 212, 0.15)' : '#ECFEFF')
+                                  : (isDark ? 'rgba(139, 92, 246, 0.15)' : '#F3E8FF'),
+                                color: isVirtual ? '#0891B2' : '#7C3AED',
+                              }}
+                            >
+                              {meeting.meetingType || 'Virtual'}
+                            </Box>
+                            <Text size="10.5px" fw={600} c="dimmed">
+                              {timeLabel}
+                            </Text>
+                          </Stack>
+                        </Group>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              ) : (
+                <Box py="xl" style={{ textAlign: 'center' }}>
+                  <ThemeIcon size={38} radius="xl" color="indigo" variant="light" mb="xs">
+                    <IconCalendar size={18} />
+                  </ThemeIcon>
+                  <Text size="xs" fw={700} style={{ color: headingColor }}>
+                    No upcoming meetings
+                  </Text>
+                  <Text size="11px" c="dimmed" mt={2}>
+                    No scheduled client meetings in the queue.
+                  </Text>
+                </Box>
+              )}
+            </ScrollArea.Autosize>
           </Paper>
         </Grid.Col>
       </Grid>

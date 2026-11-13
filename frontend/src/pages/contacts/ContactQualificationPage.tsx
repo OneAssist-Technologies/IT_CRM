@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -21,6 +21,8 @@ import {
   Tooltip,
   ThemeIcon,
   Autocomplete,
+  Modal,
+  Checkbox,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -44,9 +46,21 @@ import {
   IconBox,
   IconBrandWhatsapp,
   IconChevronDown,
+  IconMapPin,
+  IconReceiptTax,
+  IconCreditCard,
+  IconCalendarEvent,
+  IconVideo,
+  IconEdit,
+  IconPlus,
+  IconX,
 } from '@tabler/icons-react';
 import { Contact, QualificationStatus } from '../../types/contact';
+
 import { contactService } from '../../services/contactService';
+import { billingService } from '../../services/billingService';
+import { settingsService } from '../../services/settingsService';
+import { MeetingDatePicker } from '../meetings/components/MeetingDatePicker';
 import { useContact } from '../../context/ContactContext';
 import { useLead } from '../../context/LeadContext';
 import { useCRM } from '../../context/CRMContext';
@@ -81,6 +95,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
   // 1. Fetch live contact from server on mount to ensure fresh database data
   useEffect(() => {
     const targetId =
+      propContact?.importedContactId ||
       propContact?.id ||
       propContact?.contactId ||
       (() => {
@@ -88,10 +103,10 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           const saved = sessionStorage.getItem('crm_qualifying_contact');
           if (saved) {
             const parsed = JSON.parse(saved);
-            return parsed?.id || parsed?.contactId;
+            return parsed?.importedContactId || parsed?.id || parsed?.contactId;
           }
         } catch (e) {}
-        return contacts.length > 0 ? (contacts[0].id || contacts[0].contactId) : null;
+        return contacts.length > 0 ? (contacts[0].importedContactId || contacts[0].id || contacts[0].contactId) : null;
       })();
 
     if (targetId) {
@@ -106,7 +121,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           }
         })
         .catch((err) => {
-          console.error('Error fetching live contact details on mount:', err);
+          console.warn('Live contact details sync notice:', err?.message || err);
         });
     }
   }, []);
@@ -129,11 +144,131 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
   const [employeeCount, setEmployeeCount] = useState<string>('');
   const [expectedCloseDate, setExpectedCloseDate] = useState<string>('');
   const [nextFollowDate, setNextFollowDate] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
+  const [gstNumber, setGstNumber] = useState<string>('');
+  const [companyPan, setCompanyPan] = useState<string>('');
   const [remarks, setRemarks] = useState<string>('');
   const [qualifiedBy, setQualifiedBy] = useState<string>('');
   const [qualificationDate, setQualificationDate] = useState<string>(todayStr);
   const [unqualifiedReason, setUnqualifiedReason] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
+
+  // Catalog Products & Services State
+  const [catalogProducts, setCatalogProducts] = useState<string[]>([]);
+  const [catalogServices, setCatalogServices] = useState<string[]>([]);
+  const [customModalOpened, setCustomModalOpened] = useState<boolean>(false);
+  const [customNameInput, setCustomNameInput] = useState<string>('');
+  const [saveToCatalog, setSaveToCatalog] = useState<boolean>(true);
+  const [savingCatalogItem, setSavingCatalogItem] = useState<boolean>(false);
+
+
+
+  const loadCatalogItems = useCallback(async () => {
+    try {
+      const [prodsRes, projectsRes] = await Promise.allSettled([
+        billingService.getProductsServices({ status: 'Active' }),
+        settingsService.getMasterProjects({ status: 'Active' }),
+      ]);
+      const prods: string[] = [];
+      const servs: string[] = [];
+
+      if (prodsRes.status === 'fulfilled' && Array.isArray(prodsRes.value)) {
+        prodsRes.value.forEach((p) => {
+          if (p.name) {
+            if (p.type === 'Service') servs.push(p.name.trim());
+            else prods.push(p.name.trim());
+          }
+          if (Array.isArray(p.modules)) {
+            p.modules.forEach((m: any) => {
+              const name = typeof m === 'string' ? m : m?.name;
+              if (name) servs.push(name.trim());
+            });
+          }
+        });
+      }
+
+      if (projectsRes.status === 'fulfilled' && projectsRes.value?.success && Array.isArray(projectsRes.value.data)) {
+        projectsRes.value.data.forEach((mp) => {
+          if (mp.name) prods.push(mp.name.trim());
+          if (Array.isArray(mp.modules)) {
+            mp.modules.forEach((m: any) => {
+              const name = typeof m === 'string' ? m : m?.name;
+              if (name) servs.push(name.trim());
+            });
+          }
+        });
+      }
+
+      if (metadata?.catalogProducts && Array.isArray(metadata.catalogProducts)) {
+        metadata.catalogProducts.forEach((p) => p && prods.push(p.trim()));
+      }
+      if (metadata?.catalogServices && Array.isArray(metadata.catalogServices)) {
+        metadata.catalogServices.forEach((s) => s && servs.push(s.trim()));
+      }
+
+      setCatalogProducts(Array.from(new Set(prods.filter(Boolean))));
+      setCatalogServices(Array.from(new Set(servs.filter(Boolean))));
+    } catch (err) {
+      console.warn('Could not load catalog items:', err);
+    }
+  }, [metadata?.catalogProducts, metadata?.catalogServices]);
+
+  useEffect(() => {
+    loadCatalogItems();
+  }, [loadCatalogItems]);
+
+  const handleSaveCustomProduct = async () => {
+    const trimmed = customNameInput.trim();
+    if (!trimmed) return;
+
+    setInterestedService(trimmed);
+    setCustomModalOpened(false);
+    setCustomNameInput('');
+
+    if (saveToCatalog) {
+      try {
+        setSavingCatalogItem(true);
+        await billingService.createProduct({
+          name: trimmed,
+          type: category === 'Product' ? 'Product' : 'Service',
+          status: 'Active',
+        });
+        notifications.show({
+          title: 'Added to Catalog',
+          message: `"${trimmed}" has been added to your product catalog and selected.`,
+          color: 'teal',
+        });
+        await loadCatalogItems();
+      } catch (err: any) {
+        console.error('Error saving to catalog:', err);
+        notifications.show({
+          title: 'Custom Product Selected',
+          message: `"${trimmed}" selected for this contact. (Note: ${err.message || 'Could not sync to catalog'})`,
+          color: 'blue',
+        });
+      } finally {
+        setSavingCatalogItem(false);
+      }
+    } else {
+      notifications.show({
+        title: 'Custom Product Selected',
+        message: `"${trimmed}" selected for this contact.`,
+        color: 'teal',
+      });
+    }
+  };
+
+  const handleItemSelect = (val: string) => {
+    if (val === '__ADD_CUSTOM__') {
+      setCustomNameInput('');
+      setSaveToCatalog(true);
+      setCustomModalOpened(true);
+      return;
+    }
+    setInterestedService(val);
+  };
+
+
 
   const normalizeStatus = (status?: string | null): 'Qualified' | 'Follow-up Required' | 'Unqualified' | 'Pending' => {
     if (!status) return 'Pending';
@@ -172,6 +307,9 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
       setEmployeeCount(activeContact.employeeCount || '');
       setExpectedCloseDate(activeContact.expectedCloseDate || '');
       setNextFollowDate(activeContact.nextFollowDate || '');
+      setAddress(activeContact.address || '');
+      setGstNumber(activeContact.gstNumber || '');
+      setCompanyPan(activeContact.companyPan || '');
       setRemarks(activeContact.remarks || activeContact.notes || '');
 
       const initialStatus = normalizeStatus(activeContact.qualificationStatus || activeContact.status);
@@ -213,14 +351,22 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
         status: statusValue,
         budgetRange: budgetRange?.trim() || '',
         interestedService: trimmedService,
-        // Employee count & Product code only saved for Qualified
-        employeeCount: currentStatus === 'Qualified' ? employeeCount?.trim() || '' : '',
+        address: address?.trim() || '',
+        gstNumber: gstNumber?.trim().toUpperCase() || '',
+        companyPan: companyPan?.trim().toUpperCase() || '',
+        panNumber: companyPan?.trim().toUpperCase() || '',
+        // Employee count & Product code saved for Qualified / Pending
+        employeeCount: (currentStatus === 'Qualified' || currentStatus === 'Pending') ? employeeCount?.trim() || '' : '',
         productCode: currentStatus === 'Qualified' ? productCode?.trim() || '' : '',
         customProduct: currentStatus === 'Qualified' ? (productCode?.trim() || trimmedService) : (category === 'Product' ? (productCode?.trim() || trimmedService) : ''),
         internalReference: currentStatus === 'Qualified' ? productCode?.trim() || '' : '',
         expectedCloseDate: currentStatus === 'Qualified' ? expectedCloseDate || '' : '',
         nextFollowDate: (currentStatus === 'Follow-up Required' || currentStatus === 'Pending') ? nextFollowDate?.trim() || '' : '',
         remarks: remarks?.trim() || '',
+        stage: 'Qualification',
+        assignmentStatus: 'Assigned',
+        assignedTo: activeContact.assignedTo || currentUser?.id || undefined,
+        assignedToName: activeContact.assignedToName || currentUser?.name || undefined,
         qualifiedBy: qualifiedBy?.trim() || activeContact.qualifiedBy || currentUser?.name || '',
         qualificationDate: qualificationDate || todayStr,
         unqualifiedReason: currentStatus === 'Unqualified' ? unqualifiedReason?.trim() || '' : '',
@@ -232,6 +378,9 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
       if (res?.success) {
         const savedData = res.data || { ...activeContact, ...payload };
         setActiveContact(savedData);
+        setAddress(savedData.address || address?.trim() || '');
+        setGstNumber(savedData.gstNumber || gstNumber?.trim().toUpperCase() || '');
+        setCompanyPan(savedData.companyPan || companyPan?.trim().toUpperCase() || '');
         setInterestedService(savedData.interestedService || savedData.serviceList?.[0] || trimmedService);
         try {
           sessionStorage.setItem('crm_qualifying_contact', JSON.stringify(savedData));
@@ -294,6 +443,10 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           });
         }
 
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
+          sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
+        }
         // Notify notification bell and other components across the CRM
         window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
         if (currentStatus === 'Qualified') {
@@ -351,10 +504,17 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
 
   const availableOptions = React.useMemo(() => {
     const list = new Set<string>();
+
     if (category === 'Product') {
+      // 1. Catalog Products (Always first)
+      catalogProducts.forEach((p) => p && list.add(p.trim()));
+      if (metadata?.catalogProducts && Array.isArray(metadata.catalogProducts)) {
+        metadata.catalogProducts.forEach((p) => p && list.add(p.trim()));
+      }
       if (metadata?.productOptions && Array.isArray(metadata.productOptions)) {
         metadata.productOptions.forEach((p) => p && list.add(p.trim()));
       }
+      // 2. Custom products from contacts
       if (contacts && Array.isArray(contacts)) {
         contacts.forEach((c) => {
           if (Array.isArray(c.productList)) c.productList.forEach((p) => p && list.add(p.trim()));
@@ -363,9 +523,15 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
         });
       }
     } else if (category === 'Service') {
+      // 1. Catalog Services (Always first)
+      catalogServices.forEach((s) => s && list.add(s.trim()));
+      if (metadata?.catalogServices && Array.isArray(metadata.catalogServices)) {
+        metadata.catalogServices.forEach((s) => s && list.add(s.trim()));
+      }
       if (metadata?.serviceOptions && Array.isArray(metadata.serviceOptions)) {
         metadata.serviceOptions.forEach((s) => s && list.add(s.trim()));
       }
+      // 2. Custom services from contacts
       if (contacts && Array.isArray(contacts)) {
         contacts.forEach((c) => {
           if (Array.isArray(c.serviceList)) c.serviceList.forEach((s) => s && list.add(s.trim()));
@@ -373,32 +539,57 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
         });
       }
     } else {
-      if (metadata?.productOptions && Array.isArray(metadata.productOptions)) {
-        metadata.productOptions.forEach((p) => p && list.add(p.trim()));
-      }
-      if (metadata?.serviceOptions && Array.isArray(metadata.serviceOptions)) {
-        metadata.serviceOptions.forEach((s) => s && list.add(s.trim()));
-      }
-      if (contacts && Array.isArray(contacts)) {
-        contacts.forEach((c) => {
-          if (c.interestedService) list.add(c.interestedService.trim());
-          if (Array.isArray(c.serviceList)) c.serviceList.forEach((s) => s && list.add(s.trim()));
-          if (Array.isArray(c.productList)) c.productList.forEach((p) => p && list.add(p.trim()));
-          if (c.customProduct) list.add(c.customProduct.trim());
-        });
-      }
+      catalogProducts.forEach((p) => p && list.add(p.trim()));
+      catalogServices.forEach((s) => s && list.add(s.trim()));
+      (metadata?.catalogProducts || []).forEach((p) => p && list.add(p.trim()));
+      (metadata?.catalogServices || []).forEach((s) => s && list.add(s.trim()));
+      (metadata?.productOptions || []).forEach((p) => p && list.add(p.trim()));
+      (metadata?.serviceOptions || []).forEach((s) => s && list.add(s.trim()));
     }
-    return Array.from(list)
+
+    const items: { value: string; label: string }[] = Array.from(list)
       .filter(Boolean)
       .map((val) => ({ value: val, label: val }));
-  }, [category, metadata, contacts]);
+
+    const addLabel =
+      category === 'Product'
+        ? '➕ + Add Custom Product...'
+        : category === 'Service'
+        ? '➕ + Add Custom Service...'
+        : '➕ + Add Custom Item...';
+
+    items.push({ value: '__ADD_CUSTOM__', label: addLabel });
+
+    return items;
+  }, [category, catalogProducts, catalogServices, metadata, contacts]);
 
   const handleAutocompleteFilter = ({ options, search }: { options: any[]; search: string }) => {
     const q = (search || '').trim().toLowerCase();
-    if (!q) return options;
-    return options.filter((item: any) =>
+    const currentVal = (interestedService || '').trim().toLowerCase();
+
+    // If search is empty or equal to current value, show all options!
+    if (!q || q === currentVal) {
+      return options;
+    }
+
+    const filtered = options.filter((item: any) =>
       (item.label || item.value || '').toLowerCase().includes(q)
     );
+
+    const exactMatch = options.some(
+      (item: any) => (item.value || '').toLowerCase() === q && item.value !== '__ADD_CUSTOM__'
+    );
+    if (!exactMatch && q) {
+      return [
+        ...filtered,
+        {
+          value: search.trim(),
+          label: `➕ Use custom ${category === 'Product' ? 'product' : 'service'}: "${search.trim()}"`,
+        },
+      ];
+    }
+
+    return filtered;
   };
 
   const handleReasonFilter = ({ options, search }: { options: any[]; search: string }) => {
@@ -448,6 +639,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
     );
   }
 
+  const labelColor = isDark ? '#E2E8F0' : '#334155';
   const inputStyles = {
     label: {
       fontSize: 12.5,
@@ -719,6 +911,8 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                     </Text>
                   </Box>
                 </SimpleGrid>
+
+
               </Stack>
 
               <Divider my="md" color={isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'} />
@@ -847,6 +1041,63 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                       </Group>
                     </Box>
                   )}
+
+                  {/* 5. Address */}
+                  {(address || activeContact.address) && (
+                    <Box p="9px 12px" style={{ borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid #EEF2F6' }}>
+                      <Group justify="space-between" align="center" wrap="nowrap">
+                        <Group gap={10} wrap="nowrap">
+                          <ThemeIcon size={26} radius="md" variant="light" color="orange">
+                            <IconMapPin size={13} stroke={2} />
+                          </ThemeIcon>
+                          <Text size="11.5px" fw={500} c="dimmed">
+                            Address
+                          </Text>
+                        </Group>
+                        <Text size="xs" fw={550} truncate maw={160} style={{ color: isDark ? '#E2E8F0' : '#334155' }}>
+                          {address || activeContact.address}
+                        </Text>
+                      </Group>
+                    </Box>
+                  )}
+
+                  {/* 6. GST Number */}
+                  {(gstNumber || activeContact.gstNumber) && (
+                    <Box p="9px 12px" style={{ borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid #EEF2F6' }}>
+                      <Group justify="space-between" align="center" wrap="nowrap">
+                        <Group gap={10} wrap="nowrap">
+                          <ThemeIcon size={26} radius="md" variant="light" color="violet">
+                            <IconReceiptTax size={13} stroke={2} />
+                          </ThemeIcon>
+                          <Text size="11.5px" fw={500} c="dimmed">
+                            GST Number
+                          </Text>
+                        </Group>
+                        <Badge size="xs" variant="light" color="violet" radius="sm">
+                          {gstNumber || activeContact.gstNumber}
+                        </Badge>
+                      </Group>
+                    </Box>
+                  )}
+
+                  {/* 7. PAN Number */}
+                  {(companyPan || activeContact.companyPan) && (
+                    <Box p="9px 12px" style={{ borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid #EEF2F6' }}>
+                      <Group justify="space-between" align="center" wrap="nowrap">
+                        <Group gap={10} wrap="nowrap">
+                          <ThemeIcon size={26} radius="md" variant="light" color="teal">
+                            <IconCreditCard size={13} stroke={2} />
+                          </ThemeIcon>
+                          <Text size="11.5px" fw={500} c="dimmed">
+                            PAN Number
+                          </Text>
+                        </Group>
+                        <Badge size="xs" variant="light" color="teal" radius="sm">
+                          {companyPan || activeContact.companyPan}
+                        </Badge>
+                      </Group>
+                    </Box>
+                  )}
                 </Paper>
               </Stack>
             </Paper>
@@ -889,22 +1140,26 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                 </Text>
               </Group>
 
-              <Badge
-                size="md"
-                radius="md"
-                variant="light"
-                color={
-                  currentStatus === 'Qualified'
-                    ? 'teal'
-                    : currentStatus === 'Follow-up Required'
-                    ? 'blue'
-                    : currentStatus === 'Unqualified'
-                    ? 'red'
-                    : 'yellow'
-                }
-              >
-                {currentStatus}
-              </Badge>
+              <Group gap="sm" align="center">
+
+
+                <Badge
+                  size="md"
+                  radius="md"
+                  variant="light"
+                  color={
+                    currentStatus === 'Qualified'
+                      ? 'teal'
+                      : currentStatus === 'Follow-up Required'
+                      ? 'blue'
+                      : currentStatus === 'Unqualified'
+                      ? 'red'
+                      : 'yellow'
+                  }
+                >
+                  {currentStatus}
+                </Badge>
+              </Group>
             </Group>
 
             <Divider mb="lg" color={isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'} />
@@ -963,37 +1218,89 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                 <>
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
                     {/* Row 2: Interested Item & Budget Range */}
-                    <Autocomplete
-                      label={
-                        category === 'Product'
-                          ? 'Interested Product'
-                          : category === 'Service'
-                          ? 'Interested Service'
-                          : 'Interested Product / Service'
-                      }
-                      placeholder={
-                        category === 'Product'
-                          ? 'Select or type custom product...'
-                          : category === 'Service'
-                          ? 'Select or type custom service...'
-                          : 'Select or type product or service...'
-                      }
-                      leftSection={
-                        category === 'Product' ? (
-                          <IconBox size={16} color="#4F46E5" stroke={1.8} />
-                        ) : category === 'Service' ? (
-                          <IconBriefcase size={16} color="#7C3AED" stroke={1.8} />
-                        ) : (
-                          <IconTag size={16} color="#64748B" stroke={1.8} />
-                        )
-                      }
-                      data={availableOptions}
-                      value={interestedService}
-                      onChange={(val) => setInterestedService(val)}
-                      filter={handleAutocompleteFilter}
-                      styles={inputStyles}
-                      clearable
-                    />
+                    <Box>
+                      <Group justify="space-between" align="center" mb={4}>
+                        <Text fw={600} size="13px" style={{ color: labelColor }}>
+                          {category === 'Product'
+                            ? 'Interested Product'
+                            : category === 'Service'
+                            ? 'Interested Service'
+                            : 'Interested Product / Service'}
+                        </Text>
+                        <Button
+                          variant="subtle"
+                          size="compact-xs"
+                          color="indigo"
+                          leftSection={<IconPlus size={12} />}
+                          onClick={() => {
+                            setCustomNameInput('');
+                            setSaveToCatalog(true);
+                            setCustomModalOpened(true);
+                          }}
+                        >
+                          + Add Custom
+                        </Button>
+                      </Group>
+                      <Autocomplete
+                        placeholder={
+                          category === 'Product'
+                            ? 'Select product or type custom...'
+                            : category === 'Service'
+                            ? 'Select service or type custom...'
+                            : 'Select or type product/service...'
+                        }
+                        leftSection={
+                          category === 'Product' ? (
+                            <IconBox size={16} color="#4F46E5" stroke={1.8} />
+                          ) : category === 'Service' ? (
+                            <IconBriefcase size={16} color="#7C3AED" stroke={1.8} />
+                          ) : (
+                            <IconTag size={16} color="#64748B" stroke={1.8} />
+                          )
+                        }
+                        rightSection={
+                          !interestedService ? (
+                            <IconChevronDown size={15} color="#94A3B8" style={{ pointerEvents: 'none' }} />
+                          ) : undefined
+                        }
+                        data={availableOptions}
+                        value={interestedService}
+                        onChange={handleItemSelect}
+                        filter={handleAutocompleteFilter}
+                        renderOption={({ option }) => {
+                          if (option.value === '__ADD_CUSTOM__') {
+                            return (
+                              <Group gap="xs" py={4} style={{ color: '#4F46E5', fontWeight: 600 }}>
+                                <IconPlus size={15} color="#4F46E5" />
+                                <Text size="13px" fw={600} c="indigo">
+                                  {category === 'Product' ? '+ Add Custom Product...' : '+ Add Custom Service...'}
+                                </Text>
+                              </Group>
+                            );
+                          }
+                          const isCatalog = catalogProducts.includes(option.value) || catalogServices.includes(option.value);
+                          return (
+                            <Group gap="xs" py={2} justify="space-between" w="100%">
+                              <Group gap="xs">
+                                {category === 'Product' ? (
+                                  <IconBox size={14} color="#4F46E5" />
+                                ) : (
+                                  <IconBriefcase size={14} color="#7C3AED" />
+                                )}
+                                <Text size="13px">{(option as any).label || (option as any).value}</Text>
+                              </Group>
+                              {isCatalog && (
+                                <Badge size="xs" variant="light" color={category === 'Product' ? 'indigo' : 'grape'} radius="sm">
+                                  Catalog
+                                </Badge>
+                              )}
+                            </Group>
+                          );
+                        }}
+                        styles={inputStyles}
+                        clearable
+                      />
+                    </Box>
 
                     <TextInput
                       label="Budget Range"
@@ -1016,15 +1323,46 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                       clearable
                     />
 
-                    <TextInput
-                      type="date"
+                    <MeetingDatePicker
                       label="Qualification Date"
+                      placeholder="DD-MM-YYYY"
                       value={qualificationDate}
-                      onChange={(e) => setQualificationDate(e.target.value)}
+                      onChange={(val) => setQualificationDate(val)}
                       styles={inputStyles}
-                      onClick={(e) => (e.target as any).showPicker?.()}
+                      zIndex={3000}
                     />
                   </SimpleGrid>
+
+                  {/* GST & PAN Numbers (Optional) */}
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                    <TextInput
+                      label="GST Number (Optional)"
+                      placeholder="e.g. 33AAAAA0000A1Z5"
+                      leftSection={<IconReceiptTax size={16} color="#7C3AED" stroke={1.8} />}
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
+                      styles={inputStyles}
+                    />
+
+                    <TextInput
+                      label="PAN Number (Optional)"
+                      placeholder="e.g. AAAAA0000A"
+                      leftSection={<IconCreditCard size={16} color="#059669" stroke={1.8} />}
+                      value={companyPan}
+                      onChange={(e) => setCompanyPan(e.target.value.toUpperCase())}
+                      styles={inputStyles}
+                    />
+                  </SimpleGrid>
+
+                  {/* Address */}
+                  <TextInput
+                    label="Address"
+                    placeholder="Enter street, city, state, postal code..."
+                    leftSection={<IconMapPin size={16} color="#EA580C" stroke={1.8} />}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    styles={inputStyles}
+                  />
 
                   {/* Notes (Full width) */}
                   <Textarea
@@ -1042,47 +1380,129 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
               {currentStatus === 'Follow-up Required' && (
                 <>
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                    <TextInput
-                      type="date"
+                    <MeetingDatePicker
                       label="Next Follow-up Date"
+                      placeholder="DD-MM-YYYY"
                       value={nextFollowDate}
-                      onChange={(e) => setNextFollowDate(e.target.value)}
+                      onChange={(val) => setNextFollowDate(val)}
                       styles={inputStyles}
-                      onClick={(e) => (e.target as any).showPicker?.()}
+                      zIndex={3000}
                     />
 
-                    <Autocomplete
-                      label={
-                        category === 'Product'
-                          ? 'Interested Product'
-                          : category === 'Service'
-                          ? 'Interested Service'
-                          : 'Interested Product / Service'
-                      }
-                      placeholder={
-                        category === 'Product'
-                          ? 'Select or type custom product...'
-                          : category === 'Service'
-                          ? 'Select or type custom service...'
-                          : 'Select or type product or service...'
-                      }
-                      leftSection={
-                        category === 'Product' ? (
-                          <IconBox size={16} color="#4F46E5" stroke={1.8} />
-                        ) : category === 'Service' ? (
-                          <IconBriefcase size={16} color="#7C3AED" stroke={1.8} />
-                        ) : (
-                          <IconTag size={16} color="#64748B" stroke={1.8} />
-                        )
-                      }
-                      data={availableOptions}
-                      value={interestedService}
-                      onChange={(val) => setInterestedService(val)}
-                      filter={handleAutocompleteFilter}
+                    <Box>
+                      <Group justify="space-between" align="center" mb={4}>
+                        <Text fw={600} size="13px" style={{ color: labelColor }}>
+                          {category === 'Product'
+                            ? 'Interested Product'
+                            : category === 'Service'
+                            ? 'Interested Service'
+                            : 'Interested Product / Service'}
+                        </Text>
+                        <Button
+                          variant="subtle"
+                          size="compact-xs"
+                          color="indigo"
+                          leftSection={<IconPlus size={12} />}
+                          onClick={() => {
+                            setCustomNameInput('');
+                            setSaveToCatalog(true);
+                            setCustomModalOpened(true);
+                          }}
+                        >
+                          + Add Custom
+                        </Button>
+                      </Group>
+                      <Autocomplete
+                        placeholder={
+                          category === 'Product'
+                            ? 'Select product or type custom...'
+                            : category === 'Service'
+                            ? 'Select service or type custom...'
+                            : 'Select or type product/service...'
+                        }
+                        leftSection={
+                          category === 'Product' ? (
+                            <IconBox size={16} color="#4F46E5" stroke={1.8} />
+                          ) : category === 'Service' ? (
+                            <IconBriefcase size={16} color="#7C3AED" stroke={1.8} />
+                          ) : (
+                            <IconTag size={16} color="#64748B" stroke={1.8} />
+                          )
+                        }
+                        rightSection={
+                          !interestedService ? (
+                            <IconChevronDown size={15} color="#94A3B8" style={{ pointerEvents: 'none' }} />
+                          ) : undefined
+                        }
+                        data={availableOptions}
+                        value={interestedService}
+                        onChange={handleItemSelect}
+                        filter={handleAutocompleteFilter}
+                        renderOption={({ option }) => {
+                          if (option.value === '__ADD_CUSTOM__') {
+                            return (
+                              <Group gap="xs" py={4} style={{ color: '#4F46E5', fontWeight: 600 }}>
+                                <IconPlus size={15} color="#4F46E5" />
+                                <Text size="13px" fw={600} c="indigo">
+                                  {category === 'Product' ? '+ Add Custom Product...' : '+ Add Custom Service...'}
+                                </Text>
+                              </Group>
+                            );
+                          }
+                          const isCatalog = catalogProducts.includes(option.value) || catalogServices.includes(option.value);
+                          return (
+                            <Group gap="xs" py={2} justify="space-between" w="100%">
+                              <Group gap="xs">
+                                {category === 'Product' ? (
+                                  <IconBox size={14} color="#4F46E5" />
+                                ) : (
+                                  <IconBriefcase size={14} color="#7C3AED" />
+                                )}
+                                <Text size="13px">{(option as any).label || (option as any).value}</Text>
+                              </Group>
+                              {isCatalog && (
+                                <Badge size="xs" variant="light" color={category === 'Product' ? 'indigo' : 'grape'} radius="sm">
+                                  Catalog
+                                </Badge>
+                              )}
+                            </Group>
+                          );
+                        }}
+                        styles={inputStyles}
+                        clearable
+                      />
+                    </Box>
+                  </SimpleGrid>
+
+                  {/* GST & PAN Numbers (Optional) */}
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                    <TextInput
+                      label="GST Number (Optional)"
+                      placeholder="e.g. 33AAAAA0000A1Z5"
+                      leftSection={<IconReceiptTax size={16} color="#7C3AED" stroke={1.8} />}
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
                       styles={inputStyles}
-                      clearable
+                    />
+
+                    <TextInput
+                      label="PAN Number (Optional)"
+                      placeholder="e.g. AAAAA0000A"
+                      leftSection={<IconCreditCard size={16} color="#059669" stroke={1.8} />}
+                      value={companyPan}
+                      onChange={(e) => setCompanyPan(e.target.value.toUpperCase())}
+                      styles={inputStyles}
                     />
                   </SimpleGrid>
+
+                  <TextInput
+                    label="Address"
+                    placeholder="Enter street, city, state, postal code..."
+                    leftSection={<IconMapPin size={16} color="#EA580C" stroke={1.8} />}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    styles={inputStyles}
+                  />
 
                   <Textarea
                     label="Follow-up Remarks"
@@ -1112,13 +1532,13 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                       clearable
                     />
 
-                    <TextInput
-                      type="date"
+                    <MeetingDatePicker
                       label="Date"
+                      placeholder="DD-MM-YYYY"
                       value={qualificationDate}
-                      onChange={(e) => setQualificationDate(e.target.value)}
+                      onChange={(val) => setQualificationDate(val)}
                       styles={inputStyles}
-                      onClick={(e) => (e.target as any).showPicker?.()}
+                      zIndex={3000}
                     />
                   </SimpleGrid>
 
@@ -1137,45 +1557,97 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
               {currentStatus === 'Pending' && (
                 <>
                   <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
-                    <Autocomplete
-                      label={
-                        category === 'Product'
-                          ? 'Interested Product'
-                          : category === 'Service'
-                          ? 'Interested Service'
-                          : 'Interested Product / Service'
-                      }
-                      placeholder={
-                        category === 'Product'
-                          ? 'Select or type custom product...'
-                          : category === 'Service'
-                          ? 'Select or type custom service...'
-                          : 'Select or type product or service...'
-                      }
-                      leftSection={
-                        category === 'Product' ? (
-                          <IconBox size={16} color="#4F46E5" stroke={1.8} />
-                        ) : category === 'Service' ? (
-                          <IconBriefcase size={16} color="#7C3AED" stroke={1.8} />
-                        ) : (
-                          <IconTag size={16} color="#64748B" stroke={1.8} />
-                        )
-                      }
-                      data={availableOptions}
-                      value={interestedService}
-                      onChange={(val) => setInterestedService(val)}
-                      filter={handleAutocompleteFilter}
-                      styles={inputStyles}
-                      clearable
-                    />
+                    <Box>
+                      <Group justify="space-between" align="center" mb={4}>
+                        <Text fw={600} size="13px" style={{ color: labelColor }}>
+                          {category === 'Product'
+                            ? 'Interested Product'
+                            : category === 'Service'
+                            ? 'Interested Service'
+                            : 'Interested Product / Service'}
+                        </Text>
+                        <Button
+                          variant="subtle"
+                          size="compact-xs"
+                          color="indigo"
+                          leftSection={<IconPlus size={12} />}
+                          onClick={() => {
+                            setCustomNameInput('');
+                            setSaveToCatalog(true);
+                            setCustomModalOpened(true);
+                          }}
+                        >
+                          + Add Custom
+                        </Button>
+                      </Group>
+                      <Autocomplete
+                        placeholder={
+                          category === 'Product'
+                            ? 'Select product or type custom...'
+                            : category === 'Service'
+                            ? 'Select service or type custom...'
+                            : 'Select or type product/service...'
+                        }
+                        leftSection={
+                          category === 'Product' ? (
+                            <IconBox size={16} color="#4F46E5" stroke={1.8} />
+                          ) : category === 'Service' ? (
+                            <IconBriefcase size={16} color="#7C3AED" stroke={1.8} />
+                          ) : (
+                            <IconTag size={16} color="#64748B" stroke={1.8} />
+                          )
+                        }
+                        rightSection={
+                          !interestedService ? (
+                            <IconChevronDown size={15} color="#94A3B8" style={{ pointerEvents: 'none' }} />
+                          ) : undefined
+                        }
+                        data={availableOptions}
+                        value={interestedService}
+                        onChange={handleItemSelect}
+                        filter={handleAutocompleteFilter}
+                        renderOption={({ option }) => {
+                          if (option.value === '__ADD_CUSTOM__') {
+                            return (
+                              <Group gap="xs" py={4} style={{ color: '#4F46E5', fontWeight: 600 }}>
+                                <IconPlus size={15} color="#4F46E5" />
+                                <Text size="13px" fw={600} c="indigo">
+                                  {category === 'Product' ? '+ Add Custom Product...' : '+ Add Custom Service...'}
+                                </Text>
+                              </Group>
+                            );
+                          }
+                          const isCatalog = catalogProducts.includes(option.value) || catalogServices.includes(option.value);
+                          return (
+                            <Group gap="xs" py={2} justify="space-between" w="100%">
+                              <Group gap="xs">
+                                {category === 'Product' ? (
+                                  <IconBox size={14} color="#4F46E5" />
+                                ) : (
+                                  <IconBriefcase size={14} color="#7C3AED" />
+                                )}
+                                <Text size="13px">{(option as any).label || (option as any).value}</Text>
+                              </Group>
+                              {isCatalog && (
+                                <Badge size="xs" variant="light" color={category === 'Product' ? 'indigo' : 'grape'} radius="sm">
+                                  Catalog
+                                </Badge>
+                              )}
+                            </Group>
+                          );
+                        }}
+                        styles={inputStyles}
+                        clearable
+                      />
+                    </Box>
 
-                    <TextInput
-                      type="date"
+                    <MeetingDatePicker
                       label="Pending Follow-up / Review Date"
+                      placeholder="DD-MM-YYYY"
                       value={nextFollowDate}
-                      onChange={(e) => setNextFollowDate(e.target.value)}
+                      onChange={(val) => setNextFollowDate(val)}
                       styles={inputStyles}
-                      onClick={(e) => (e.target as any).showPicker?.()}
+                      zIndex={3000}
                     />
                   </SimpleGrid>
 
@@ -1189,15 +1661,58 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
                       styles={inputStyles}
                     />
 
-                    <TextInput
-                      type="date"
-                      label="Qualification Date"
-                      value={qualificationDate}
-                      onChange={(e) => setQualificationDate(e.target.value)}
+                    <Select
+                      label="Employee Count"
+                      placeholder="Select employee count..."
+                      leftSection={<IconUsers size={16} color="#0D9488" stroke={1.8} />}
+                      data={employeeCountOptions}
+                      value={employeeCount || null}
+                      onChange={(val) => setEmployeeCount(val || '')}
                       styles={inputStyles}
-                      onClick={(e) => (e.target as any).showPicker?.()}
+                      clearable
                     />
                   </SimpleGrid>
+
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                    <MeetingDatePicker
+                      label="Qualification Date"
+                      placeholder="DD-MM-YYYY"
+                      value={qualificationDate}
+                      onChange={(val) => setQualificationDate(val)}
+                      styles={inputStyles}
+                      zIndex={3000}
+                    />
+                  </SimpleGrid>
+
+                  {/* GST & PAN Numbers (Optional) */}
+                  <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+                    <TextInput
+                      label="GST Number (Optional)"
+                      placeholder="e.g. 33AAAAA0000A1Z5"
+                      leftSection={<IconReceiptTax size={16} color="#7C3AED" stroke={1.8} />}
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
+                      styles={inputStyles}
+                    />
+
+                    <TextInput
+                      label="PAN Number (Optional)"
+                      placeholder="e.g. AAAAA0000A"
+                      leftSection={<IconCreditCard size={16} color="#059669" stroke={1.8} />}
+                      value={companyPan}
+                      onChange={(e) => setCompanyPan(e.target.value.toUpperCase())}
+                      styles={inputStyles}
+                    />
+                  </SimpleGrid>
+
+                  <TextInput
+                    label="Address"
+                    placeholder="Enter street, city, state, postal code..."
+                    leftSection={<IconMapPin size={16} color="#EA580C" stroke={1.8} />}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    styles={inputStyles}
+                  />
 
                   <Textarea
                     label="Pending Notes"
@@ -1262,6 +1777,55 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           </Paper>
         </Grid.Col>
       </Grid>
+
+            {/* Add Custom Product/Service Modal */}
+      <Modal
+        opened={customModalOpened}
+        onClose={() => setCustomModalOpened(false)}
+        title={
+          <Group gap="xs">
+            <ThemeIcon color="indigo" variant="light" size="md" radius="md">
+              <IconPlus size={18} />
+            </ThemeIcon>
+            <Text fw={700} size="sm">
+              Add Custom {category === 'Product' ? 'Product' : category === 'Service' ? 'Service' : 'Item'}
+            </Text>
+          </Group>
+        }
+        radius="md"
+        centered
+        zIndex={3500}
+      >
+        <Stack gap="md">
+          <TextInput
+            label={`${category === 'Product' ? 'Product' : 'Service'} Name`}
+            placeholder={`e.g. ${category === 'Product' ? 'AI Analytics Engine' : 'Cloud Security Audit'}`}
+            value={customNameInput}
+            onChange={(e) => setCustomNameInput(e.target.value)}
+            required
+            autoFocus
+          />
+          <Checkbox
+            label={`Save this ${category === 'Product' ? 'product' : 'service'} to Catalog for future leads`}
+            checked={saveToCatalog}
+            onChange={(e) => setSaveToCatalog(e.currentTarget.checked)}
+            color="indigo"
+          />
+          <Group justify="flex-end" gap="xs" mt="sm">
+            <Button variant="default" onClick={() => setCustomModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button
+              color="indigo"
+              loading={savingCatalogItem}
+              disabled={!customNameInput.trim()}
+              onClick={handleSaveCustomProduct}
+            >
+              Add {category === 'Product' ? 'Product' : 'Service'}
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </Box>
   );
 };

@@ -172,10 +172,10 @@ export const LeadMeetingsTableView: React.FC<LeadMeetingsTableViewProps> = ({
               <IconTarget size={32} stroke={1.8} />
             </Box>
             <Text fw={700} size="lg" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
-              No Scheduled Meetings Found
+              No Meetings Found
             </Text>
             <Text size="sm" c="dimmed" style={{ maxWidth: 420 }}>
-              No leads currently have scheduled meetings matching your search or filters. Click &quot;Schedule Meeting&quot; above to schedule one.
+              No leads currently have meetings matching your search or filters. Click &quot;Schedule Meeting&quot; above to schedule one.
             </Text>
           </Stack>
         </Center>

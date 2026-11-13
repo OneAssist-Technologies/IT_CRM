@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Stack,
@@ -21,6 +21,7 @@ import {
   Autocomplete,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { MeetingDatePicker } from '../../meetings/components/MeetingDatePicker';
 import {
   IconTargetArrow,
   IconCheck,
@@ -35,6 +36,8 @@ import {
   IconBriefcase,
   IconAlertCircle,
   IconFileText,
+  IconReceiptTax,
+  IconCreditCard,
 } from '@tabler/icons-react';
 import { Contact, QualificationStatus, ContactPriority } from '../../../types/contact';
 import { useContact } from '../../../context/ContactContext';
@@ -59,6 +62,15 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
 
   const { currentUser } = useCRM();
   const { updateContact, metadata } = useContact();
+
+  const drawerProductServiceOptions = useMemo(() => {
+    const list = new Set<string>();
+    (metadata?.catalogProducts || []).forEach((p) => p && list.add(p.trim()));
+    (metadata?.productOptions || []).forEach((p) => p && list.add(p.trim()));
+    (metadata?.catalogServices || []).forEach((s) => s && list.add(s.trim()));
+    (metadata?.serviceOptions || []).forEach((s) => s && list.add(s.trim()));
+    return Array.from(list).filter(Boolean);
+  }, [metadata]);
   const { fetchLeads, fetchStats } = useLead();
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -73,6 +85,9 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
   const [qualificationStatus, setQualificationStatus] = useState<QualificationStatus>('Pending');
   const [qualifiedBy, setQualifiedBy] = useState<string>('');
   const [qualificationDate, setQualificationDate] = useState<string>(todayStr);
+  const [address, setAddress] = useState<string>('');
+  const [gstNumber, setGstNumber] = useState<string>('');
+  const [companyPan, setCompanyPan] = useState<string>('');
   const [unqualifiedReason, setUnqualifiedReason] = useState<string>('');
   const [saving, setSaving] = useState<boolean>(false);
 
@@ -113,6 +128,9 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
           ''
       );
       setQualificationDate(contact.qualificationDate || todayStr);
+      setAddress(contact.address || '');
+      setGstNumber(contact.gstNumber || '');
+      setCompanyPan(contact.companyPan || '');
       setUnqualifiedReason(contact.unqualifiedReason || contact.disqualificationReason || '');
     }
   }, [contact, opened]);
@@ -133,8 +151,16 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
         qualificationStatus,
         qualifiedBy: qualifiedBy.trim(),
         qualificationDate: qualificationDate || todayStr,
+        address: address.trim(),
+        gstNumber: gstNumber.trim().toUpperCase() || '',
+        companyPan: companyPan.trim().toUpperCase() || '',
+        panNumber: companyPan.trim().toUpperCase() || '',
         unqualifiedReason: qualificationStatus === 'Unqualified' ? unqualifiedReason.trim() : '',
         disqualificationReason: qualificationStatus === 'Unqualified' ? unqualifiedReason.trim() : '',
+        stage: 'Qualification',
+        assignmentStatus: 'Assigned',
+        assignedTo: contact.assignedTo || currentUser?.id || undefined,
+        assignedToName: contact.assignedToName || currentUser?.name || undefined,
         status:
           qualificationStatus === 'Qualified'
             ? 'Qualified'
@@ -164,6 +190,11 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
           });
         }
 
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
+          sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
+        }
+        window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
         onSuccess?.();
         onClose();
       }
@@ -438,8 +469,8 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
                   Web app, mobile app, ERP, CRM, etc.
                 </Text>
                 <Autocomplete
-                  placeholder="Select or type custom service..."
-                  data={[]}
+                  placeholder="Select or type custom service or product..."
+                  data={drawerProductServiceOptions}
                   value={interestedService}
                   onChange={(val) => setInterestedService(val)}
                   filter={({ options, search }) => {
@@ -526,6 +557,78 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
               />
             </Box>
 
+            {/* GST Number & PAN Number (Optional) */}
+            <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md">
+              <Box>
+                <Text fw={600} size="13px" style={{ color: labelColor }}>
+                  GST Number (Optional)
+                </Text>
+                <Text size="11px" c="dimmed" mb={4}>
+                  e.g. 33AAAAA0000A1Z5
+                </Text>
+                <TextInput
+                  placeholder="Enter GST number..."
+                  leftSection={<IconReceiptTax size={16} color="#7C3AED" stroke={1.8} />}
+                  value={gstNumber}
+                  onChange={(e) => setGstNumber(e.currentTarget.value.toUpperCase())}
+                  radius="md"
+                  styles={{
+                    input: {
+                      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : '#CBD5E1',
+                      fontSize: 13,
+                    },
+                  }}
+                />
+              </Box>
+
+              <Box>
+                <Text fw={600} size="13px" style={{ color: labelColor }}>
+                  PAN Number (Optional)
+                </Text>
+                <Text size="11px" c="dimmed" mb={4}>
+                  e.g. AAAAA0000A
+                </Text>
+                <TextInput
+                  placeholder="Enter PAN number..."
+                  leftSection={<IconCreditCard size={16} color="#059669" stroke={1.8} />}
+                  value={companyPan}
+                  onChange={(e) => setCompanyPan(e.currentTarget.value.toUpperCase())}
+                  radius="md"
+                  styles={{
+                    input: {
+                      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : '#CBD5E1',
+                      fontSize: 13,
+                    },
+                  }}
+                />
+              </Box>
+            </SimpleGrid>
+
+            {/* Address */}
+            <Box>
+              <Text fw={600} size="13px" style={{ color: labelColor }}>
+                Address
+              </Text>
+              <Text size="11px" c="dimmed" mb={4}>
+                Contact / Company office address
+              </Text>
+              <TextInput
+                placeholder="Enter street, city, state, postal code..."
+                value={address}
+                onChange={(e) => setAddress(e.currentTarget.value)}
+                radius="md"
+                styles={{
+                  input: {
+                    backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : '#CBD5E1',
+                    fontSize: 13,
+                  },
+                }}
+              />
+            </Box>
+
             {/* 8. Qualified By & 9. Qualification Date */}
             {/* Qualification Date */}
             <Box>
@@ -535,18 +638,11 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
                 <Text size="11px" c="dimmed" mb={4}>
                   Eppo qualify pannanga?
                 </Text>
-                <TextInput
-                  type="date"
+                <MeetingDatePicker
                   value={qualificationDate}
-                  onChange={(e) => setQualificationDate(e.currentTarget.value)}
-                  radius="md"
-                  styles={{
-                    input: {
-                      backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.15)' : '#CBD5E1',
-                      fontSize: 13,
-                    },
-                  }}
+                  placeholder="DD-MM-YYYY"
+                  onChange={(val: string) => setQualificationDate(val)}
+                  zIndex={3000}
                 />
               </Box>
 

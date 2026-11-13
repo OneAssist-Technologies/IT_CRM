@@ -6,7 +6,7 @@ import * as projectService from '../services/project.service.js';
  */
 export async function getProjects(req, res) {
   try {
-    const result = await projectService.getProjectsService(req.query);
+    const result = await projectService.getProjectsService(req.query, req.user);
     return res.status(200).json({
       success: true,
       ...result,
@@ -37,9 +37,9 @@ export async function getProjectById(req, res) {
  * 3. Get Project KPI Stats
  * GET /api/v1/projects/stats
  */
-export async function getProjectStats(_req, res) {
+export async function getProjectStats(req, res) {
   try {
-    const result = await projectService.getProjectStatsService();
+    const result = await projectService.getProjectStatsService(req.user);
     return res.status(200).json({
       success: true,
       ...result,

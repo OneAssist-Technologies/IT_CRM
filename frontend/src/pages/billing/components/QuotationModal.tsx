@@ -56,6 +56,8 @@ interface QuotationModalProps {
   initialLead?: Lead | null;
   embedded?: boolean;
   onNavigateSection?: (section: any) => void;
+  isRevision?: boolean;
+  baseQuotation?: Quotation | null;
 }
 
 export const QuotationModal: React.FC<QuotationModalProps> = ({
@@ -66,6 +68,8 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
   initialLead,
   embedded = false,
   onNavigateSection,
+  isRevision = false,
+  baseQuotation = null,
 }) => {
   const isDark = useComputedColorScheme('light') === 'dark';
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +77,17 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
   const [masterProjects, setMasterProjects] = useState<MasterProject[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [customRowIndices, setCustomRowIndices] = useState<number[]>([]);
+
+  // Revision state & details
+  const effectiveBase = isRevision ? (baseQuotation || quotation) : null;
+  const nextVersion = effectiveBase
+    ? (effectiveBase.latestVersion ? effectiveBase.latestVersion + 1 : ((effectiveBase.version || 1) + 1))
+    : 2;
+  const nextRevisionName = `V${nextVersion}`;
+  const baseQuotationNumber = effectiveBase
+    ? (effectiveBase.originalQuotationNumber || effectiveBase.quotationNumber)
+    : '';
+  const [revisionNotes, setRevisionNotes] = useState<string>('');
 
   const selectedProject = masterProjects.find(
     (p) => p.id === selectedProjectId || p.projectCode === selectedProjectId
@@ -169,11 +184,58 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
     }
   }, [opened, initialLead]);
 
-  // Populate on edit or initialLead
+  // Populate on edit, revision or initialLead
   useEffect(() => {
     if (!opened) return;
 
-    if (quotation) {
+    if (isRevision && effectiveBase) {
+      setContactId(effectiveBase.contactId || '');
+      setContactName(effectiveBase.contactName || '');
+      setCompanyName(effectiveBase.companyName || '');
+      setContactEmail(effectiveBase.contactEmail || '');
+      setContactPhone(effectiveBase.contactPhone || '');
+      setClientGst(effectiveBase.clientGst || '');
+      setClientAddress(effectiveBase.clientAddress || '');
+      setQuotationDate(new Date().toISOString().split('T')[0]);
+      setValidUntil(
+        effectiveBase.validUntil?.split('T')[0] ||
+        new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0]
+      );
+      setStatus('Draft');
+      setDiscountType(effectiveBase.discountType || 'percentage');
+      setDiscountValue(Number(effectiveBase.discountValue) || 0);
+      setPaymentTerms(effectiveBase.paymentTerms || 'Net 30 Days');
+      setNotes(effectiveBase.notes || '');
+      setTermsConditions(effectiveBase.termsConditions || '');
+      setRevisionNotes('');
+      if (effectiveBase.items && effectiveBase.items.length > 0) {
+        setItems(
+          effectiveBase.items.map((it) => {
+            const qty = Number(it.quantity) || 1;
+            const price = Number(it.unitPrice) || 0;
+            const disc = Number(it.discount) || 0;
+            const discType = it.discountType || 'percentage';
+            const gross = qty * price;
+            const discAmt = discType === 'percentage' ? (gross * disc) / 100 : Math.min(gross, disc);
+            const base = Math.max(0, gross - discAmt);
+            const taxRate = Number(it.taxRate) || 0;
+            const taxAmount = Number(((base * taxRate) / 100).toFixed(2));
+            const totalAmount = Number((base + taxAmount).toFixed(2));
+
+            return {
+              ...it,
+              quantity: qty,
+              unitPrice: price,
+              discount: disc,
+              discountType: discType,
+              taxRate,
+              taxAmount: it.taxAmount ? Number(it.taxAmount) : taxAmount,
+              totalAmount: it.totalAmount ? Number(it.totalAmount) : totalAmount,
+            };
+          })
+        );
+      }
+    } else if (quotation) {
       setContactId(quotation.contactId || '');
       setContactName(quotation.contactName || '');
       setCompanyName(quotation.companyName || '');
@@ -617,7 +679,17 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
       };
 
       let savedQuote: Quotation | undefined;
-      if (quotation?.id && !quotation.id.startsWith('quo-')) {
+      if (isRevision && effectiveBase?.id) {
+        savedQuote = await billingService.createQuotationRevision(effectiveBase.id, {
+          ...payload,
+          projectName: effectiveBase.projectName || payload.projectName,
+          revisionNotes: revisionNotes.trim() || `Revision ${nextRevisionName} created from ${baseQuotationNumber}`,
+        });
+        notifications.show({
+          color: 'green',
+          message: `Quotation Revision ${nextRevisionName} (${savedQuote.quotationNumber}) created successfully!`,
+        });
+      } else if (quotation?.id && !quotation.id.startsWith('quo-')) {
         savedQuote = await billingService.updateQuotation(quotation.id, payload);
         notifications.show({
           color: 'green',
@@ -683,14 +755,18 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
           </Box>
           <div>
             <Text fw={800} size="19px" style={{ color: isDark ? '#F8FAFC' : '#0F172A', lineHeight: 1.2 }}>
-              {quotation
+              {isRevision && effectiveBase
+                ? `Create Revision ${nextRevisionName} (${baseQuotationNumber}-${nextRevisionName})`
+                : quotation
                 ? `Edit Quotation (${quotation.quotationNumber})`
                 : initialLead
                 ? `Create Quotation • ${initialLead.name}`
                 : 'Quotation Maker • New Quotation'}
             </Text>
             <Text size="xs" c="dimmed" mt={2}>
-              {initialLead
+              {isRevision && effectiveBase
+                ? `Cloning line items and terms from ${effectiveBase.quotationNumber}. Historical version is preserved.`
+                : initialLead
                 ? `Build and save quotation for ${initialLead.name} (${initialLead.companyName || 'Lead'}) directly in CRM database`
                 : 'Prepare itemized estimate with catalogue products, GST rates, and terms (Stored in CRM Database)'}
             </Text>
@@ -721,6 +797,45 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
           </ActionIcon>
         )}
       </Group>
+
+      {/* Revision Banner if creating revision */}
+      {isRevision && effectiveBase && (
+        <Paper
+          p="sm"
+          radius="md"
+          mb="md"
+          style={{
+            background: isDark ? 'rgba(79, 70, 229, 0.15)' : '#EEF2FF',
+            border: isDark ? '1px solid rgba(79, 70, 229, 0.35)' : '1px solid #C7D2FE',
+          }}
+        >
+          <Group justify="space-between" align="center" mb={6}>
+            <Group gap="xs">
+              <Badge color="indigo" variant="filled" size="sm" radius="sm">
+                Next Version: {nextRevisionName}
+              </Badge>
+              <Text size="xs" fw={700} style={{ color: isDark ? '#C7D2FE' : '#3730A3' }}>
+                Revision of {baseQuotationNumber}
+              </Text>
+            </Group>
+            <Text size="11px" c="dimmed">
+              Original Version: {effectiveBase.revisionName || `V${effectiveBase.version || 1}`} ({effectiveBase.status})
+            </Text>
+          </Group>
+          <TextInput
+            label="Revision Reason / Changes Requested by Client"
+            placeholder="e.g., Client requested 5% additional discount on software development and 45-day credit period"
+            value={revisionNotes}
+            onChange={(e) => setRevisionNotes(e.currentTarget.value)}
+            size="xs"
+            styles={{
+              input: {
+                backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+              },
+            }}
+          />
+        </Paper>
+      )}
 
       <form onSubmit={handleSubmit}>
         <Stack gap="md">
@@ -1208,7 +1323,7 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
                 boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
               }}
             >
-              {quotation ? 'Update Quotation' : 'Create Quotation'}
+              {isRevision ? `Create Revision ${nextRevisionName}` : (quotation ? 'Update Quotation' : 'Create Quotation')}
             </Button>
 
             {/* Conditional Navigation Buttons based on quotation status */}

@@ -45,6 +45,7 @@ export function formatCallLogResponse(log) {
     employeeName: log.employeeName,
     contactId: log.contactId || null,
     contactName: log.contactName,
+    companyName: log.companyName || null,
     phoneNumber: log.phoneNumber,
     leadId: log.leadId || null,
     duration: log.duration,

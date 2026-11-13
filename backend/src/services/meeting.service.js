@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { getCache, setCache, delCache } from '../config/redis.js';
 import { io } from '../utils/socket.js';
+import { recordActivity } from './activity.service.js';
 
 const CACHE_KEY_PREFIX = 'crm:meetings:';
 
@@ -9,56 +10,130 @@ const CACHE_KEY_PREFIX = 'crm:meetings:';
  */
 function getScheduledMeetingSelectQuery(whereClause = 'WHERE 1=1') {
   return `
-    SELECT 
-      m.id,
-      COALESCE(m."lead_id", m."contactId") AS "leadId",
-      COALESCE(m."lead_id", m."contactId") AS "lead_id",
-      COALESCE(m."contactId", m."lead_id") AS "contactId",
-      m.title,
-      m.title AS "meetingTitle",
-      m.purpose,
-      m."meetingDate",
-      m."meetingDate" AS "date",
-      m."startTime",
-      m."startTime" AS "meetingTime",
-      m."startTime" AS "time",
-      m."endTime",
-      m."meetingType",
-      m.location,
-      m.location AS "meetingLocation",
-      m.location AS "meetingLink",
-      m."employeeId",
-      m."employeeName",
-      m."employeeName" AS "assignedTo",
-      m."employeeEmail",
-      m."employeeDesignation",
-      COALESCE(l.name, m."clientName") AS "leadName",
-      COALESCE(m."clientName", l.name) AS "clientName",
-      l."companyName" AS "companyName",
-      l.email AS "leadEmail",
-      l.phone AS "leadPhone",
-      l."leadId" AS "leadCode",
-      l.id AS "leadDbId",
-      l.stage AS "leadStage",
-      l.status AS "leadStatus",
-      m.status,
-      m.status AS "meetingStatus",
-      m.notes,
-      m.notes AS "description",
-      m.requirements,
-      m."requirementFileName",
-      m."requirementFileUrl",
-      m."requirementFileSize",
-      m."createdAt",
-      m."updatedAt"
-    FROM "ScheduledMeeting" m
-    LEFT JOIN "Lead" l ON (
-      m."lead_id" = l.id OR 
-      m."contactId" = l.id OR 
-      m."lead_id" = l."leadId" OR 
-      m."contactId" = l."leadId"
+    WITH meeting_rows AS (
+      SELECT 
+        m.id,
+        COALESCE(m."lead_id", m."contactId") AS "leadId",
+        COALESCE(m."lead_id", m."contactId") AS "lead_id",
+        COALESCE(m."contactId", m."lead_id") AS "contactId",
+        m.title,
+        m.title AS "meetingTitle",
+        m.purpose,
+        m."meetingDate",
+        m."meetingDate" AS "date",
+        m."startTime",
+        m."startTime" AS "meetingTime",
+        m."startTime" AS "time",
+        m."endTime",
+        m."meetingType",
+        m.location,
+        m.location AS "meetingLocation",
+        m.location AS "meetingLink",
+        m."employeeId",
+        m."employeeName",
+        m."employeeName" AS "assignedTo",
+        m."employeeEmail",
+        m."employeeDesignation",
+        COALESCE(l.name, c.name, cust."contactPerson", b.name, m."clientName") AS "leadName",
+        COALESCE(m."clientName", cust."companyName", l.name, c.name, b.name) AS "clientName",
+        COALESCE(l."companyName", c."companyName", cust."companyName", b."companyName") AS "companyName",
+        COALESCE(l.email, c.email, cust.email, b.email) AS "leadEmail",
+        COALESCE(l.phone, c.phone, cust.phone, b.phone) AS "leadPhone",
+        COALESCE(l."leadId", c."contactId", cust."customerId", b."bulkId") AS "leadCode",
+        COALESCE(l.id, c.id, cust.id, b.id) AS "leadDbId",
+        COALESCE(l.stage, c.stage, 'Customer') AS "leadStage",
+        COALESCE(l.status, c.status, cust.status, b.status) AS "leadStatus",
+        m.status,
+        m.status AS "meetingStatus",
+        m.notes,
+        m.notes AS "description",
+        m.requirements,
+        m."requirementFileName",
+        m."requirementFileUrl",
+        m."requirementFileSize",
+        m."createdAt",
+        m."updatedAt",
+        CAST(ROW_NUMBER() OVER (
+          PARTITION BY m.id 
+          ORDER BY 
+            (CASE WHEN c."internalReference" = l."leadId" THEN 1 ELSE 2 END),
+            c."updatedAt" DESC NULLS LAST,
+            b."updatedAt" DESC NULLS LAST
+        ) AS INT) as rn
+      FROM "ScheduledMeeting" m
+      LEFT JOIN "Lead" l ON (
+        m."lead_id" = l.id OR 
+        m."lead_id" = l."leadId" OR 
+        m."contactId" = l.id OR 
+        m."contactId" = l."leadId"
+      )
+      LEFT JOIN "Contact" c ON (
+        m."contactId" = c.id OR
+        m."contactId" = c."contactId" OR
+        m."lead_id" = c.id OR
+        m."lead_id" = c."contactId" OR
+        (l."leadId" IS NOT NULL AND c."internalReference" = l."leadId") OR
+        (l.phone IS NOT NULL AND l.phone != '' AND c.phone = l.phone)
+      )
+      LEFT JOIN "Customer" cust ON (
+        m."contactId" = cust.id OR
+        m."contactId" = cust."customerId" OR
+        m."lead_id" = cust.id OR
+        m."lead_id" = cust."customerId" OR
+        (m."clientName" IS NOT NULL AND (cust."companyName" = m."clientName" OR cust."contactPerson" = m."clientName"))
+      )
+      LEFT JOIN "BulkUploadContact" b ON (
+        m."contactId" = b.id OR
+        m."contactId" = b."bulkId" OR
+        m."lead_id" = b.id OR
+        m."lead_id" = b."bulkId"
+      )
+      ${whereClause}
     )
-    ${whereClause}
+    SELECT 
+      id,
+      "leadId",
+      "lead_id",
+      "contactId",
+      title,
+      "meetingTitle",
+      purpose,
+      "meetingDate",
+      date,
+      "startTime",
+      "meetingTime",
+      time,
+      "endTime",
+      "meetingType",
+      location,
+      "meetingLocation",
+      "meetingLink",
+      "employeeId",
+      "employeeName",
+      "assignedTo",
+      "employeeEmail",
+      "employeeDesignation",
+      "leadName",
+      "clientName",
+      "companyName",
+      "leadEmail",
+      "leadPhone",
+      "leadCode",
+      "leadDbId",
+      "leadStage",
+      "leadStatus",
+      status,
+      "meetingStatus",
+      notes,
+      description,
+      requirements,
+      "requirementFileName",
+      "requirementFileUrl",
+      "requirementFileSize",
+      "createdAt",
+      "updatedAt"
+    FROM meeting_rows 
+    WHERE rn = 1
   `;
 }
 
@@ -73,9 +148,56 @@ export async function getMeetingsService(queryParams = {}) {
   let paramIdx = 1;
 
   if (leadId && leadId !== 'ALL') {
-    where += ` AND (m."lead_id" = $${paramIdx} OR m."contactId" = $${paramIdx} OR l."leadId" = $${paramIdx} OR l.id = $${paramIdx})`;
-    paramIdx++;
-    params.push(leadId);
+    const cleanId = String(leadId).trim();
+    const matchedIds = [cleanId];
+    try {
+      const foundLead = await prisma.lead.findFirst({
+        where: { OR: [{ id: cleanId }, { leadId: cleanId }] },
+      });
+      if (foundLead) {
+        matchedIds.push(foundLead.id, foundLead.leadId);
+        const linkedC = await prisma.contact.findFirst({
+          where: {
+            OR: [
+              { internalReference: foundLead.leadId },
+              { internalReference: foundLead.id },
+              ...(foundLead.phone ? [{ phone: foundLead.phone }] : []),
+              ...(foundLead.email ? [{ email: { equals: foundLead.email, mode: 'insensitive' } }] : []),
+            ],
+          },
+        });
+        if (linkedC) matchedIds.push(linkedC.id, linkedC.contactId);
+      } else {
+        const foundC = await prisma.contact.findFirst({
+          where: { OR: [{ id: cleanId }, { contactId: cleanId }] },
+        });
+        if (foundC) {
+          matchedIds.push(foundC.id, foundC.contactId);
+          const linkedL = await prisma.lead.findFirst({
+            where: {
+              OR: [
+                ...(foundC.internalReference ? [{ leadId: foundC.internalReference }, { id: foundC.internalReference }] : []),
+                ...(foundC.phone ? [{ phone: foundC.phone }] : []),
+                ...(foundC.email ? [{ email: { equals: foundC.email, mode: 'insensitive' } }] : []),
+              ],
+            },
+          });
+          if (linkedL) matchedIds.push(linkedL.id, linkedL.leadId);
+        }
+      }
+    } catch (_) {}
+
+    const uniqueIds = Array.from(new Set(matchedIds.filter(Boolean)));
+    const placeholders = uniqueIds.map(() => `$${paramIdx++}`).join(', ');
+    where += ` AND (
+      m."lead_id" IN (${placeholders}) OR 
+      m."contactId" IN (${placeholders}) OR 
+      l."leadId" IN (${placeholders}) OR 
+      l.id IN (${placeholders}) OR 
+      c."contactId" IN (${placeholders}) OR 
+      c.id IN (${placeholders})
+    )`;
+    params.push(...uniqueIds);
   }
 
   if (date && date !== 'ALL') {
@@ -113,16 +235,30 @@ export async function getMeetingsService(queryParams = {}) {
       m."clientName" ILIKE $${paramIdx} OR 
       m.location ILIKE $${paramIdx} OR 
       l.name ILIKE $${paramIdx} OR 
-      l."companyName" ILIKE $${paramIdx}
+      l."companyName" ILIKE $${paramIdx} OR
+      c.name ILIKE $${paramIdx} OR 
+      c."companyName" ILIKE $${paramIdx} OR
+      b.name ILIKE $${paramIdx} OR 
+      b."companyName" ILIKE $${paramIdx}
     )`;
     paramIdx++;
     params.push(s);
   }
 
   // Date-wise ordering: Meeting Date ASC, Start Time ASC, Created At DESC
-  const fullQuery = `${getScheduledMeetingSelectQuery(where)} ORDER BY m."meetingDate" ASC, m."startTime" ASC, m."createdAt" DESC`;
+  const fullQuery = `${getScheduledMeetingSelectQuery(where)} ORDER BY "meetingDate" ASC, "startTime" ASC, "createdAt" DESC`;
 
-  const meetings = await prisma.$queryRawUnsafe(fullQuery, ...params);
+  const rawMeetings = await prisma.$queryRawUnsafe(fullQuery, ...params);
+
+  // Deduplicate by meeting id as an additional ironclad safeguard
+  const seenIds = new Set();
+  const meetings = [];
+  for (const m of rawMeetings) {
+    if (!seenIds.has(m.id)) {
+      seenIds.add(m.id);
+      meetings.push(m);
+    }
+  }
 
   // Group date-wise
   const dateWiseMap = {};
@@ -201,19 +337,98 @@ export async function createMeetingService(body) {
 
   const targetLeadIdentifier = lead_id || leadId || contactId;
 
-  // Resolve lead from Lead table if identifier provided
+  // Resolve lead from Lead table if identifier provided, or Contact/BulkUploadContact/Customer
   let resolvedLead = null;
-  if (targetLeadIdentifier) {
-    const leads = await prisma.$queryRawUnsafe(
-      `SELECT id, "leadId", name, "companyName", stage, status FROM "Lead" WHERE id = $1 OR "leadId" = $1 LIMIT 1`,
-      targetLeadIdentifier
-    );
-    if (leads && leads.length > 0) {
-      resolvedLead = leads[0];
+  let resolvedContact = null;
+  let resolvedCustomer = null;
+
+  const candidateIdentifiers = [lead_id, leadId, contactId, targetLeadIdentifier].filter(Boolean);
+
+  for (const ident of candidateIdentifiers) {
+    if (!resolvedLead) {
+      const leads = await prisma.$queryRawUnsafe(
+        `SELECT id, "leadId", name, "companyName", stage, status, phone, email FROM "Lead" WHERE id = $1 OR "leadId" = $1 LIMIT 1`,
+        ident
+      );
+      if (leads && leads.length > 0) {
+        resolvedLead = leads[0];
+      }
+    }
+    if (!resolvedContact) {
+      const contacts = await prisma.$queryRawUnsafe(
+        `SELECT id, "contactId", name, "companyName", stage, status, phone, email, "internalReference" FROM "Contact" WHERE id = $1 OR "contactId" = $1 LIMIT 1`,
+        ident
+      );
+      if (contacts && contacts.length > 0) {
+        resolvedContact = contacts[0];
+      } else {
+        const bulkContacts = await prisma.$queryRawUnsafe(
+          `SELECT id, "bulkId", name, "companyName", status, phone, email FROM "BulkUploadContact" WHERE id = $1 OR "bulkId" = $1 LIMIT 1`,
+          ident
+        );
+        if (bulkContacts && bulkContacts.length > 0) {
+          resolvedContact = bulkContacts[0];
+        }
+      }
+    }
+    if (!resolvedCustomer && !resolvedLead && !resolvedContact) {
+      try {
+        const customers = await prisma.$queryRawUnsafe(
+          `SELECT id, "customerId", "companyName", "contactPerson", phone, email FROM "Customer" WHERE id = $1 OR "customerId" = $1 LIMIT 1`,
+          ident
+        );
+        if (customers && customers.length > 0) {
+          resolvedCustomer = customers[0];
+        }
+      } catch (_) {}
     }
   }
 
-  const finalLeadId = resolvedLead ? resolvedLead.id : targetLeadIdentifier || null;
+  // Cross-lookup: If lead found without contact, find its associated contact
+  if (resolvedLead && !resolvedContact) {
+    const linkedContacts = await prisma.$queryRawUnsafe(
+      `SELECT id, "contactId", name, "companyName", stage, status, "internalReference" 
+       FROM "Contact" 
+       WHERE "internalReference" = $1 OR "internalReference" = $2 
+          OR (phone IS NOT NULL AND phone != '' AND phone = $3)
+          OR (email IS NOT NULL AND email != '' AND LOWER(email) = LOWER($4))
+       LIMIT 1`,
+      resolvedLead.leadId,
+      resolvedLead.id,
+      resolvedLead.phone || '',
+      resolvedLead.email || ''
+    );
+    if (linkedContacts && linkedContacts.length > 0) {
+      resolvedContact = linkedContacts[0];
+    }
+  }
+
+  // Cross-lookup: If contact found without lead, find its associated converted lead
+  if (resolvedContact && !resolvedLead) {
+    const linkedLeads = await prisma.$queryRawUnsafe(
+      `SELECT id, "leadId", name, "companyName", stage, status, phone, email 
+       FROM "Lead" 
+       WHERE "leadId" = $1 OR id = $1
+          OR (phone IS NOT NULL AND phone != '' AND phone = $2)
+          OR (email IS NOT NULL AND email != '' AND LOWER(email) = LOWER($3))
+       LIMIT 1`,
+      resolvedContact.internalReference || '',
+      resolvedContact.phone || '',
+      resolvedContact.email || ''
+    );
+    if (linkedLeads && linkedLeads.length > 0) {
+      resolvedLead = linkedLeads[0];
+      if (resolvedContact.id && (!resolvedContact.internalReference || resolvedContact.internalReference !== resolvedLead.leadId)) {
+        prisma.contact.updateMany({
+          where: { id: resolvedContact.id },
+          data: { internalReference: resolvedLead.leadId },
+        }).catch(() => {});
+      }
+    }
+  }
+
+  const finalLeadId = resolvedLead ? resolvedLead.id : (leadId || lead_id || null);
+  const finalContactId = resolvedContact ? resolvedContact.id : (contactId || null);
   const finalTitle = (title || meeting_title || meetingTitle || purpose || 'Client Discovery Meeting').trim();
   const finalPurpose = (purpose || finalTitle).trim();
   const finalDate = meeting_date || meetingDate || date;
@@ -226,10 +441,16 @@ export async function createMeetingService(body) {
   const finalNotes = (description !== undefined ? description : notes || '').trim();
 
   let finalClientName = clientName;
-  if (!finalClientName && resolvedLead) {
-    finalClientName = resolvedLead.companyName ? `${resolvedLead.name} (${resolvedLead.companyName})` : resolvedLead.name;
+  if (!finalClientName) {
+    if (resolvedLead) {
+      finalClientName = resolvedLead.companyName ? `${resolvedLead.name} (${resolvedLead.companyName})` : resolvedLead.name;
+    } else if (resolvedContact) {
+      finalClientName = resolvedContact.companyName ? `${resolvedContact.name} (${resolvedContact.companyName})` : resolvedContact.name;
+    } else if (resolvedCustomer) {
+      finalClientName = resolvedCustomer.companyName ? `${resolvedCustomer.contactPerson || 'Client'} (${resolvedCustomer.companyName})` : (resolvedCustomer.contactPerson || resolvedCustomer.companyName);
+    }
   }
-  finalClientName = (finalClientName || 'Lead Client').trim();
+  finalClientName = (finalClientName || 'Client Discussion').trim();
 
   if (!finalDate) {
     const error = new Error('Meeting date is required.');
@@ -313,7 +534,7 @@ export async function createMeetingService(body) {
     finalEmployeeName,
     employeeEmail || null,
     employeeDesignation || null,
-    finalLeadId,
+    finalContactId,
     finalLeadId,
     finalClientName,
     finalStatus,
@@ -346,6 +567,33 @@ export async function createMeetingService(body) {
   try {
     io.emit('meeting:created', created);
   } catch (_) {}
+
+  // Automatically record activity in timeline
+  try {
+    await recordActivity({
+      type: 'meeting',
+      title: created.title || 'Meeting Scheduled',
+      description: created.purpose ? `${created.purpose}${created.notes ? ` - ${created.notes}` : ''}` : 'Meeting with client - Requirement discussion',
+      leadId: created.leadId || created.lead_id,
+      leadCode: created.leadCode,
+      leadName: created.leadName,
+      contactId: created.contactId,
+      contactName: created.leadName || created.clientName,
+      customerName: created.clientName,
+      entityId: created.id,
+      entityType: 'Meeting',
+      status: created.status || 'Scheduled',
+      performedBy: created.employeeName,
+      performedById: created.employeeId,
+      activityDate: created.meetingDate || created.date,
+      activityTime: created.startTime || created.time || '10:30 AM',
+      metadata: {
+        nextFollowDate: body.nextFollowDate || body.followUpDate || undefined,
+      },
+    });
+  } catch (err) {
+    console.warn('Activity recording note:', err.message);
+  }
 
   return created;
 }
@@ -487,6 +735,56 @@ export async function updateMeetingService(id, body) {
     io.emit('meeting:updated', updated);
   } catch (_) {}
 
+  // Synchronize corresponding activity in timeline
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    await prisma.activity.updateMany({
+      where: {
+        OR: [
+          { entityId: id },
+          { entityId: id, entityType: 'Meeting' },
+        ],
+      },
+      data: {
+        status: updated.status || 'Scheduled',
+        title: updated.title && updated.title !== 'Client Discussion' ? updated.title : 'Meeting Scheduled',
+        description: updated.purpose ? `${updated.purpose}${updated.notes ? ` - ${updated.notes}` : ''}` : 'Meeting with client - Requirement discussion',
+        activityDate: todayStr,
+        activityTime: updated.startTime || updated.time,
+        customerName: updated.clientName,
+        performedBy: updated.employeeName || 'Staff',
+        updatedAt: new Date(),
+        ...(body.nextFollowDate || body.followUpDate
+          ? {
+              metadata: {
+                nextFollowDate: body.nextFollowDate || body.followUpDate,
+              },
+            }
+          : {}),
+      },
+    });
+
+    if (body.status !== undefined || body.meetingStatus !== undefined || body.meeting_status !== undefined) {
+      await recordActivity({
+        type: 'meeting',
+        title: `Meeting: ${updated.status || 'Scheduled'}`,
+        description: `Meeting "${updated.title || 'Meeting'}" status updated to ${updated.status}.${updated.notes ? ` Notes: ${updated.notes}` : ''}`,
+        leadId: updated.leadId || updated.lead_id,
+        leadCode: updated.leadId || updated.lead_id,
+        leadName: updated.clientName,
+        customerName: updated.clientName,
+        entityId: updated.id,
+        entityType: 'Meeting',
+        entityNumber: updated.id,
+        status: updated.status,
+        performedBy: updated.employeeName || 'Staff',
+        activityDate: todayStr,
+      }).catch(() => {});
+    }
+  } catch (actErr) {
+    console.warn('Note: Activity update error:', actErr.message);
+  }
+
   return updated;
 }
 
@@ -496,6 +794,17 @@ export async function updateMeetingService(id, body) {
 export async function deleteMeetingService(id) {
   await getMeetingByIdService(id);
   await prisma.$executeRawUnsafe(`DELETE FROM "ScheduledMeeting" WHERE id = $1`, id);
+
+  try {
+    await prisma.activity.deleteMany({
+      where: {
+        OR: [
+          { entityId: id },
+          { entityId: id, entityType: 'Meeting' },
+        ],
+      },
+    });
+  } catch (_) {}
 
   try {
     io.emit('meeting:deleted', { id });

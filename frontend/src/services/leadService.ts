@@ -16,7 +16,7 @@ import {
   ContractFilters,
 } from '../types/lead';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE_URL } from '../config/env';
 
 async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -29,18 +29,26 @@ async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}):
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(errorData.message || `API Error: ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers,
+      signal: options.signal || controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
+    }
+
+    return response.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return response.json();
 }
 
 export const leadService = {
@@ -126,6 +134,7 @@ export const leadService = {
       issueDate: p.proposalDate,
       validUntil: p.validUntil,
       status: p.status,
+      rejectionReason: p.rejectionReason || null,
       currency: p.currency || 'INR (₹)',
       items: (p.items || []).map((it: any) => ({
         id: it.id,
@@ -158,6 +167,7 @@ export const leadService = {
       issueDate: p.proposalDate,
       validUntil: p.validUntil,
       status: p.status,
+      rejectionReason: p.rejectionReason || null,
       currency: p.currency || 'INR (₹)',
       items: (p.items || []).map((it: any) => ({
         id: it.id,

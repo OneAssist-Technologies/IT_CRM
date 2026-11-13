@@ -16,6 +16,7 @@ export interface RolePermission {
   moduleId: string;
   moduleName: string;
   category: string;
+  dataScope?: 'Own' | 'All';
   canView: boolean;
   canCreate: boolean;
   canEdit: boolean;
@@ -95,6 +96,7 @@ export interface UserPermissionsMap {
     delete: boolean;
     export: boolean;
     approve: boolean;
+    dataScope?: 'Own' | 'All';
   };
 }
 

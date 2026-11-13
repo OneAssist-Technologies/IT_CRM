@@ -36,6 +36,9 @@ import {
   IconCreditCard,
   IconRocket,
   IconSparkles,
+  IconNotes,
+  IconBrandWhatsapp,
+  IconClock,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Lead } from '../../../types/lead';
@@ -47,6 +50,7 @@ import { usePermissions } from '../../../context/AccessControlContext';
 interface LeadTableViewProps {
   leads: Lead[];
   onEdit: (lead: Lead) => void;
+  onUpdateLead?: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
   onAddNew?: () => void;
   loading?: boolean;
@@ -55,6 +59,7 @@ interface LeadTableViewProps {
 export const LeadTableView: React.FC<LeadTableViewProps> = ({
   leads,
   onEdit,
+  onUpdateLead,
   onDelete,
   onAddNew,
   loading = false,
@@ -321,7 +326,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
     return SUBMODULE_STAGES[1]; // Meetings
   };
 
-  const STATUS_OPTIONS = ['New', 'In Progress', 'Complete'];
+  const STATUS_OPTIONS = ['New', 'In Progress', 'Completed', 'Lost'];
 
   const getStatusDotColor = (statusVal?: string | null) => {
     const s = (statusVal || '').toLowerCase();
@@ -329,6 +334,12 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
       return '#EF4444';
     }
     if (s.includes('qualif') || s.includes('won') || s.includes('complete') || s.includes('active')) {
+      return '#10B981';
+    }
+    if (s.includes('follow')) {
+      return '#F59E0B';
+    }
+    if (s.includes('interest')) {
       return '#10B981';
     }
     if (s.includes('progress') || s.includes('contact')) {
@@ -475,37 +486,319 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
     setActiveNav('lead-schedule');
   };
 
-  // Sleek Modern STATUS Badge matching Contacts design
+
+  // Helper to format activity timestamps nicely (e.g. "Today • 10:20 AM" or "Oct 31, 2026 • 05:00 PM")
+  const formatActivityTimestamp = (dateStr?: string | null, timeStr?: string | null, isoStr?: string | null) => {
+    if (!dateStr && !isoStr) return 'Recently';
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+
+    let rawDate = dateStr || (isoStr ? isoStr.slice(0, 10) : '');
+    if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(rawDate)) {
+      const parts = rawDate.split(/[-/]/);
+      rawDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    const targetDateStr = rawDate;
+
+    let dayLabel = targetDateStr;
+    if (targetDateStr === todayStr) {
+      dayLabel = 'Today';
+    } else if (targetDateStr === yesterdayStr) {
+      dayLabel = 'Yesterday';
+    } else if (targetDateStr) {
+      try {
+        const d = new Date(targetDateStr.includes('T') ? targetDateStr : `${targetDateStr}T12:00:00Z`);
+        dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch {
+        dayLabel = targetDateStr;
+      }
+    }
+
+    const finalTime = (timeStr && timeStr.trim()) || (isoStr ? new Date(isoStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+    if (finalTime) {
+      return `${dayLabel} • ${finalTime}`;
+    }
+    return dayLabel;
+  };
+
+  const getActivityTypeDetails = (type?: string) => {
+    const t = (type || '').toLowerCase();
+    if (t === 'meeting') {
+      return { icon: <IconCalendar size={13} />, color: '#2563EB', bg: isDark ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF', label: 'Meeting' };
+    }
+    if (t === 'call') {
+      return { icon: <IconPhoneCall size={13} />, color: '#10B981', bg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', label: 'Call' };
+    }
+    if (t === 'whatsapp') {
+      return { icon: <IconBrandWhatsapp size={13} />, color: '#16A34A', bg: isDark ? 'rgba(22, 163, 74, 0.15)' : '#F0FDF4', label: 'WhatsApp' };
+    }
+    if (t === 'email') {
+      return { icon: <IconMail size={13} />, color: '#EA580C', bg: isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED', label: 'Email' };
+    }
+    if (t === 'proposal') {
+      return { icon: <IconFileDescription size={13} />, color: '#7C3AED', bg: isDark ? 'rgba(124, 58, 237, 0.15)' : '#FAF5FF', label: 'Proposal' };
+    }
+    if (t === 'quotation') {
+      return { icon: <IconCalculator size={13} />, color: '#DB2777', bg: isDark ? 'rgba(219, 39, 119, 0.15)' : '#FDF2F8', label: 'Quotation' };
+    }
+    if (t === 'contract') {
+      return { icon: <IconFileCheck size={13} />, color: '#059669', bg: isDark ? 'rgba(5, 150, 105, 0.15)' : '#ECFDF5', label: 'Contract' };
+    }
+    if (t === 'invoice') {
+      return { icon: <IconReceipt size={13} />, color: '#4F46E5', bg: isDark ? 'rgba(79, 70, 229, 0.15)' : '#EEF2FF', label: 'Invoice' };
+    }
+    if (t === 'payment') {
+      return { icon: <IconCreditCard size={13} />, color: '#0D9488', bg: isDark ? 'rgba(13, 148, 136, 0.15)' : '#F0FDFA', label: 'Payment' };
+    }
+    if (t === 'qualification') {
+      return { icon: <IconUserCheck size={13} />, color: '#0284C7', bg: isDark ? 'rgba(2, 132, 199, 0.15)' : '#F0F9FF', label: 'Qualification' };
+    }
+    if (t === 'note') {
+      return { icon: <IconNotes size={13} />, color: '#D97706', bg: isDark ? 'rgba(217, 119, 6, 0.15)' : '#FFFBEB', label: 'Note' };
+    }
+    return { icon: <IconSparkles size={13} />, color: '#6366F1', bg: isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF', label: 'Activity' };
+  };
+
+  const formatMeetingScheduleDateTime = (dateStr?: string | null, timeStr?: string | null) => {
+    if (!dateStr) return timeStr || '';
+    let rawDate = dateStr.trim();
+    if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(rawDate)) {
+      const parts = rawDate.split(/[-/]/);
+      rawDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    let datePart = rawDate;
+    try {
+      const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00Z`);
+      if (!isNaN(d.getTime())) {
+        datePart = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    } catch {}
+
+    if (timeStr && timeStr.trim()) {
+      return `${datePart} • ${timeStr.trim()}`;
+    }
+    return datePart;
+  };
+
+  const formatFollowUpDate = (dateStr?: string | null) => {
+    if (!dateStr) return '';
+    let rawDate = dateStr.trim();
+    if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(rawDate)) {
+      const parts = rawDate.split(/[-/]/);
+      rawDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    try {
+      const d = new Date(rawDate.includes('T') ? rawDate : `${rawDate}T12:00:00Z`);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatLastActivityTitle = (act: any) => {
+    const t = (act.type || '').toLowerCase();
+    const status = act.status ? String(act.status).trim() : '';
+    const direction = act.direction || 'Outgoing';
+
+    if (t === 'meeting') {
+      return status ? `Meeting: ${status}` : 'Meeting: Scheduled';
+    }
+
+    if (t === 'call') {
+      return status ? `Call: ${direction} - ${status}` : `Call: ${direction}`;
+    }
+
+    if (t === 'email') {
+      return status ? `Email: ${direction} - ${status}` : `Email: ${direction}`;
+    }
+
+    if (t === 'whatsapp') {
+      return status ? `WhatsApp: ${direction} - ${status}` : `WhatsApp: ${direction}`;
+    }
+
+    let displayTitle = act.title || 'Activity';
+    if (displayTitle.startsWith('EMAIL: ')) {
+      displayTitle = 'Email: ' + displayTitle.slice(7);
+    } else if (displayTitle.startsWith('WHATSAPP: ')) {
+      displayTitle = 'WhatsApp: ' + displayTitle.slice(10);
+    } else if (displayTitle.startsWith('CALL: ')) {
+      displayTitle = 'Call: ' + displayTitle.slice(6);
+    }
+    return status && !displayTitle.toLowerCase().includes(status.toLowerCase())
+      ? `${displayTitle} - ${status}`
+      : displayTitle;
+  };
+
+  const renderLastActivity = (lead: Lead) => {
+    const act = lead.lastActivity;
+    if (!act) {
+      return (
+        <Text size="xs" c="dimmed">
+          No activity yet
+        </Text>
+      );
+    }
+
+    const { icon, color, bg } = getActivityTypeDetails(act.type);
+    const displayTitle = formatLastActivityTitle(act);
+    const timeDisplay = formatActivityTimestamp(act.date, act.time, act.updatedAt || act.createdAt);
+    const isMeeting = (act.type || '').toLowerCase() === 'meeting';
+    const isFollowUp = /follow/i.test(act.status || '') || /follow/i.test(displayTitle);
+    const effectiveFollowUpDate = act.followUpDate || act.nextFollowDate || (act as any).metadata?.nextFollowDate || (lead as any).nextFollowDate;
+
+    return (
+      <Stack gap={2} style={{ minWidth: 'max-content', maxWidth: 280 }}>
+        <Group gap={6} wrap="nowrap" align="center">
+          <Box
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 6,
+              backgroundColor: bg,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: color,
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </Box>
+          <Text
+            size="xs"
+            fw={600}
+            style={{
+              color: isDark ? '#E2E8F0' : '#1E293B',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+            title={displayTitle}
+          >
+            {displayTitle}
+          </Text>
+        </Group>
+
+        {/* Follow up date badge (shown across ALL contact modes when status is Follow-up) */}
+        {isFollowUp && effectiveFollowUpDate && (
+          <Group gap={4} wrap="nowrap" align="center" style={{ paddingLeft: 28, marginTop: 2 }}>
+            <Badge
+              size="xs"
+              variant="light"
+              color="orange"
+              leftSection={<IconCalendar size={11} />}
+              styles={{
+                root: {
+                  textTransform: 'none',
+                  height: 20,
+                  paddingLeft: 6,
+                  paddingRight: 8,
+                  width: 'auto',
+                  maxWidth: 'none',
+                  backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFF7ED',
+                  color: isDark ? '#FDBA74' : '#C2410C',
+                  border: isDark ? '1px solid rgba(253, 186, 116, 0.25)' : '1px solid #FED7AA',
+                  flexShrink: 0,
+                },
+                label: {
+                  fontWeight: 600,
+                  fontSize: 11,
+                  overflow: 'visible',
+                  textOverflow: 'clip',
+                  whiteSpace: 'nowrap',
+                },
+              }}
+            >
+              Follow-up: {formatFollowUpDate(effectiveFollowUpDate)}
+            </Badge>
+          </Group>
+        )}
+
+        {/* Meeting scheduled date & time (shown ONLY when meeting is scheduled and NOT follow-up) */}
+        {isMeeting && !isFollowUp && (act.date || act.time) && (
+          <Group gap={4} wrap="nowrap" align="center" style={{ paddingLeft: 28, marginTop: 2 }}>
+            <Badge
+              size="xs"
+              variant="light"
+              color="blue"
+              leftSection={<IconCalendar size={11} />}
+              styles={{
+                root: {
+                  textTransform: 'none',
+                  height: 20,
+                  paddingLeft: 6,
+                  paddingRight: 8,
+                  width: 'auto',
+                  maxWidth: 'none',
+                  backgroundColor: isDark ? 'rgba(37, 99, 235, 0.18)' : '#EFF6FF',
+                  color: isDark ? '#93C5FD' : '#1D4ED8',
+                  border: isDark ? '1px solid rgba(147, 197, 253, 0.25)' : '1px solid #BFDBFE',
+                  flexShrink: 0,
+                },
+                label: {
+                  fontWeight: 600,
+                  fontSize: 11,
+                  overflow: 'visible',
+                  textOverflow: 'clip',
+                  whiteSpace: 'nowrap',
+                },
+              }}
+            >
+              {formatMeetingScheduleDateTime(act.date, act.time)}
+            </Badge>
+          </Group>
+        )}
+      </Stack>
+    );
+  };
+
+  // Sleek Modern STATUS Badge strictly displaying New, In Progress, Completed, or Lost
   const renderStatusBadge = (statusVal?: string | null, stageVal?: string | null) => {
     let raw = (statusVal || stageVal || 'New').trim();
-    if (raw.toLowerCase() === 'contacted') {
-      raw = 'In Progress';
-    } else if (raw.toLowerCase() === 'won' || raw.toLowerCase() === 'closed won' || raw.toLowerCase() === 'completed') {
-      raw = 'Complete';
+    const sLow = raw.toLowerCase();
+    let normalized = 'New';
+    if (sLow.includes('lost') || sLow.includes('disqual') || sLow.includes('unqual') || sLow.includes('cancel')) {
+      normalized = 'Lost';
+    } else if (sLow.includes('complete') || sLow.includes('won') || sLow.includes('closed won')) {
+      normalized = 'Completed';
+    } else if (
+      sLow.includes('progress') ||
+      sLow.includes('follow') ||
+      sLow.includes('interest') ||
+      sLow.includes('proposal') ||
+      sLow.includes('negotiat') ||
+      sLow.includes('contact') ||
+      sLow.includes('active')
+    ) {
+      normalized = 'In Progress';
+    } else {
+      normalized = 'New';
     }
-    const st = raw;
-    const sLow = st.toLowerCase();
+
     let bg = isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF';
     let color = isDark ? '#93C5FD' : '#1D4ED8';
     let border = isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE';
 
-    if (sLow.includes('unqual') || sLow.includes('disqual') || sLow.includes('lost') || sLow.includes('cancel')) {
+    if (normalized === 'Lost') {
       bg = isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEF2F2';
       color = isDark ? '#FCA5A5' : '#DC2626';
       border = isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA';
-    } else if (sLow.includes('qualif') || sLow.includes('won') || sLow.includes('complete')) {
+    } else if (normalized === 'Completed') {
       bg = isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5';
       color = isDark ? '#6EE7B7' : '#047857';
       border = isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0';
-    } else if (sLow.includes('progress') || sLow.includes('contact')) {
+    } else if (normalized === 'In Progress') {
       bg = isDark ? 'rgba(14, 165, 233, 0.16)' : '#F0F9FF';
       color = isDark ? '#7DD3FC' : '#0284C7';
       border = isDark ? 'rgba(14, 165, 233, 0.35)' : '#BAE6FD';
-    } else if (sLow.includes('proposal') || sLow.includes('negotiat')) {
-      bg = isDark ? 'rgba(147, 51, 234, 0.14)' : '#FAF5FF';
-      color = isDark ? '#D8B4FE' : '#7E22CE';
-      border = isDark ? 'rgba(147, 51, 234, 0.25)' : '#E9D5FF';
-    } else if (sLow.includes('new') || sLow.includes('init')) {
+    } else {
+      // New
       bg = isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF';
       color = isDark ? '#93C5FD' : '#1D4ED8';
       border = isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE';
@@ -528,7 +821,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
           whiteSpace: 'nowrap',
         }}
       >
-        {st}
+        {normalized}
       </Box>
     );
   };
@@ -741,7 +1034,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
           marginTop: 12,
         }}
       >
-        <Table.ScrollContainer minWidth={750}>
+        <Table.ScrollContainer minWidth={920}>
           <Table verticalSpacing="md" horizontalSpacing="lg" highlightOnHover>
             <Table.Thead
               style={{
@@ -764,6 +1057,9 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                 </Table.Th>
                 <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em' }}>
                   STATUS
+                </Table.Th>
+                <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', minWidth: 220 }}>
+                  LAST ACTIVITY
                 </Table.Th>
                 <Table.Th style={{ color: isDark ? '#94A3B8' : '#64748B', fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textAlign: 'right' }}>
                   ACTIONS
@@ -801,49 +1097,31 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                       >
                         {lead.name ? lead.name.charAt(0).toUpperCase() : 'L'}
                       </Box>
-                      <div>
-                        <Text
-                          fw={700}
-                          size="sm"
-                          style={{
-                            color: isDark ? '#F9FAFB' : '#0F172A',
-                            transition: 'color 0.15s ease',
-                          }}
-                        >
-                          {lead.name}
-                        </Text>
-                        <Group gap={6} align="center" wrap="nowrap" mt={2}>
-                          <Text size="xs" c="dimmed">
-                            Added: {formatLastUpdate(lead.createdAt)}
-                          </Text>
-                          <Text size="xs" c="dimmed">•</Text>
-                          <Text size="xs" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                            By <span style={{ fontWeight: 600, color: isDark ? '#E2E8F0' : '#334155' }}>{lead.createdByName || 'Admin'}</span>
-                          </Text>
-                        </Group>
-                      </div>
+                      <Text
+                        fw={700}
+                        size="sm"
+                        style={{
+                          color: isDark ? '#F9FAFB' : '#0F172A',
+                          transition: 'color 0.15s ease',
+                        }}
+                      >
+                        {lead.name}
+                      </Text>
                     </Group>
                   </Table.Td>
 
                   {/* 2. Company / Profession */}
                   <Table.Td>
-                    <Stack gap={2}>
-                      <Group gap={6} wrap="nowrap">
-                        {lead.companyName ? (
-                          <IconBuilding size={14} color="#64748B" />
-                        ) : (
-                          <IconUser size={14} color="#64748B" />
-                        )}
-                        <Text size="sm" fw={500}>
-                          {lead.companyName || lead.profession || 'Individual'}
-                        </Text>
-                      </Group>
-                      {lead.designation && (
-                        <Text size="xs" c="dimmed">
-                          {lead.designation}
-                        </Text>
+                    <Group gap={6} wrap="nowrap">
+                      {lead.companyName ? (
+                        <IconBuilding size={14} color="#64748B" />
+                      ) : (
+                        <IconUser size={14} color="#64748B" />
                       )}
-                    </Stack>
+                      <Text size="sm" fw={500}>
+                        {lead.companyName || lead.profession || 'Individual'}
+                      </Text>
+                    </Group>
                   </Table.Td>
 
                   {/* 3. Contact Info */}
@@ -973,7 +1251,7 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                               {renderStatusBadge(lead.status, lead.stage)}
                               {lead.stage && (
                                 <Text size="11px" c="dimmed" style={{ paddingLeft: 4 }}>
-                                  {lead.stage}
+                                  {lead.stage?.toLowerCase() === 'qualification' ? 'Initialization' : lead.stage}
                                 </Text>
                               )}
                             </Stack>
@@ -983,7 +1261,12 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                       <Menu.Dropdown p="xs">
                         <Menu.Label>Change Status</Menu.Label>
                         {STATUS_OPTIONS.map((statusOpt) => {
-                          const isCurrent = (lead.status || 'New').toLowerCase() === statusOpt.toLowerCase();
+                          const sL = (lead.status || 'New').toLowerCase();
+                          let curNorm = 'New';
+                          if (sL.includes('lost') || sL.includes('disqual') || sL.includes('cancel')) curNorm = 'Lost';
+                          else if (sL.includes('complete') || sL.includes('won')) curNorm = 'Completed';
+                          else if (sL.includes('progress') || sL.includes('follow') || sL.includes('interest') || sL.includes('proposal') || sL.includes('contact') || sL.includes('active')) curNorm = 'In Progress';
+                          const isCurrent = curNorm === statusOpt;
                           return (
                             <Menu.Item
                               key={statusOpt}
@@ -1010,9 +1293,25 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                     </Menu>
                   </Table.Td>
 
+                  {/* 6. Last Activity */}
+                  <Table.Td style={{ minWidth: 220 }} onClick={(e) => e.stopPropagation()}>
+                    {renderLastActivity(lead)}
+                  </Table.Td>
+
                   {/* 5. Actions */}
                   <Table.Td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                     <Group gap={6} justify="flex-end" wrap="nowrap">
+                      <Tooltip label="Update Lead" withArrow>
+                        <ActionIcon
+                          variant="subtle"
+                          color="teal"
+                          size="md"
+                          radius="md"
+                          onClick={() => (onUpdateLead ? onUpdateLead(lead) : onEdit(lead))}
+                        >
+                          <IconNotes size={16} />
+                        </ActionIcon>
+                      </Tooltip>
                       <Tooltip label="Edit Lead" withArrow>
                         <ActionIcon
                           variant="subtle"
@@ -1090,14 +1389,6 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                   <Text fw={700} size="14px" truncate style={{ color: isDark ? '#F9FAFB' : '#0F172A' }}>
                     {lead.name}
                   </Text>
-                  <Group gap={6} align="center" wrap="wrap">
-                    <Text size="xs" c="dimmed">
-                      {formatLastUpdate(lead.createdAt)}
-                    </Text>
-                    <Text size="xs" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                      By <span style={{ fontWeight: 600, color: isDark ? '#E2E8F0' : '#334155' }}>{lead.createdByName || 'Admin'}</span>
-                    </Text>
-                  </Group>
                 </Box>
               </Group>
 
@@ -1111,7 +1402,12 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                   <Menu.Dropdown p="xs">
                     <Menu.Label>Change Status</Menu.Label>
                     {STATUS_OPTIONS.map((statusOpt) => {
-                      const isCurrent = (lead.status || 'New').toLowerCase() === statusOpt.toLowerCase();
+                      const sL = (lead.status || 'New').toLowerCase();
+                      let curNorm = 'New';
+                      if (sL.includes('lost') || sL.includes('disqual') || sL.includes('cancel')) curNorm = 'Lost';
+                      else if (sL.includes('complete') || sL.includes('won')) curNorm = 'Completed';
+                      else if (sL.includes('progress') || sL.includes('follow') || sL.includes('interest') || sL.includes('proposal') || sL.includes('contact') || sL.includes('active')) curNorm = 'In Progress';
+                      const isCurrent = curNorm === statusOpt;
                       return (
                         <Menu.Item
                           key={statusOpt}
@@ -1205,6 +1501,63 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
               )}
             </Group>
 
+            {/* Last Activity in Mobile */}
+            {lead.lastActivity && (
+              <Stack gap={2} mb="xs">
+                <Group gap={6} align="center" wrap="wrap">
+                  <Text size="xs" c="dimmed">Last Activity:</Text>
+                  <Text size="xs" fw={600} style={{ color: isDark ? '#CBD5E1' : '#334155' }}>
+                    {formatLastActivityTitle(lead.lastActivity)}
+                  </Text>
+                  {((/follow/i.test(lead.lastActivity.status || '') || /follow/i.test(lead.lastActivity.title || '')) && (lead.lastActivity.followUpDate || lead.lastActivity.nextFollowDate || (lead as any).nextFollowDate)) ? (
+                    <Badge
+                      size="xs"
+                      variant="light"
+                      color="orange"
+                      leftSection={<IconCalendar size={10} />}
+                      styles={{
+                        root: {
+                          textTransform: 'none',
+                          height: 18,
+                          paddingLeft: 6,
+                          paddingRight: 8,
+                          backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFF7ED',
+                          color: isDark ? '#FDBA74' : '#C2410C',
+                          border: isDark ? '1px solid rgba(253, 186, 116, 0.25)' : '1px solid #FED7AA',
+                          flexShrink: 0,
+                        },
+                        label: { fontWeight: 600, fontSize: 10, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' },
+                      }}
+                    >
+                      Follow-up: {formatFollowUpDate(lead.lastActivity.followUpDate || lead.lastActivity.nextFollowDate || (lead as any).nextFollowDate)}
+                    </Badge>
+                  ) : ((lead.lastActivity.type || '').toLowerCase() === 'meeting' && (lead.lastActivity.date || lead.lastActivity.time) ? (
+                    <Badge
+                      size="xs"
+                      variant="light"
+                      color="blue"
+                      leftSection={<IconCalendar size={10} />}
+                      styles={{
+                        root: {
+                          textTransform: 'none',
+                          height: 18,
+                          paddingLeft: 6,
+                          paddingRight: 8,
+                          backgroundColor: isDark ? 'rgba(37, 99, 235, 0.18)' : '#EFF6FF',
+                          color: isDark ? '#93C5FD' : '#1D4ED8',
+                          border: isDark ? '1px solid rgba(147, 197, 253, 0.25)' : '1px solid #BFDBFE',
+                          flexShrink: 0,
+                        },
+                        label: { fontWeight: 600, fontSize: 10, overflow: 'visible', textOverflow: 'clip', whiteSpace: 'nowrap' },
+                      }}
+                    >
+                      {formatMeetingScheduleDateTime(lead.lastActivity.date, lead.lastActivity.time)}
+                    </Badge>
+                  ) : null)}
+                </Group>
+              </Stack>
+            )}
+
             {/* Company / Profession & Stage */}
             <Group justify="space-between" align="center" wrap="wrap" gap="xs" mb="xs">
               <Group gap={6} wrap="nowrap">
@@ -1215,13 +1568,12 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
                 )}
                 <Text size="xs" fw={500} style={{ color: isDark ? '#CBD5E1' : '#475569' }}>
                   {lead.companyName || lead.profession || 'Individual'}
-                  {lead.designation ? ` • ${lead.designation}` : ''}
                 </Text>
               </Group>
 
               {lead.stage && (
                 <Badge variant="outline" size="xs" color="gray" style={{ textTransform: 'none' }}>
-                  {lead.stage}
+                  {lead.stage?.toLowerCase() === 'qualification' ? 'Initialization' : lead.stage}
                 </Badge>
               )}
             </Group>
@@ -1265,6 +1617,16 @@ export const LeadTableView: React.FC<LeadTableViewProps> = ({
               }}
             >
               <Group gap={6}>
+                <ActionIcon
+                  variant="subtle"
+                  color="teal"
+                  size="md"
+                  radius="md"
+                  onClick={() => (onUpdateLead ? onUpdateLead(lead) : onEdit(lead))}
+                  title="Update Lead"
+                >
+                  <IconNotes size={16} />
+                </ActionIcon>
                 <ActionIcon
                   variant="subtle"
                   color="blue"

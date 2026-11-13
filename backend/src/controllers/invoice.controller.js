@@ -120,6 +120,40 @@ export async function convertQuotationToOrder(req, res) {
   }
 }
 
+export async function createQuotationRevision(req, res) {
+  try {
+    const revision = await billingService.createQuotationRevisionService(req.params.id, req.body, req.user);
+    return sendSuccess(res, revision, 'Quotation revision created successfully.', 201);
+  } catch (error) {
+    console.error('createQuotationRevision error:', error);
+    return sendError(res, error.message || 'Failed to create quotation revision.', error.status || 400);
+  }
+}
+
+export async function updateQuotationStatus(req, res) {
+  try {
+    const { status, notes } = req.body;
+    if (!status) {
+      return sendError(res, 'Status is required.', 400);
+    }
+    const updated = await billingService.updateQuotationStatusService(req.params.id, status, req.user, notes);
+    return sendSuccess(res, updated, 'Quotation status updated successfully.');
+  } catch (error) {
+    console.error('updateQuotationStatus error:', error);
+    return sendError(res, error.message || 'Failed to update quotation status.', error.status || 400);
+  }
+}
+
+export async function getQuotationRevisions(req, res) {
+  try {
+    const revisions = await billingService.getQuotationRevisionsService(req.params.id);
+    return sendSuccess(res, revisions, 'Quotation revisions retrieved successfully.');
+  } catch (error) {
+    console.error('getQuotationRevisions error:', error);
+    return sendError(res, error.message || 'Failed to fetch quotation revisions.', error.status || 400);
+  }
+}
+
 // =============================================================================
 // 4. SALES ORDERS & CONTRACTS
 // =============================================================================

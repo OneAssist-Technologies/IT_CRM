@@ -38,21 +38,30 @@ export const Header: React.FC<HeaderProps> = () => {
 
   const { currentUser, setActiveNav, globalSearch, setGlobalSearch, logoutUser, sidebarMobileOpened, setSidebarMobileOpened } = useCRM();
 
-  const pillBg = isDark ? '#1E293B' : '#F5F8FA';
-  const pillBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(15, 23, 42, 0.08)';
+  const pillBg = isDark ? 'rgba(30, 41, 59, 0.7)' : '#FFFFFF';
+  const pillBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(226, 232, 240, 0.9)';
+  const pillShadow = isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04)';
   const textColor = isDark ? '#F8FAFC' : '#0F172A';
   const iconColor = isDark ? '#94A3B8' : '#64748B';
+
+  const headerBg = isDark
+    ? 'rgba(5, 11, 26, 0.88)'
+    : 'rgba(255, 255, 255, 0.88)';
+  const headerBorder = isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(226, 232, 240, 0.8)';
 
   return (
     <Box
       style={{
         height: 64,
-        background: 'var(--mantine-color-default)',
-        borderBottom: '1px solid var(--mantine-color-default-border)',
+        background: headerBg,
+        borderBottom: `1px solid ${headerBorder}`,
+        boxShadow: isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.02)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 20px',
+        padding: '0 24px',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -61,7 +70,7 @@ export const Header: React.FC<HeaderProps> = () => {
       }}
     >
       {/* 1. Left: Mobile Burger + Search Bar with fixed max-width */}
-      <Group gap="sm" style={{ flex: 1, maxWidth: 380 }} wrap="nowrap" align="center">
+      <Group gap="sm" style={{ flex: 1, maxWidth: 420 }} wrap="nowrap" align="center">
         <Burger
           opened={sidebarMobileOpened}
           onClick={() => setSidebarMobileOpened(!sidebarMobileOpened)}
@@ -71,8 +80,8 @@ export const Header: React.FC<HeaderProps> = () => {
           aria-label="Toggle navigation"
         />
         <TextInput
-          placeholder="Search..."
-          leftSection={<IconSearch size={16} stroke={2} color={iconColor} />}
+          placeholder="Search anything..."
+          leftSection={<IconSearch size={16} stroke={1.8} color={iconColor} />}
           rightSection={
             globalSearch ? (
               <ActionIcon
@@ -80,27 +89,45 @@ export const Header: React.FC<HeaderProps> = () => {
                 variant="subtle"
                 color="gray"
                 onClick={() => setGlobalSearch('')}
+                title="Clear search"
               >
                 <IconX size={13} />
               </ActionIcon>
-            ) : null
+            ) : (
+              <Kbd
+                size="xs"
+                style={{
+                  background: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
+                  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0'}`,
+                  color: isDark ? '#94A3B8' : '#64748B',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                  marginRight: 4,
+                }}
+              >
+                ⌘K
+              </Kbd>
+            )
           }
           value={globalSearch}
           onChange={(e) => setGlobalSearch(e.currentTarget.value)}
-          style={{ flex: 1, minWidth: 120 }}
+          style={{ flex: 1, minWidth: 140 }}
           radius="100px"
-          variant="unstyled"
           styles={{
             input: {
-              background: pillBg,
-              paddingLeft: 36,
-              paddingRight: 16,
-              height: 38,
+              background: isDark ? 'rgba(30, 41, 59, 0.65)' : '#F8FAFC',
+              paddingLeft: 38,
+              paddingRight: 40,
+              height: 40,
               borderRadius: 100,
               fontSize: 13,
               fontWeight: 500,
               color: textColor,
               border: `1px solid ${pillBorder}`,
+              boxShadow: 'none',
+              transition: 'all 0.2s ease',
             },
           }}
         />
@@ -119,8 +146,12 @@ export const Header: React.FC<HeaderProps> = () => {
             radius="100px"
             style={{
               background: pillBg,
-              color: isDark ? '#F59E0B' : '#0F172A',
+              color: isDark ? '#F59E0B' : '#64748B',
               border: `1px solid ${pillBorder}`,
+              boxShadow: pillShadow,
+              width: 38,
+              height: 38,
+              transition: 'all 0.2s ease',
             }}
             onClick={() => {
               const nextScheme = isDark ? 'light' : 'dark';
@@ -130,7 +161,7 @@ export const Header: React.FC<HeaderProps> = () => {
               } catch (e) {}
             }}
           >
-            {isDark ? <IconSun size={16} stroke={1.8} /> : <IconMoon size={16} stroke={1.8} />}
+            {isDark ? <IconSun size={17} stroke={1.8} /> : <IconMoon size={17} stroke={1.8} />}
           </ActionIcon>
         </Tooltip>
 
@@ -145,12 +176,24 @@ export const Header: React.FC<HeaderProps> = () => {
                 background: pillBg,
                 borderRadius: 100,
                 border: `1px solid ${pillBorder}`,
+                boxShadow: pillShadow,
                 cursor: 'pointer',
                 userSelect: 'none',
                 transition: 'all 0.15s ease',
               }}
             >
-              <Avatar src={currentUser.avatar || undefined} radius="100px" size="sm" color="blue">
+              <Avatar
+                src={currentUser.avatar || undefined}
+                radius="100px"
+                size="sm"
+                styles={{
+                  placeholder: {
+                    background: 'linear-gradient(135deg, #0055FF 0%, #0070F3 55%, #00C6FF 100%)',
+                    color: '#FFFFFF',
+                    fontWeight: 700,
+                  },
+                }}
+              >
                 {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
               </Avatar>
               <Text size="xs" fw={700} visibleFrom="sm" style={{ color: textColor }}>

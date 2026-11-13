@@ -44,6 +44,16 @@ export type Employee = $Result.DefaultSelection<Prisma.$EmployeePayload>
  */
 export type Contact = $Result.DefaultSelection<Prisma.$ContactPayload>
 /**
+ * Model BulkUploadContact
+ * 
+ */
+export type BulkUploadContact = $Result.DefaultSelection<Prisma.$BulkUploadContactPayload>
+/**
+ * Model ImportBatch
+ * 
+ */
+export type ImportBatch = $Result.DefaultSelection<Prisma.$ImportBatchPayload>
+/**
  * Model Company
  * 
  */
@@ -163,6 +173,11 @@ export type Negotiation = $Result.DefaultSelection<Prisma.$NegotiationPayload>
  * 
  */
 export type Contract = $Result.DefaultSelection<Prisma.$ContractPayload>
+/**
+ * Model Activity
+ * 
+ */
+export type Activity = $Result.DefaultSelection<Prisma.$ActivityPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -341,6 +356,26 @@ export class PrismaClient<
     * ```
     */
   get contact(): Prisma.ContactDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.bulkUploadContact`: Exposes CRUD operations for the **BulkUploadContact** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BulkUploadContacts
+    * const bulkUploadContacts = await prisma.bulkUploadContact.findMany()
+    * ```
+    */
+  get bulkUploadContact(): Prisma.BulkUploadContactDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.importBatch`: Exposes CRUD operations for the **ImportBatch** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ImportBatches
+    * const importBatches = await prisma.importBatch.findMany()
+    * ```
+    */
+  get importBatch(): Prisma.ImportBatchDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.company`: Exposes CRUD operations for the **Company** model.
@@ -581,6 +616,16 @@ export class PrismaClient<
     * ```
     */
   get contract(): Prisma.ContractDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.activity`: Exposes CRUD operations for the **Activity** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Activities
+    * const activities = await prisma.activity.findMany()
+    * ```
+    */
+  get activity(): Prisma.ActivityDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -1028,6 +1073,8 @@ export namespace Prisma {
     AccessAuditLog: 'AccessAuditLog',
     Employee: 'Employee',
     Contact: 'Contact',
+    BulkUploadContact: 'BulkUploadContact',
+    ImportBatch: 'ImportBatch',
     Company: 'Company',
     Lead: 'Lead',
     ScheduledMeeting: 'ScheduledMeeting',
@@ -1051,7 +1098,8 @@ export namespace Prisma {
     BillingAuditLog: 'BillingAuditLog',
     BillingSettings: 'BillingSettings',
     Negotiation: 'Negotiation',
-    Contract: 'Contract'
+    Contract: 'Contract',
+    Activity: 'Activity'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1070,7 +1118,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "role" | "rolePermission" | "accessAuditLog" | "employee" | "contact" | "company" | "lead" | "scheduledMeeting" | "project" | "callLog" | "customer" | "masterProject" | "systemSetting" | "billingProduct" | "quotation" | "quotationItem" | "proposal" | "proposalItem" | "salesOrder" | "salesOrderItem" | "billingMilestone" | "invoice" | "invoiceItem" | "payment" | "paymentAllocation" | "billingAuditLog" | "billingSettings" | "negotiation" | "contract"
+      modelProps: "user" | "role" | "rolePermission" | "accessAuditLog" | "employee" | "contact" | "bulkUploadContact" | "importBatch" | "company" | "lead" | "scheduledMeeting" | "project" | "callLog" | "customer" | "masterProject" | "systemSetting" | "billingProduct" | "quotation" | "quotationItem" | "proposal" | "proposalItem" | "salesOrder" | "salesOrderItem" | "billingMilestone" | "invoice" | "invoiceItem" | "payment" | "paymentAllocation" | "billingAuditLog" | "billingSettings" | "negotiation" | "contract" | "activity"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1515,6 +1563,154 @@ export namespace Prisma {
           count: {
             args: Prisma.ContactCountArgs<ExtArgs>
             result: $Utils.Optional<ContactCountAggregateOutputType> | number
+          }
+        }
+      }
+      BulkUploadContact: {
+        payload: Prisma.$BulkUploadContactPayload<ExtArgs>
+        fields: Prisma.BulkUploadContactFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BulkUploadContactFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BulkUploadContactFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>
+          }
+          findFirst: {
+            args: Prisma.BulkUploadContactFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BulkUploadContactFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>
+          }
+          findMany: {
+            args: Prisma.BulkUploadContactFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>[]
+          }
+          create: {
+            args: Prisma.BulkUploadContactCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>
+          }
+          createMany: {
+            args: Prisma.BulkUploadContactCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BulkUploadContactCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>[]
+          }
+          delete: {
+            args: Prisma.BulkUploadContactDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>
+          }
+          update: {
+            args: Prisma.BulkUploadContactUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>
+          }
+          deleteMany: {
+            args: Prisma.BulkUploadContactDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BulkUploadContactUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BulkUploadContactUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>[]
+          }
+          upsert: {
+            args: Prisma.BulkUploadContactUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BulkUploadContactPayload>
+          }
+          aggregate: {
+            args: Prisma.BulkUploadContactAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBulkUploadContact>
+          }
+          groupBy: {
+            args: Prisma.BulkUploadContactGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BulkUploadContactGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BulkUploadContactCountArgs<ExtArgs>
+            result: $Utils.Optional<BulkUploadContactCountAggregateOutputType> | number
+          }
+        }
+      }
+      ImportBatch: {
+        payload: Prisma.$ImportBatchPayload<ExtArgs>
+        fields: Prisma.ImportBatchFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ImportBatchFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ImportBatchFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          }
+          findFirst: {
+            args: Prisma.ImportBatchFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ImportBatchFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          }
+          findMany: {
+            args: Prisma.ImportBatchFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>[]
+          }
+          create: {
+            args: Prisma.ImportBatchCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          }
+          createMany: {
+            args: Prisma.ImportBatchCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ImportBatchCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>[]
+          }
+          delete: {
+            args: Prisma.ImportBatchDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          }
+          update: {
+            args: Prisma.ImportBatchUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          }
+          deleteMany: {
+            args: Prisma.ImportBatchDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ImportBatchUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ImportBatchUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>[]
+          }
+          upsert: {
+            args: Prisma.ImportBatchUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ImportBatchPayload>
+          }
+          aggregate: {
+            args: Prisma.ImportBatchAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateImportBatch>
+          }
+          groupBy: {
+            args: Prisma.ImportBatchGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ImportBatchGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ImportBatchCountArgs<ExtArgs>
+            result: $Utils.Optional<ImportBatchCountAggregateOutputType> | number
           }
         }
       }
@@ -3294,6 +3490,80 @@ export namespace Prisma {
           }
         }
       }
+      Activity: {
+        payload: Prisma.$ActivityPayload<ExtArgs>
+        fields: Prisma.ActivityFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ActivityFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ActivityFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>
+          }
+          findFirst: {
+            args: Prisma.ActivityFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ActivityFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>
+          }
+          findMany: {
+            args: Prisma.ActivityFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>[]
+          }
+          create: {
+            args: Prisma.ActivityCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>
+          }
+          createMany: {
+            args: Prisma.ActivityCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ActivityCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>[]
+          }
+          delete: {
+            args: Prisma.ActivityDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>
+          }
+          update: {
+            args: Prisma.ActivityUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>
+          }
+          deleteMany: {
+            args: Prisma.ActivityDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ActivityUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ActivityUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>[]
+          }
+          upsert: {
+            args: Prisma.ActivityUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ActivityPayload>
+          }
+          aggregate: {
+            args: Prisma.ActivityAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateActivity>
+          }
+          groupBy: {
+            args: Prisma.ActivityGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ActivityGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ActivityCountArgs<ExtArgs>
+            result: $Utils.Optional<ActivityCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -3396,6 +3666,8 @@ export namespace Prisma {
     accessAuditLog?: AccessAuditLogOmit
     employee?: EmployeeOmit
     contact?: ContactOmit
+    bulkUploadContact?: BulkUploadContactOmit
+    importBatch?: ImportBatchOmit
     company?: CompanyOmit
     lead?: LeadOmit
     scheduledMeeting?: ScheduledMeetingOmit
@@ -3420,6 +3692,7 @@ export namespace Prisma {
     billingSettings?: BillingSettingsOmit
     negotiation?: NegotiationOmit
     contract?: ContractOmit
+    activity?: ActivityOmit
   }
 
   /* Types for Logging */
@@ -3549,10 +3822,12 @@ export namespace Prisma {
    */
 
   export type QuotationCountOutputType = {
+    revisions: number
     items: number
   }
 
   export type QuotationCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    revisions?: boolean | QuotationCountOutputTypeCountRevisionsArgs
     items?: boolean | QuotationCountOutputTypeCountItemsArgs
   }
 
@@ -3565,6 +3840,13 @@ export namespace Prisma {
      * Select specific fields to fetch from the QuotationCountOutputType
      */
     select?: QuotationCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * QuotationCountOutputType without action
+   */
+  export type QuotationCountOutputTypeCountRevisionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: QuotationWhereInput
   }
 
   /**
@@ -6135,6 +6417,7 @@ export namespace Prisma {
     canDelete: boolean | null
     canExport: boolean | null
     canApprove: boolean | null
+    dataScope: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -6151,6 +6434,7 @@ export namespace Prisma {
     canDelete: boolean | null
     canExport: boolean | null
     canApprove: boolean | null
+    dataScope: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -6167,6 +6451,7 @@ export namespace Prisma {
     canDelete: number
     canExport: number
     canApprove: number
+    dataScope: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -6185,6 +6470,7 @@ export namespace Prisma {
     canDelete?: true
     canExport?: true
     canApprove?: true
+    dataScope?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -6201,6 +6487,7 @@ export namespace Prisma {
     canDelete?: true
     canExport?: true
     canApprove?: true
+    dataScope?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -6217,6 +6504,7 @@ export namespace Prisma {
     canDelete?: true
     canExport?: true
     canApprove?: true
+    dataScope?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -6306,6 +6594,7 @@ export namespace Prisma {
     canDelete: boolean
     canExport: boolean
     canApprove: boolean
+    dataScope: string | null
     createdAt: Date
     updatedAt: Date
     _count: RolePermissionCountAggregateOutputType | null
@@ -6339,6 +6628,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     role?: boolean | RoleDefaultArgs<ExtArgs>
@@ -6356,6 +6646,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     role?: boolean | RoleDefaultArgs<ExtArgs>
@@ -6373,6 +6664,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     role?: boolean | RoleDefaultArgs<ExtArgs>
@@ -6390,11 +6682,12 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type RolePermissionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "roleId" | "moduleId" | "moduleName" | "category" | "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canApprove" | "createdAt" | "updatedAt", ExtArgs["result"]["rolePermission"]>
+  export type RolePermissionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "roleId" | "moduleId" | "moduleName" | "category" | "canView" | "canCreate" | "canEdit" | "canDelete" | "canExport" | "canApprove" | "dataScope" | "createdAt" | "updatedAt", ExtArgs["result"]["rolePermission"]>
   export type RolePermissionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     role?: boolean | RoleDefaultArgs<ExtArgs>
   }
@@ -6422,6 +6715,7 @@ export namespace Prisma {
       canDelete: boolean
       canExport: boolean
       canApprove: boolean
+      dataScope: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["rolePermission"]>
@@ -6859,6 +7153,7 @@ export namespace Prisma {
     readonly canDelete: FieldRef<"RolePermission", 'Boolean'>
     readonly canExport: FieldRef<"RolePermission", 'Boolean'>
     readonly canApprove: FieldRef<"RolePermission", 'Boolean'>
+    readonly dataScope: FieldRef<"RolePermission", 'String'>
     readonly createdAt: FieldRef<"RolePermission", 'DateTime'>
     readonly updatedAt: FieldRef<"RolePermission", 'DateTime'>
   }
@@ -11224,6 +11519,2693 @@ export namespace Prisma {
 
 
   /**
+   * Model BulkUploadContact
+   */
+
+  export type AggregateBulkUploadContact = {
+    _count: BulkUploadContactCountAggregateOutputType | null
+    _min: BulkUploadContactMinAggregateOutputType | null
+    _max: BulkUploadContactMaxAggregateOutputType | null
+  }
+
+  export type BulkUploadContactMinAggregateOutputType = {
+    id: string | null
+    bulkId: string | null
+    batchId: string | null
+    fileName: string | null
+    name: string | null
+    email: string | null
+    phone: string | null
+    companyName: string | null
+    contactPerson: string | null
+    designation: string | null
+    profession: string | null
+    category: string | null
+    source: string | null
+    customSource: string | null
+    contactType: string | null
+    estimatedValue: string | null
+    expectedCloseDate: string | null
+    description: string | null
+    remarks: string | null
+    notes: string | null
+    gstNumber: string | null
+    employeeCount: string | null
+    companyPan: string | null
+    cinNumber: string | null
+    companyWebsite: string | null
+    linkedinUrl: string | null
+    annualTurnover: string | null
+    verificationStatus: string | null
+    registeredState: string | null
+    status: string | null
+    stage: string | null
+    priority: string | null
+    assignedTo: string | null
+    assignedToName: string | null
+    assignmentStatus: string | null
+    contactMode: string | null
+    street: string | null
+    city: string | null
+    zip: string | null
+    country: string | null
+    isImportedToContact: boolean | null
+    importedContactId: string | null
+    createdBy: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BulkUploadContactMaxAggregateOutputType = {
+    id: string | null
+    bulkId: string | null
+    batchId: string | null
+    fileName: string | null
+    name: string | null
+    email: string | null
+    phone: string | null
+    companyName: string | null
+    contactPerson: string | null
+    designation: string | null
+    profession: string | null
+    category: string | null
+    source: string | null
+    customSource: string | null
+    contactType: string | null
+    estimatedValue: string | null
+    expectedCloseDate: string | null
+    description: string | null
+    remarks: string | null
+    notes: string | null
+    gstNumber: string | null
+    employeeCount: string | null
+    companyPan: string | null
+    cinNumber: string | null
+    companyWebsite: string | null
+    linkedinUrl: string | null
+    annualTurnover: string | null
+    verificationStatus: string | null
+    registeredState: string | null
+    status: string | null
+    stage: string | null
+    priority: string | null
+    assignedTo: string | null
+    assignedToName: string | null
+    assignmentStatus: string | null
+    contactMode: string | null
+    street: string | null
+    city: string | null
+    zip: string | null
+    country: string | null
+    isImportedToContact: boolean | null
+    importedContactId: string | null
+    createdBy: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BulkUploadContactCountAggregateOutputType = {
+    id: number
+    bulkId: number
+    batchId: number
+    fileName: number
+    name: number
+    email: number
+    phone: number
+    companyName: number
+    contactPerson: number
+    designation: number
+    profession: number
+    category: number
+    source: number
+    customSource: number
+    contactType: number
+    estimatedValue: number
+    expectedCloseDate: number
+    description: number
+    remarks: number
+    notes: number
+    gstNumber: number
+    employeeCount: number
+    companyPan: number
+    cinNumber: number
+    companyWebsite: number
+    linkedinUrl: number
+    annualTurnover: number
+    verificationStatus: number
+    registeredState: number
+    productList: number
+    serviceList: number
+    status: number
+    stage: number
+    priority: number
+    assignedTo: number
+    assignedToName: number
+    assignmentStatus: number
+    contactMode: number
+    street: number
+    city: number
+    zip: number
+    country: number
+    isImportedToContact: number
+    importedContactId: number
+    createdBy: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type BulkUploadContactMinAggregateInputType = {
+    id?: true
+    bulkId?: true
+    batchId?: true
+    fileName?: true
+    name?: true
+    email?: true
+    phone?: true
+    companyName?: true
+    contactPerson?: true
+    designation?: true
+    profession?: true
+    category?: true
+    source?: true
+    customSource?: true
+    contactType?: true
+    estimatedValue?: true
+    expectedCloseDate?: true
+    description?: true
+    remarks?: true
+    notes?: true
+    gstNumber?: true
+    employeeCount?: true
+    companyPan?: true
+    cinNumber?: true
+    companyWebsite?: true
+    linkedinUrl?: true
+    annualTurnover?: true
+    verificationStatus?: true
+    registeredState?: true
+    status?: true
+    stage?: true
+    priority?: true
+    assignedTo?: true
+    assignedToName?: true
+    assignmentStatus?: true
+    contactMode?: true
+    street?: true
+    city?: true
+    zip?: true
+    country?: true
+    isImportedToContact?: true
+    importedContactId?: true
+    createdBy?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BulkUploadContactMaxAggregateInputType = {
+    id?: true
+    bulkId?: true
+    batchId?: true
+    fileName?: true
+    name?: true
+    email?: true
+    phone?: true
+    companyName?: true
+    contactPerson?: true
+    designation?: true
+    profession?: true
+    category?: true
+    source?: true
+    customSource?: true
+    contactType?: true
+    estimatedValue?: true
+    expectedCloseDate?: true
+    description?: true
+    remarks?: true
+    notes?: true
+    gstNumber?: true
+    employeeCount?: true
+    companyPan?: true
+    cinNumber?: true
+    companyWebsite?: true
+    linkedinUrl?: true
+    annualTurnover?: true
+    verificationStatus?: true
+    registeredState?: true
+    status?: true
+    stage?: true
+    priority?: true
+    assignedTo?: true
+    assignedToName?: true
+    assignmentStatus?: true
+    contactMode?: true
+    street?: true
+    city?: true
+    zip?: true
+    country?: true
+    isImportedToContact?: true
+    importedContactId?: true
+    createdBy?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BulkUploadContactCountAggregateInputType = {
+    id?: true
+    bulkId?: true
+    batchId?: true
+    fileName?: true
+    name?: true
+    email?: true
+    phone?: true
+    companyName?: true
+    contactPerson?: true
+    designation?: true
+    profession?: true
+    category?: true
+    source?: true
+    customSource?: true
+    contactType?: true
+    estimatedValue?: true
+    expectedCloseDate?: true
+    description?: true
+    remarks?: true
+    notes?: true
+    gstNumber?: true
+    employeeCount?: true
+    companyPan?: true
+    cinNumber?: true
+    companyWebsite?: true
+    linkedinUrl?: true
+    annualTurnover?: true
+    verificationStatus?: true
+    registeredState?: true
+    productList?: true
+    serviceList?: true
+    status?: true
+    stage?: true
+    priority?: true
+    assignedTo?: true
+    assignedToName?: true
+    assignmentStatus?: true
+    contactMode?: true
+    street?: true
+    city?: true
+    zip?: true
+    country?: true
+    isImportedToContact?: true
+    importedContactId?: true
+    createdBy?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type BulkUploadContactAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BulkUploadContact to aggregate.
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BulkUploadContacts to fetch.
+     */
+    orderBy?: BulkUploadContactOrderByWithRelationInput | BulkUploadContactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BulkUploadContactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BulkUploadContacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BulkUploadContacts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BulkUploadContacts
+    **/
+    _count?: true | BulkUploadContactCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BulkUploadContactMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BulkUploadContactMaxAggregateInputType
+  }
+
+  export type GetBulkUploadContactAggregateType<T extends BulkUploadContactAggregateArgs> = {
+        [P in keyof T & keyof AggregateBulkUploadContact]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBulkUploadContact[P]>
+      : GetScalarType<T[P], AggregateBulkUploadContact[P]>
+  }
+
+
+
+
+  export type BulkUploadContactGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BulkUploadContactWhereInput
+    orderBy?: BulkUploadContactOrderByWithAggregationInput | BulkUploadContactOrderByWithAggregationInput[]
+    by: BulkUploadContactScalarFieldEnum[] | BulkUploadContactScalarFieldEnum
+    having?: BulkUploadContactScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BulkUploadContactCountAggregateInputType | true
+    _min?: BulkUploadContactMinAggregateInputType
+    _max?: BulkUploadContactMaxAggregateInputType
+  }
+
+  export type BulkUploadContactGroupByOutputType = {
+    id: string
+    bulkId: string | null
+    batchId: string | null
+    fileName: string | null
+    name: string
+    email: string | null
+    phone: string | null
+    companyName: string | null
+    contactPerson: string | null
+    designation: string | null
+    profession: string | null
+    category: string | null
+    source: string | null
+    customSource: string | null
+    contactType: string | null
+    estimatedValue: string | null
+    expectedCloseDate: string | null
+    description: string | null
+    remarks: string | null
+    notes: string | null
+    gstNumber: string | null
+    employeeCount: string | null
+    companyPan: string | null
+    cinNumber: string | null
+    companyWebsite: string | null
+    linkedinUrl: string | null
+    annualTurnover: string | null
+    verificationStatus: string | null
+    registeredState: string | null
+    productList: string[]
+    serviceList: string[]
+    status: string | null
+    stage: string | null
+    priority: string | null
+    assignedTo: string | null
+    assignedToName: string | null
+    assignmentStatus: string | null
+    contactMode: string | null
+    street: string | null
+    city: string | null
+    zip: string | null
+    country: string | null
+    isImportedToContact: boolean
+    importedContactId: string | null
+    createdBy: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: BulkUploadContactCountAggregateOutputType | null
+    _min: BulkUploadContactMinAggregateOutputType | null
+    _max: BulkUploadContactMaxAggregateOutputType | null
+  }
+
+  type GetBulkUploadContactGroupByPayload<T extends BulkUploadContactGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BulkUploadContactGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BulkUploadContactGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BulkUploadContactGroupByOutputType[P]>
+            : GetScalarType<T[P], BulkUploadContactGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BulkUploadContactSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    bulkId?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    name?: boolean
+    email?: boolean
+    phone?: boolean
+    companyName?: boolean
+    contactPerson?: boolean
+    designation?: boolean
+    profession?: boolean
+    category?: boolean
+    source?: boolean
+    customSource?: boolean
+    contactType?: boolean
+    estimatedValue?: boolean
+    expectedCloseDate?: boolean
+    description?: boolean
+    remarks?: boolean
+    notes?: boolean
+    gstNumber?: boolean
+    employeeCount?: boolean
+    companyPan?: boolean
+    cinNumber?: boolean
+    companyWebsite?: boolean
+    linkedinUrl?: boolean
+    annualTurnover?: boolean
+    verificationStatus?: boolean
+    registeredState?: boolean
+    productList?: boolean
+    serviceList?: boolean
+    status?: boolean
+    stage?: boolean
+    priority?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    assignmentStatus?: boolean
+    contactMode?: boolean
+    street?: boolean
+    city?: boolean
+    zip?: boolean
+    country?: boolean
+    isImportedToContact?: boolean
+    importedContactId?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["bulkUploadContact"]>
+
+  export type BulkUploadContactSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    bulkId?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    name?: boolean
+    email?: boolean
+    phone?: boolean
+    companyName?: boolean
+    contactPerson?: boolean
+    designation?: boolean
+    profession?: boolean
+    category?: boolean
+    source?: boolean
+    customSource?: boolean
+    contactType?: boolean
+    estimatedValue?: boolean
+    expectedCloseDate?: boolean
+    description?: boolean
+    remarks?: boolean
+    notes?: boolean
+    gstNumber?: boolean
+    employeeCount?: boolean
+    companyPan?: boolean
+    cinNumber?: boolean
+    companyWebsite?: boolean
+    linkedinUrl?: boolean
+    annualTurnover?: boolean
+    verificationStatus?: boolean
+    registeredState?: boolean
+    productList?: boolean
+    serviceList?: boolean
+    status?: boolean
+    stage?: boolean
+    priority?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    assignmentStatus?: boolean
+    contactMode?: boolean
+    street?: boolean
+    city?: boolean
+    zip?: boolean
+    country?: boolean
+    isImportedToContact?: boolean
+    importedContactId?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["bulkUploadContact"]>
+
+  export type BulkUploadContactSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    bulkId?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    name?: boolean
+    email?: boolean
+    phone?: boolean
+    companyName?: boolean
+    contactPerson?: boolean
+    designation?: boolean
+    profession?: boolean
+    category?: boolean
+    source?: boolean
+    customSource?: boolean
+    contactType?: boolean
+    estimatedValue?: boolean
+    expectedCloseDate?: boolean
+    description?: boolean
+    remarks?: boolean
+    notes?: boolean
+    gstNumber?: boolean
+    employeeCount?: boolean
+    companyPan?: boolean
+    cinNumber?: boolean
+    companyWebsite?: boolean
+    linkedinUrl?: boolean
+    annualTurnover?: boolean
+    verificationStatus?: boolean
+    registeredState?: boolean
+    productList?: boolean
+    serviceList?: boolean
+    status?: boolean
+    stage?: boolean
+    priority?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    assignmentStatus?: boolean
+    contactMode?: boolean
+    street?: boolean
+    city?: boolean
+    zip?: boolean
+    country?: boolean
+    isImportedToContact?: boolean
+    importedContactId?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["bulkUploadContact"]>
+
+  export type BulkUploadContactSelectScalar = {
+    id?: boolean
+    bulkId?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    name?: boolean
+    email?: boolean
+    phone?: boolean
+    companyName?: boolean
+    contactPerson?: boolean
+    designation?: boolean
+    profession?: boolean
+    category?: boolean
+    source?: boolean
+    customSource?: boolean
+    contactType?: boolean
+    estimatedValue?: boolean
+    expectedCloseDate?: boolean
+    description?: boolean
+    remarks?: boolean
+    notes?: boolean
+    gstNumber?: boolean
+    employeeCount?: boolean
+    companyPan?: boolean
+    cinNumber?: boolean
+    companyWebsite?: boolean
+    linkedinUrl?: boolean
+    annualTurnover?: boolean
+    verificationStatus?: boolean
+    registeredState?: boolean
+    productList?: boolean
+    serviceList?: boolean
+    status?: boolean
+    stage?: boolean
+    priority?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    assignmentStatus?: boolean
+    contactMode?: boolean
+    street?: boolean
+    city?: boolean
+    zip?: boolean
+    country?: boolean
+    isImportedToContact?: boolean
+    importedContactId?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type BulkUploadContactOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "bulkId" | "batchId" | "fileName" | "name" | "email" | "phone" | "companyName" | "contactPerson" | "designation" | "profession" | "category" | "source" | "customSource" | "contactType" | "estimatedValue" | "expectedCloseDate" | "description" | "remarks" | "notes" | "gstNumber" | "employeeCount" | "companyPan" | "cinNumber" | "companyWebsite" | "linkedinUrl" | "annualTurnover" | "verificationStatus" | "registeredState" | "productList" | "serviceList" | "status" | "stage" | "priority" | "assignedTo" | "assignedToName" | "assignmentStatus" | "contactMode" | "street" | "city" | "zip" | "country" | "isImportedToContact" | "importedContactId" | "createdBy" | "createdAt" | "updatedAt", ExtArgs["result"]["bulkUploadContact"]>
+
+  export type $BulkUploadContactPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BulkUploadContact"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      bulkId: string | null
+      batchId: string | null
+      fileName: string | null
+      name: string
+      email: string | null
+      phone: string | null
+      companyName: string | null
+      contactPerson: string | null
+      designation: string | null
+      profession: string | null
+      category: string | null
+      source: string | null
+      customSource: string | null
+      contactType: string | null
+      estimatedValue: string | null
+      expectedCloseDate: string | null
+      description: string | null
+      remarks: string | null
+      notes: string | null
+      gstNumber: string | null
+      employeeCount: string | null
+      companyPan: string | null
+      cinNumber: string | null
+      companyWebsite: string | null
+      linkedinUrl: string | null
+      annualTurnover: string | null
+      verificationStatus: string | null
+      registeredState: string | null
+      productList: string[]
+      serviceList: string[]
+      status: string | null
+      stage: string | null
+      priority: string | null
+      assignedTo: string | null
+      assignedToName: string | null
+      assignmentStatus: string | null
+      contactMode: string | null
+      street: string | null
+      city: string | null
+      zip: string | null
+      country: string | null
+      isImportedToContact: boolean
+      importedContactId: string | null
+      createdBy: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["bulkUploadContact"]>
+    composites: {}
+  }
+
+  type BulkUploadContactGetPayload<S extends boolean | null | undefined | BulkUploadContactDefaultArgs> = $Result.GetResult<Prisma.$BulkUploadContactPayload, S>
+
+  type BulkUploadContactCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BulkUploadContactFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BulkUploadContactCountAggregateInputType | true
+    }
+
+  export interface BulkUploadContactDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BulkUploadContact'], meta: { name: 'BulkUploadContact' } }
+    /**
+     * Find zero or one BulkUploadContact that matches the filter.
+     * @param {BulkUploadContactFindUniqueArgs} args - Arguments to find a BulkUploadContact
+     * @example
+     * // Get one BulkUploadContact
+     * const bulkUploadContact = await prisma.bulkUploadContact.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BulkUploadContactFindUniqueArgs>(args: SelectSubset<T, BulkUploadContactFindUniqueArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BulkUploadContact that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BulkUploadContactFindUniqueOrThrowArgs} args - Arguments to find a BulkUploadContact
+     * @example
+     * // Get one BulkUploadContact
+     * const bulkUploadContact = await prisma.bulkUploadContact.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BulkUploadContactFindUniqueOrThrowArgs>(args: SelectSubset<T, BulkUploadContactFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BulkUploadContact that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactFindFirstArgs} args - Arguments to find a BulkUploadContact
+     * @example
+     * // Get one BulkUploadContact
+     * const bulkUploadContact = await prisma.bulkUploadContact.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BulkUploadContactFindFirstArgs>(args?: SelectSubset<T, BulkUploadContactFindFirstArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BulkUploadContact that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactFindFirstOrThrowArgs} args - Arguments to find a BulkUploadContact
+     * @example
+     * // Get one BulkUploadContact
+     * const bulkUploadContact = await prisma.bulkUploadContact.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BulkUploadContactFindFirstOrThrowArgs>(args?: SelectSubset<T, BulkUploadContactFindFirstOrThrowArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BulkUploadContacts that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BulkUploadContacts
+     * const bulkUploadContacts = await prisma.bulkUploadContact.findMany()
+     * 
+     * // Get first 10 BulkUploadContacts
+     * const bulkUploadContacts = await prisma.bulkUploadContact.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const bulkUploadContactWithIdOnly = await prisma.bulkUploadContact.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BulkUploadContactFindManyArgs>(args?: SelectSubset<T, BulkUploadContactFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BulkUploadContact.
+     * @param {BulkUploadContactCreateArgs} args - Arguments to create a BulkUploadContact.
+     * @example
+     * // Create one BulkUploadContact
+     * const BulkUploadContact = await prisma.bulkUploadContact.create({
+     *   data: {
+     *     // ... data to create a BulkUploadContact
+     *   }
+     * })
+     * 
+     */
+    create<T extends BulkUploadContactCreateArgs>(args: SelectSubset<T, BulkUploadContactCreateArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BulkUploadContacts.
+     * @param {BulkUploadContactCreateManyArgs} args - Arguments to create many BulkUploadContacts.
+     * @example
+     * // Create many BulkUploadContacts
+     * const bulkUploadContact = await prisma.bulkUploadContact.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BulkUploadContactCreateManyArgs>(args?: SelectSubset<T, BulkUploadContactCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BulkUploadContacts and returns the data saved in the database.
+     * @param {BulkUploadContactCreateManyAndReturnArgs} args - Arguments to create many BulkUploadContacts.
+     * @example
+     * // Create many BulkUploadContacts
+     * const bulkUploadContact = await prisma.bulkUploadContact.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BulkUploadContacts and only return the `id`
+     * const bulkUploadContactWithIdOnly = await prisma.bulkUploadContact.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BulkUploadContactCreateManyAndReturnArgs>(args?: SelectSubset<T, BulkUploadContactCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BulkUploadContact.
+     * @param {BulkUploadContactDeleteArgs} args - Arguments to delete one BulkUploadContact.
+     * @example
+     * // Delete one BulkUploadContact
+     * const BulkUploadContact = await prisma.bulkUploadContact.delete({
+     *   where: {
+     *     // ... filter to delete one BulkUploadContact
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BulkUploadContactDeleteArgs>(args: SelectSubset<T, BulkUploadContactDeleteArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BulkUploadContact.
+     * @param {BulkUploadContactUpdateArgs} args - Arguments to update one BulkUploadContact.
+     * @example
+     * // Update one BulkUploadContact
+     * const bulkUploadContact = await prisma.bulkUploadContact.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BulkUploadContactUpdateArgs>(args: SelectSubset<T, BulkUploadContactUpdateArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BulkUploadContacts.
+     * @param {BulkUploadContactDeleteManyArgs} args - Arguments to filter BulkUploadContacts to delete.
+     * @example
+     * // Delete a few BulkUploadContacts
+     * const { count } = await prisma.bulkUploadContact.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BulkUploadContactDeleteManyArgs>(args?: SelectSubset<T, BulkUploadContactDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BulkUploadContacts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BulkUploadContacts
+     * const bulkUploadContact = await prisma.bulkUploadContact.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BulkUploadContactUpdateManyArgs>(args: SelectSubset<T, BulkUploadContactUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BulkUploadContacts and returns the data updated in the database.
+     * @param {BulkUploadContactUpdateManyAndReturnArgs} args - Arguments to update many BulkUploadContacts.
+     * @example
+     * // Update many BulkUploadContacts
+     * const bulkUploadContact = await prisma.bulkUploadContact.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BulkUploadContacts and only return the `id`
+     * const bulkUploadContactWithIdOnly = await prisma.bulkUploadContact.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BulkUploadContactUpdateManyAndReturnArgs>(args: SelectSubset<T, BulkUploadContactUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BulkUploadContact.
+     * @param {BulkUploadContactUpsertArgs} args - Arguments to update or create a BulkUploadContact.
+     * @example
+     * // Update or create a BulkUploadContact
+     * const bulkUploadContact = await prisma.bulkUploadContact.upsert({
+     *   create: {
+     *     // ... data to create a BulkUploadContact
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BulkUploadContact we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BulkUploadContactUpsertArgs>(args: SelectSubset<T, BulkUploadContactUpsertArgs<ExtArgs>>): Prisma__BulkUploadContactClient<$Result.GetResult<Prisma.$BulkUploadContactPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BulkUploadContacts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactCountArgs} args - Arguments to filter BulkUploadContacts to count.
+     * @example
+     * // Count the number of BulkUploadContacts
+     * const count = await prisma.bulkUploadContact.count({
+     *   where: {
+     *     // ... the filter for the BulkUploadContacts we want to count
+     *   }
+     * })
+    **/
+    count<T extends BulkUploadContactCountArgs>(
+      args?: Subset<T, BulkUploadContactCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BulkUploadContactCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BulkUploadContact.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BulkUploadContactAggregateArgs>(args: Subset<T, BulkUploadContactAggregateArgs>): Prisma.PrismaPromise<GetBulkUploadContactAggregateType<T>>
+
+    /**
+     * Group by BulkUploadContact.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BulkUploadContactGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BulkUploadContactGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BulkUploadContactGroupByArgs['orderBy'] }
+        : { orderBy?: BulkUploadContactGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BulkUploadContactGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBulkUploadContactGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BulkUploadContact model
+   */
+  readonly fields: BulkUploadContactFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BulkUploadContact.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BulkUploadContactClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BulkUploadContact model
+   */
+  interface BulkUploadContactFieldRefs {
+    readonly id: FieldRef<"BulkUploadContact", 'String'>
+    readonly bulkId: FieldRef<"BulkUploadContact", 'String'>
+    readonly batchId: FieldRef<"BulkUploadContact", 'String'>
+    readonly fileName: FieldRef<"BulkUploadContact", 'String'>
+    readonly name: FieldRef<"BulkUploadContact", 'String'>
+    readonly email: FieldRef<"BulkUploadContact", 'String'>
+    readonly phone: FieldRef<"BulkUploadContact", 'String'>
+    readonly companyName: FieldRef<"BulkUploadContact", 'String'>
+    readonly contactPerson: FieldRef<"BulkUploadContact", 'String'>
+    readonly designation: FieldRef<"BulkUploadContact", 'String'>
+    readonly profession: FieldRef<"BulkUploadContact", 'String'>
+    readonly category: FieldRef<"BulkUploadContact", 'String'>
+    readonly source: FieldRef<"BulkUploadContact", 'String'>
+    readonly customSource: FieldRef<"BulkUploadContact", 'String'>
+    readonly contactType: FieldRef<"BulkUploadContact", 'String'>
+    readonly estimatedValue: FieldRef<"BulkUploadContact", 'String'>
+    readonly expectedCloseDate: FieldRef<"BulkUploadContact", 'String'>
+    readonly description: FieldRef<"BulkUploadContact", 'String'>
+    readonly remarks: FieldRef<"BulkUploadContact", 'String'>
+    readonly notes: FieldRef<"BulkUploadContact", 'String'>
+    readonly gstNumber: FieldRef<"BulkUploadContact", 'String'>
+    readonly employeeCount: FieldRef<"BulkUploadContact", 'String'>
+    readonly companyPan: FieldRef<"BulkUploadContact", 'String'>
+    readonly cinNumber: FieldRef<"BulkUploadContact", 'String'>
+    readonly companyWebsite: FieldRef<"BulkUploadContact", 'String'>
+    readonly linkedinUrl: FieldRef<"BulkUploadContact", 'String'>
+    readonly annualTurnover: FieldRef<"BulkUploadContact", 'String'>
+    readonly verificationStatus: FieldRef<"BulkUploadContact", 'String'>
+    readonly registeredState: FieldRef<"BulkUploadContact", 'String'>
+    readonly productList: FieldRef<"BulkUploadContact", 'String[]'>
+    readonly serviceList: FieldRef<"BulkUploadContact", 'String[]'>
+    readonly status: FieldRef<"BulkUploadContact", 'String'>
+    readonly stage: FieldRef<"BulkUploadContact", 'String'>
+    readonly priority: FieldRef<"BulkUploadContact", 'String'>
+    readonly assignedTo: FieldRef<"BulkUploadContact", 'String'>
+    readonly assignedToName: FieldRef<"BulkUploadContact", 'String'>
+    readonly assignmentStatus: FieldRef<"BulkUploadContact", 'String'>
+    readonly contactMode: FieldRef<"BulkUploadContact", 'String'>
+    readonly street: FieldRef<"BulkUploadContact", 'String'>
+    readonly city: FieldRef<"BulkUploadContact", 'String'>
+    readonly zip: FieldRef<"BulkUploadContact", 'String'>
+    readonly country: FieldRef<"BulkUploadContact", 'String'>
+    readonly isImportedToContact: FieldRef<"BulkUploadContact", 'Boolean'>
+    readonly importedContactId: FieldRef<"BulkUploadContact", 'String'>
+    readonly createdBy: FieldRef<"BulkUploadContact", 'String'>
+    readonly createdAt: FieldRef<"BulkUploadContact", 'DateTime'>
+    readonly updatedAt: FieldRef<"BulkUploadContact", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BulkUploadContact findUnique
+   */
+  export type BulkUploadContactFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * Filter, which BulkUploadContact to fetch.
+     */
+    where: BulkUploadContactWhereUniqueInput
+  }
+
+  /**
+   * BulkUploadContact findUniqueOrThrow
+   */
+  export type BulkUploadContactFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * Filter, which BulkUploadContact to fetch.
+     */
+    where: BulkUploadContactWhereUniqueInput
+  }
+
+  /**
+   * BulkUploadContact findFirst
+   */
+  export type BulkUploadContactFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * Filter, which BulkUploadContact to fetch.
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BulkUploadContacts to fetch.
+     */
+    orderBy?: BulkUploadContactOrderByWithRelationInput | BulkUploadContactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BulkUploadContacts.
+     */
+    cursor?: BulkUploadContactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BulkUploadContacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BulkUploadContacts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BulkUploadContacts.
+     */
+    distinct?: BulkUploadContactScalarFieldEnum | BulkUploadContactScalarFieldEnum[]
+  }
+
+  /**
+   * BulkUploadContact findFirstOrThrow
+   */
+  export type BulkUploadContactFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * Filter, which BulkUploadContact to fetch.
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BulkUploadContacts to fetch.
+     */
+    orderBy?: BulkUploadContactOrderByWithRelationInput | BulkUploadContactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BulkUploadContacts.
+     */
+    cursor?: BulkUploadContactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BulkUploadContacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BulkUploadContacts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BulkUploadContacts.
+     */
+    distinct?: BulkUploadContactScalarFieldEnum | BulkUploadContactScalarFieldEnum[]
+  }
+
+  /**
+   * BulkUploadContact findMany
+   */
+  export type BulkUploadContactFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * Filter, which BulkUploadContacts to fetch.
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BulkUploadContacts to fetch.
+     */
+    orderBy?: BulkUploadContactOrderByWithRelationInput | BulkUploadContactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BulkUploadContacts.
+     */
+    cursor?: BulkUploadContactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BulkUploadContacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BulkUploadContacts.
+     */
+    skip?: number
+    distinct?: BulkUploadContactScalarFieldEnum | BulkUploadContactScalarFieldEnum[]
+  }
+
+  /**
+   * BulkUploadContact create
+   */
+  export type BulkUploadContactCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * The data needed to create a BulkUploadContact.
+     */
+    data: XOR<BulkUploadContactCreateInput, BulkUploadContactUncheckedCreateInput>
+  }
+
+  /**
+   * BulkUploadContact createMany
+   */
+  export type BulkUploadContactCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BulkUploadContacts.
+     */
+    data: BulkUploadContactCreateManyInput | BulkUploadContactCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BulkUploadContact createManyAndReturn
+   */
+  export type BulkUploadContactCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * The data used to create many BulkUploadContacts.
+     */
+    data: BulkUploadContactCreateManyInput | BulkUploadContactCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BulkUploadContact update
+   */
+  export type BulkUploadContactUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * The data needed to update a BulkUploadContact.
+     */
+    data: XOR<BulkUploadContactUpdateInput, BulkUploadContactUncheckedUpdateInput>
+    /**
+     * Choose, which BulkUploadContact to update.
+     */
+    where: BulkUploadContactWhereUniqueInput
+  }
+
+  /**
+   * BulkUploadContact updateMany
+   */
+  export type BulkUploadContactUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BulkUploadContacts.
+     */
+    data: XOR<BulkUploadContactUpdateManyMutationInput, BulkUploadContactUncheckedUpdateManyInput>
+    /**
+     * Filter which BulkUploadContacts to update
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * Limit how many BulkUploadContacts to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BulkUploadContact updateManyAndReturn
+   */
+  export type BulkUploadContactUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * The data used to update BulkUploadContacts.
+     */
+    data: XOR<BulkUploadContactUpdateManyMutationInput, BulkUploadContactUncheckedUpdateManyInput>
+    /**
+     * Filter which BulkUploadContacts to update
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * Limit how many BulkUploadContacts to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BulkUploadContact upsert
+   */
+  export type BulkUploadContactUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * The filter to search for the BulkUploadContact to update in case it exists.
+     */
+    where: BulkUploadContactWhereUniqueInput
+    /**
+     * In case the BulkUploadContact found by the `where` argument doesn't exist, create a new BulkUploadContact with this data.
+     */
+    create: XOR<BulkUploadContactCreateInput, BulkUploadContactUncheckedCreateInput>
+    /**
+     * In case the BulkUploadContact was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BulkUploadContactUpdateInput, BulkUploadContactUncheckedUpdateInput>
+  }
+
+  /**
+   * BulkUploadContact delete
+   */
+  export type BulkUploadContactDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+    /**
+     * Filter which BulkUploadContact to delete.
+     */
+    where: BulkUploadContactWhereUniqueInput
+  }
+
+  /**
+   * BulkUploadContact deleteMany
+   */
+  export type BulkUploadContactDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BulkUploadContacts to delete
+     */
+    where?: BulkUploadContactWhereInput
+    /**
+     * Limit how many BulkUploadContacts to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BulkUploadContact without action
+   */
+  export type BulkUploadContactDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BulkUploadContact
+     */
+    select?: BulkUploadContactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BulkUploadContact
+     */
+    omit?: BulkUploadContactOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ImportBatch
+   */
+
+  export type AggregateImportBatch = {
+    _count: ImportBatchCountAggregateOutputType | null
+    _avg: ImportBatchAvgAggregateOutputType | null
+    _sum: ImportBatchSumAggregateOutputType | null
+    _min: ImportBatchMinAggregateOutputType | null
+    _max: ImportBatchMaxAggregateOutputType | null
+  }
+
+  export type ImportBatchAvgAggregateOutputType = {
+    fileSize: number | null
+    totalRows: number | null
+    importedCount: number | null
+    failedCount: number | null
+  }
+
+  export type ImportBatchSumAggregateOutputType = {
+    fileSize: number | null
+    totalRows: number | null
+    importedCount: number | null
+    failedCount: number | null
+  }
+
+  export type ImportBatchMinAggregateOutputType = {
+    id: string | null
+    batchId: string | null
+    fileName: string | null
+    fileSize: number | null
+    totalRows: number | null
+    importedCount: number | null
+    failedCount: number | null
+    status: string | null
+    assignedTo: string | null
+    assignedToName: string | null
+    createdBy: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ImportBatchMaxAggregateOutputType = {
+    id: string | null
+    batchId: string | null
+    fileName: string | null
+    fileSize: number | null
+    totalRows: number | null
+    importedCount: number | null
+    failedCount: number | null
+    status: string | null
+    assignedTo: string | null
+    assignedToName: string | null
+    createdBy: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ImportBatchCountAggregateOutputType = {
+    id: number
+    batchId: number
+    fileName: number
+    fileSize: number
+    totalRows: number
+    importedCount: number
+    failedCount: number
+    status: number
+    failedRows: number
+    assignedTo: number
+    assignedToName: number
+    createdBy: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ImportBatchAvgAggregateInputType = {
+    fileSize?: true
+    totalRows?: true
+    importedCount?: true
+    failedCount?: true
+  }
+
+  export type ImportBatchSumAggregateInputType = {
+    fileSize?: true
+    totalRows?: true
+    importedCount?: true
+    failedCount?: true
+  }
+
+  export type ImportBatchMinAggregateInputType = {
+    id?: true
+    batchId?: true
+    fileName?: true
+    fileSize?: true
+    totalRows?: true
+    importedCount?: true
+    failedCount?: true
+    status?: true
+    assignedTo?: true
+    assignedToName?: true
+    createdBy?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ImportBatchMaxAggregateInputType = {
+    id?: true
+    batchId?: true
+    fileName?: true
+    fileSize?: true
+    totalRows?: true
+    importedCount?: true
+    failedCount?: true
+    status?: true
+    assignedTo?: true
+    assignedToName?: true
+    createdBy?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ImportBatchCountAggregateInputType = {
+    id?: true
+    batchId?: true
+    fileName?: true
+    fileSize?: true
+    totalRows?: true
+    importedCount?: true
+    failedCount?: true
+    status?: true
+    failedRows?: true
+    assignedTo?: true
+    assignedToName?: true
+    createdBy?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ImportBatchAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ImportBatch to aggregate.
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ImportBatches to fetch.
+     */
+    orderBy?: ImportBatchOrderByWithRelationInput | ImportBatchOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ImportBatchWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ImportBatches from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ImportBatches.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ImportBatches
+    **/
+    _count?: true | ImportBatchCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ImportBatchAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ImportBatchSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ImportBatchMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ImportBatchMaxAggregateInputType
+  }
+
+  export type GetImportBatchAggregateType<T extends ImportBatchAggregateArgs> = {
+        [P in keyof T & keyof AggregateImportBatch]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateImportBatch[P]>
+      : GetScalarType<T[P], AggregateImportBatch[P]>
+  }
+
+
+
+
+  export type ImportBatchGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ImportBatchWhereInput
+    orderBy?: ImportBatchOrderByWithAggregationInput | ImportBatchOrderByWithAggregationInput[]
+    by: ImportBatchScalarFieldEnum[] | ImportBatchScalarFieldEnum
+    having?: ImportBatchScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ImportBatchCountAggregateInputType | true
+    _avg?: ImportBatchAvgAggregateInputType
+    _sum?: ImportBatchSumAggregateInputType
+    _min?: ImportBatchMinAggregateInputType
+    _max?: ImportBatchMaxAggregateInputType
+  }
+
+  export type ImportBatchGroupByOutputType = {
+    id: string
+    batchId: string
+    fileName: string
+    fileSize: number | null
+    totalRows: number
+    importedCount: number
+    failedCount: number
+    status: string
+    failedRows: JsonValue | null
+    assignedTo: string | null
+    assignedToName: string | null
+    createdBy: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ImportBatchCountAggregateOutputType | null
+    _avg: ImportBatchAvgAggregateOutputType | null
+    _sum: ImportBatchSumAggregateOutputType | null
+    _min: ImportBatchMinAggregateOutputType | null
+    _max: ImportBatchMaxAggregateOutputType | null
+  }
+
+  type GetImportBatchGroupByPayload<T extends ImportBatchGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ImportBatchGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ImportBatchGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ImportBatchGroupByOutputType[P]>
+            : GetScalarType<T[P], ImportBatchGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ImportBatchSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    fileSize?: boolean
+    totalRows?: boolean
+    importedCount?: boolean
+    failedCount?: boolean
+    status?: boolean
+    failedRows?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["importBatch"]>
+
+  export type ImportBatchSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    fileSize?: boolean
+    totalRows?: boolean
+    importedCount?: boolean
+    failedCount?: boolean
+    status?: boolean
+    failedRows?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["importBatch"]>
+
+  export type ImportBatchSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    fileSize?: boolean
+    totalRows?: boolean
+    importedCount?: boolean
+    failedCount?: boolean
+    status?: boolean
+    failedRows?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["importBatch"]>
+
+  export type ImportBatchSelectScalar = {
+    id?: boolean
+    batchId?: boolean
+    fileName?: boolean
+    fileSize?: boolean
+    totalRows?: boolean
+    importedCount?: boolean
+    failedCount?: boolean
+    status?: boolean
+    failedRows?: boolean
+    assignedTo?: boolean
+    assignedToName?: boolean
+    createdBy?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ImportBatchOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "batchId" | "fileName" | "fileSize" | "totalRows" | "importedCount" | "failedCount" | "status" | "failedRows" | "assignedTo" | "assignedToName" | "createdBy" | "createdAt" | "updatedAt", ExtArgs["result"]["importBatch"]>
+
+  export type $ImportBatchPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ImportBatch"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      batchId: string
+      fileName: string
+      fileSize: number | null
+      totalRows: number
+      importedCount: number
+      failedCount: number
+      status: string
+      failedRows: Prisma.JsonValue | null
+      assignedTo: string | null
+      assignedToName: string | null
+      createdBy: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["importBatch"]>
+    composites: {}
+  }
+
+  type ImportBatchGetPayload<S extends boolean | null | undefined | ImportBatchDefaultArgs> = $Result.GetResult<Prisma.$ImportBatchPayload, S>
+
+  type ImportBatchCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ImportBatchFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ImportBatchCountAggregateInputType | true
+    }
+
+  export interface ImportBatchDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ImportBatch'], meta: { name: 'ImportBatch' } }
+    /**
+     * Find zero or one ImportBatch that matches the filter.
+     * @param {ImportBatchFindUniqueArgs} args - Arguments to find a ImportBatch
+     * @example
+     * // Get one ImportBatch
+     * const importBatch = await prisma.importBatch.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ImportBatchFindUniqueArgs>(args: SelectSubset<T, ImportBatchFindUniqueArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ImportBatch that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ImportBatchFindUniqueOrThrowArgs} args - Arguments to find a ImportBatch
+     * @example
+     * // Get one ImportBatch
+     * const importBatch = await prisma.importBatch.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ImportBatchFindUniqueOrThrowArgs>(args: SelectSubset<T, ImportBatchFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ImportBatch that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchFindFirstArgs} args - Arguments to find a ImportBatch
+     * @example
+     * // Get one ImportBatch
+     * const importBatch = await prisma.importBatch.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ImportBatchFindFirstArgs>(args?: SelectSubset<T, ImportBatchFindFirstArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ImportBatch that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchFindFirstOrThrowArgs} args - Arguments to find a ImportBatch
+     * @example
+     * // Get one ImportBatch
+     * const importBatch = await prisma.importBatch.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ImportBatchFindFirstOrThrowArgs>(args?: SelectSubset<T, ImportBatchFindFirstOrThrowArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ImportBatches that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ImportBatches
+     * const importBatches = await prisma.importBatch.findMany()
+     * 
+     * // Get first 10 ImportBatches
+     * const importBatches = await prisma.importBatch.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const importBatchWithIdOnly = await prisma.importBatch.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ImportBatchFindManyArgs>(args?: SelectSubset<T, ImportBatchFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ImportBatch.
+     * @param {ImportBatchCreateArgs} args - Arguments to create a ImportBatch.
+     * @example
+     * // Create one ImportBatch
+     * const ImportBatch = await prisma.importBatch.create({
+     *   data: {
+     *     // ... data to create a ImportBatch
+     *   }
+     * })
+     * 
+     */
+    create<T extends ImportBatchCreateArgs>(args: SelectSubset<T, ImportBatchCreateArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ImportBatches.
+     * @param {ImportBatchCreateManyArgs} args - Arguments to create many ImportBatches.
+     * @example
+     * // Create many ImportBatches
+     * const importBatch = await prisma.importBatch.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ImportBatchCreateManyArgs>(args?: SelectSubset<T, ImportBatchCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ImportBatches and returns the data saved in the database.
+     * @param {ImportBatchCreateManyAndReturnArgs} args - Arguments to create many ImportBatches.
+     * @example
+     * // Create many ImportBatches
+     * const importBatch = await prisma.importBatch.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ImportBatches and only return the `id`
+     * const importBatchWithIdOnly = await prisma.importBatch.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ImportBatchCreateManyAndReturnArgs>(args?: SelectSubset<T, ImportBatchCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ImportBatch.
+     * @param {ImportBatchDeleteArgs} args - Arguments to delete one ImportBatch.
+     * @example
+     * // Delete one ImportBatch
+     * const ImportBatch = await prisma.importBatch.delete({
+     *   where: {
+     *     // ... filter to delete one ImportBatch
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ImportBatchDeleteArgs>(args: SelectSubset<T, ImportBatchDeleteArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ImportBatch.
+     * @param {ImportBatchUpdateArgs} args - Arguments to update one ImportBatch.
+     * @example
+     * // Update one ImportBatch
+     * const importBatch = await prisma.importBatch.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ImportBatchUpdateArgs>(args: SelectSubset<T, ImportBatchUpdateArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ImportBatches.
+     * @param {ImportBatchDeleteManyArgs} args - Arguments to filter ImportBatches to delete.
+     * @example
+     * // Delete a few ImportBatches
+     * const { count } = await prisma.importBatch.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ImportBatchDeleteManyArgs>(args?: SelectSubset<T, ImportBatchDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ImportBatches.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ImportBatches
+     * const importBatch = await prisma.importBatch.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ImportBatchUpdateManyArgs>(args: SelectSubset<T, ImportBatchUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ImportBatches and returns the data updated in the database.
+     * @param {ImportBatchUpdateManyAndReturnArgs} args - Arguments to update many ImportBatches.
+     * @example
+     * // Update many ImportBatches
+     * const importBatch = await prisma.importBatch.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ImportBatches and only return the `id`
+     * const importBatchWithIdOnly = await prisma.importBatch.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ImportBatchUpdateManyAndReturnArgs>(args: SelectSubset<T, ImportBatchUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ImportBatch.
+     * @param {ImportBatchUpsertArgs} args - Arguments to update or create a ImportBatch.
+     * @example
+     * // Update or create a ImportBatch
+     * const importBatch = await prisma.importBatch.upsert({
+     *   create: {
+     *     // ... data to create a ImportBatch
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ImportBatch we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ImportBatchUpsertArgs>(args: SelectSubset<T, ImportBatchUpsertArgs<ExtArgs>>): Prisma__ImportBatchClient<$Result.GetResult<Prisma.$ImportBatchPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ImportBatches.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchCountArgs} args - Arguments to filter ImportBatches to count.
+     * @example
+     * // Count the number of ImportBatches
+     * const count = await prisma.importBatch.count({
+     *   where: {
+     *     // ... the filter for the ImportBatches we want to count
+     *   }
+     * })
+    **/
+    count<T extends ImportBatchCountArgs>(
+      args?: Subset<T, ImportBatchCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ImportBatchCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ImportBatch.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ImportBatchAggregateArgs>(args: Subset<T, ImportBatchAggregateArgs>): Prisma.PrismaPromise<GetImportBatchAggregateType<T>>
+
+    /**
+     * Group by ImportBatch.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ImportBatchGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ImportBatchGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ImportBatchGroupByArgs['orderBy'] }
+        : { orderBy?: ImportBatchGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ImportBatchGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetImportBatchGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ImportBatch model
+   */
+  readonly fields: ImportBatchFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ImportBatch.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ImportBatchClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ImportBatch model
+   */
+  interface ImportBatchFieldRefs {
+    readonly id: FieldRef<"ImportBatch", 'String'>
+    readonly batchId: FieldRef<"ImportBatch", 'String'>
+    readonly fileName: FieldRef<"ImportBatch", 'String'>
+    readonly fileSize: FieldRef<"ImportBatch", 'Int'>
+    readonly totalRows: FieldRef<"ImportBatch", 'Int'>
+    readonly importedCount: FieldRef<"ImportBatch", 'Int'>
+    readonly failedCount: FieldRef<"ImportBatch", 'Int'>
+    readonly status: FieldRef<"ImportBatch", 'String'>
+    readonly failedRows: FieldRef<"ImportBatch", 'Json'>
+    readonly assignedTo: FieldRef<"ImportBatch", 'String'>
+    readonly assignedToName: FieldRef<"ImportBatch", 'String'>
+    readonly createdBy: FieldRef<"ImportBatch", 'String'>
+    readonly createdAt: FieldRef<"ImportBatch", 'DateTime'>
+    readonly updatedAt: FieldRef<"ImportBatch", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ImportBatch findUnique
+   */
+  export type ImportBatchFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * Filter, which ImportBatch to fetch.
+     */
+    where: ImportBatchWhereUniqueInput
+  }
+
+  /**
+   * ImportBatch findUniqueOrThrow
+   */
+  export type ImportBatchFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * Filter, which ImportBatch to fetch.
+     */
+    where: ImportBatchWhereUniqueInput
+  }
+
+  /**
+   * ImportBatch findFirst
+   */
+  export type ImportBatchFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * Filter, which ImportBatch to fetch.
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ImportBatches to fetch.
+     */
+    orderBy?: ImportBatchOrderByWithRelationInput | ImportBatchOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ImportBatches.
+     */
+    cursor?: ImportBatchWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ImportBatches from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ImportBatches.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ImportBatches.
+     */
+    distinct?: ImportBatchScalarFieldEnum | ImportBatchScalarFieldEnum[]
+  }
+
+  /**
+   * ImportBatch findFirstOrThrow
+   */
+  export type ImportBatchFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * Filter, which ImportBatch to fetch.
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ImportBatches to fetch.
+     */
+    orderBy?: ImportBatchOrderByWithRelationInput | ImportBatchOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ImportBatches.
+     */
+    cursor?: ImportBatchWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ImportBatches from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ImportBatches.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ImportBatches.
+     */
+    distinct?: ImportBatchScalarFieldEnum | ImportBatchScalarFieldEnum[]
+  }
+
+  /**
+   * ImportBatch findMany
+   */
+  export type ImportBatchFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * Filter, which ImportBatches to fetch.
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ImportBatches to fetch.
+     */
+    orderBy?: ImportBatchOrderByWithRelationInput | ImportBatchOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ImportBatches.
+     */
+    cursor?: ImportBatchWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ImportBatches from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ImportBatches.
+     */
+    skip?: number
+    distinct?: ImportBatchScalarFieldEnum | ImportBatchScalarFieldEnum[]
+  }
+
+  /**
+   * ImportBatch create
+   */
+  export type ImportBatchCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * The data needed to create a ImportBatch.
+     */
+    data: XOR<ImportBatchCreateInput, ImportBatchUncheckedCreateInput>
+  }
+
+  /**
+   * ImportBatch createMany
+   */
+  export type ImportBatchCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ImportBatches.
+     */
+    data: ImportBatchCreateManyInput | ImportBatchCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ImportBatch createManyAndReturn
+   */
+  export type ImportBatchCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * The data used to create many ImportBatches.
+     */
+    data: ImportBatchCreateManyInput | ImportBatchCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ImportBatch update
+   */
+  export type ImportBatchUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * The data needed to update a ImportBatch.
+     */
+    data: XOR<ImportBatchUpdateInput, ImportBatchUncheckedUpdateInput>
+    /**
+     * Choose, which ImportBatch to update.
+     */
+    where: ImportBatchWhereUniqueInput
+  }
+
+  /**
+   * ImportBatch updateMany
+   */
+  export type ImportBatchUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ImportBatches.
+     */
+    data: XOR<ImportBatchUpdateManyMutationInput, ImportBatchUncheckedUpdateManyInput>
+    /**
+     * Filter which ImportBatches to update
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * Limit how many ImportBatches to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ImportBatch updateManyAndReturn
+   */
+  export type ImportBatchUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * The data used to update ImportBatches.
+     */
+    data: XOR<ImportBatchUpdateManyMutationInput, ImportBatchUncheckedUpdateManyInput>
+    /**
+     * Filter which ImportBatches to update
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * Limit how many ImportBatches to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ImportBatch upsert
+   */
+  export type ImportBatchUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * The filter to search for the ImportBatch to update in case it exists.
+     */
+    where: ImportBatchWhereUniqueInput
+    /**
+     * In case the ImportBatch found by the `where` argument doesn't exist, create a new ImportBatch with this data.
+     */
+    create: XOR<ImportBatchCreateInput, ImportBatchUncheckedCreateInput>
+    /**
+     * In case the ImportBatch was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ImportBatchUpdateInput, ImportBatchUncheckedUpdateInput>
+  }
+
+  /**
+   * ImportBatch delete
+   */
+  export type ImportBatchDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+    /**
+     * Filter which ImportBatch to delete.
+     */
+    where: ImportBatchWhereUniqueInput
+  }
+
+  /**
+   * ImportBatch deleteMany
+   */
+  export type ImportBatchDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ImportBatches to delete
+     */
+    where?: ImportBatchWhereInput
+    /**
+     * Limit how many ImportBatches to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ImportBatch without action
+   */
+  export type ImportBatchDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ImportBatch
+     */
+    select?: ImportBatchSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ImportBatch
+     */
+    omit?: ImportBatchOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Model Company
    */
 
@@ -12270,6 +15252,7 @@ export namespace Prisma {
     category: string | null
     status: string | null
     stage: string | null
+    priority: string | null
     assignedTo: string | null
     assignedToName: string | null
     createdBy: string | null
@@ -12294,6 +15277,7 @@ export namespace Prisma {
     category: string | null
     status: string | null
     stage: string | null
+    priority: string | null
     assignedTo: string | null
     assignedToName: string | null
     createdBy: string | null
@@ -12320,6 +15304,7 @@ export namespace Prisma {
     serviceList: number
     status: number
     stage: number
+    priority: number
     assignedTo: number
     assignedToName: number
     createdBy: number
@@ -12346,6 +15331,7 @@ export namespace Prisma {
     category?: true
     status?: true
     stage?: true
+    priority?: true
     assignedTo?: true
     assignedToName?: true
     createdBy?: true
@@ -12370,6 +15356,7 @@ export namespace Prisma {
     category?: true
     status?: true
     stage?: true
+    priority?: true
     assignedTo?: true
     assignedToName?: true
     createdBy?: true
@@ -12396,6 +15383,7 @@ export namespace Prisma {
     serviceList?: true
     status?: true
     stage?: true
+    priority?: true
     assignedTo?: true
     assignedToName?: true
     createdBy?: true
@@ -12495,6 +15483,7 @@ export namespace Prisma {
     serviceList: string[]
     status: string | null
     stage: string | null
+    priority: string | null
     assignedTo: string | null
     assignedToName: string | null
     createdBy: string | null
@@ -12538,6 +15527,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -12564,6 +15554,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -12590,6 +15581,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -12616,6 +15608,7 @@ export namespace Prisma {
     serviceList?: boolean
     status?: boolean
     stage?: boolean
+    priority?: boolean
     assignedTo?: boolean
     assignedToName?: boolean
     createdBy?: boolean
@@ -12624,7 +15617,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type LeadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "leadId" | "name" | "email" | "phone" | "contactType" | "profession" | "companyName" | "designation" | "address" | "source" | "customSource" | "category" | "productList" | "serviceList" | "status" | "stage" | "assignedTo" | "assignedToName" | "createdBy" | "createdByName" | "createdAt" | "updatedAt", ExtArgs["result"]["lead"]>
+  export type LeadOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "leadId" | "name" | "email" | "phone" | "contactType" | "profession" | "companyName" | "designation" | "address" | "source" | "customSource" | "category" | "productList" | "serviceList" | "status" | "stage" | "priority" | "assignedTo" | "assignedToName" | "createdBy" | "createdByName" | "createdAt" | "updatedAt", ExtArgs["result"]["lead"]>
 
   export type $LeadPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Lead"
@@ -12647,6 +15640,7 @@ export namespace Prisma {
       serviceList: string[]
       status: string | null
       stage: string | null
+      priority: string | null
       assignedTo: string | null
       assignedToName: string | null
       createdBy: string | null
@@ -13093,6 +16087,7 @@ export namespace Prisma {
     readonly serviceList: FieldRef<"Lead", 'String[]'>
     readonly status: FieldRef<"Lead", 'String'>
     readonly stage: FieldRef<"Lead", 'String'>
+    readonly priority: FieldRef<"Lead", 'String'>
     readonly assignedTo: FieldRef<"Lead", 'String'>
     readonly assignedToName: FieldRef<"Lead", 'String'>
     readonly createdBy: FieldRef<"Lead", 'String'>
@@ -21733,6 +24728,8 @@ export namespace Prisma {
   }
 
   export type QuotationAvgAggregateOutputType = {
+    version: number | null
+    revisionNumber: number | null
     subtotal: number | null
     discountValue: number | null
     discountAmount: number | null
@@ -21741,6 +24738,8 @@ export namespace Prisma {
   }
 
   export type QuotationSumAggregateOutputType = {
+    version: number | null
+    revisionNumber: number | null
     subtotal: number | null
     discountValue: number | null
     discountAmount: number | null
@@ -21751,6 +24750,14 @@ export namespace Prisma {
   export type QuotationMinAggregateOutputType = {
     id: string | null
     quotationNumber: string | null
+    originalQuotationNumber: string | null
+    version: number | null
+    revisionNumber: number | null
+    revisionName: string | null
+    isLatest: boolean | null
+    projectName: string | null
+    revisionNotes: string | null
+    parentQuotationId: string | null
     contactId: string | null
     contactName: string | null
     contactEmail: string | null
@@ -21776,6 +24783,9 @@ export namespace Prisma {
     salesOwnerName: string | null
     convertedToOrderId: string | null
     convertedAt: Date | null
+    sentAt: Date | null
+    acceptedAt: Date | null
+    supersededAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -21783,6 +24793,14 @@ export namespace Prisma {
   export type QuotationMaxAggregateOutputType = {
     id: string | null
     quotationNumber: string | null
+    originalQuotationNumber: string | null
+    version: number | null
+    revisionNumber: number | null
+    revisionName: string | null
+    isLatest: boolean | null
+    projectName: string | null
+    revisionNotes: string | null
+    parentQuotationId: string | null
     contactId: string | null
     contactName: string | null
     contactEmail: string | null
@@ -21808,6 +24826,9 @@ export namespace Prisma {
     salesOwnerName: string | null
     convertedToOrderId: string | null
     convertedAt: Date | null
+    sentAt: Date | null
+    acceptedAt: Date | null
+    supersededAt: Date | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -21815,6 +24836,14 @@ export namespace Prisma {
   export type QuotationCountAggregateOutputType = {
     id: number
     quotationNumber: number
+    originalQuotationNumber: number
+    version: number
+    revisionNumber: number
+    revisionName: number
+    isLatest: number
+    projectName: number
+    revisionNotes: number
+    parentQuotationId: number
     contactId: number
     contactName: number
     contactEmail: number
@@ -21840,6 +24869,9 @@ export namespace Prisma {
     salesOwnerName: number
     convertedToOrderId: number
     convertedAt: number
+    sentAt: number
+    acceptedAt: number
+    supersededAt: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -21847,6 +24879,8 @@ export namespace Prisma {
 
 
   export type QuotationAvgAggregateInputType = {
+    version?: true
+    revisionNumber?: true
     subtotal?: true
     discountValue?: true
     discountAmount?: true
@@ -21855,6 +24889,8 @@ export namespace Prisma {
   }
 
   export type QuotationSumAggregateInputType = {
+    version?: true
+    revisionNumber?: true
     subtotal?: true
     discountValue?: true
     discountAmount?: true
@@ -21865,6 +24901,14 @@ export namespace Prisma {
   export type QuotationMinAggregateInputType = {
     id?: true
     quotationNumber?: true
+    originalQuotationNumber?: true
+    version?: true
+    revisionNumber?: true
+    revisionName?: true
+    isLatest?: true
+    projectName?: true
+    revisionNotes?: true
+    parentQuotationId?: true
     contactId?: true
     contactName?: true
     contactEmail?: true
@@ -21890,6 +24934,9 @@ export namespace Prisma {
     salesOwnerName?: true
     convertedToOrderId?: true
     convertedAt?: true
+    sentAt?: true
+    acceptedAt?: true
+    supersededAt?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -21897,6 +24944,14 @@ export namespace Prisma {
   export type QuotationMaxAggregateInputType = {
     id?: true
     quotationNumber?: true
+    originalQuotationNumber?: true
+    version?: true
+    revisionNumber?: true
+    revisionName?: true
+    isLatest?: true
+    projectName?: true
+    revisionNotes?: true
+    parentQuotationId?: true
     contactId?: true
     contactName?: true
     contactEmail?: true
@@ -21922,6 +24977,9 @@ export namespace Prisma {
     salesOwnerName?: true
     convertedToOrderId?: true
     convertedAt?: true
+    sentAt?: true
+    acceptedAt?: true
+    supersededAt?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -21929,6 +24987,14 @@ export namespace Prisma {
   export type QuotationCountAggregateInputType = {
     id?: true
     quotationNumber?: true
+    originalQuotationNumber?: true
+    version?: true
+    revisionNumber?: true
+    revisionName?: true
+    isLatest?: true
+    projectName?: true
+    revisionNotes?: true
+    parentQuotationId?: true
     contactId?: true
     contactName?: true
     contactEmail?: true
@@ -21954,6 +25020,9 @@ export namespace Prisma {
     salesOwnerName?: true
     convertedToOrderId?: true
     convertedAt?: true
+    sentAt?: true
+    acceptedAt?: true
+    supersededAt?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -22048,6 +25117,14 @@ export namespace Prisma {
   export type QuotationGroupByOutputType = {
     id: string
     quotationNumber: string
+    originalQuotationNumber: string | null
+    version: number
+    revisionNumber: number
+    revisionName: string | null
+    isLatest: boolean
+    projectName: string | null
+    revisionNotes: string | null
+    parentQuotationId: string | null
     contactId: string | null
     contactName: string
     contactEmail: string | null
@@ -22073,6 +25150,9 @@ export namespace Prisma {
     salesOwnerName: string | null
     convertedToOrderId: string | null
     convertedAt: Date | null
+    sentAt: Date | null
+    acceptedAt: Date | null
+    supersededAt: Date | null
     createdAt: Date
     updatedAt: Date
     _count: QuotationCountAggregateOutputType | null
@@ -22099,6 +25179,14 @@ export namespace Prisma {
   export type QuotationSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     quotationNumber?: boolean
+    originalQuotationNumber?: boolean
+    version?: boolean
+    revisionNumber?: boolean
+    revisionName?: boolean
+    isLatest?: boolean
+    projectName?: boolean
+    revisionNotes?: boolean
+    parentQuotationId?: boolean
     contactId?: boolean
     contactName?: boolean
     contactEmail?: boolean
@@ -22124,8 +25212,13 @@ export namespace Prisma {
     salesOwnerName?: boolean
     convertedToOrderId?: boolean
     convertedAt?: boolean
+    sentAt?: boolean
+    acceptedAt?: boolean
+    supersededAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    parentQuotation?: boolean | Quotation$parentQuotationArgs<ExtArgs>
+    revisions?: boolean | Quotation$revisionsArgs<ExtArgs>
     items?: boolean | Quotation$itemsArgs<ExtArgs>
     _count?: boolean | QuotationCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["quotation"]>
@@ -22133,6 +25226,14 @@ export namespace Prisma {
   export type QuotationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     quotationNumber?: boolean
+    originalQuotationNumber?: boolean
+    version?: boolean
+    revisionNumber?: boolean
+    revisionName?: boolean
+    isLatest?: boolean
+    projectName?: boolean
+    revisionNotes?: boolean
+    parentQuotationId?: boolean
     contactId?: boolean
     contactName?: boolean
     contactEmail?: boolean
@@ -22158,13 +25259,25 @@ export namespace Prisma {
     salesOwnerName?: boolean
     convertedToOrderId?: boolean
     convertedAt?: boolean
+    sentAt?: boolean
+    acceptedAt?: boolean
+    supersededAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    parentQuotation?: boolean | Quotation$parentQuotationArgs<ExtArgs>
   }, ExtArgs["result"]["quotation"]>
 
   export type QuotationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     quotationNumber?: boolean
+    originalQuotationNumber?: boolean
+    version?: boolean
+    revisionNumber?: boolean
+    revisionName?: boolean
+    isLatest?: boolean
+    projectName?: boolean
+    revisionNotes?: boolean
+    parentQuotationId?: boolean
     contactId?: boolean
     contactName?: boolean
     contactEmail?: boolean
@@ -22190,13 +25303,25 @@ export namespace Prisma {
     salesOwnerName?: boolean
     convertedToOrderId?: boolean
     convertedAt?: boolean
+    sentAt?: boolean
+    acceptedAt?: boolean
+    supersededAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    parentQuotation?: boolean | Quotation$parentQuotationArgs<ExtArgs>
   }, ExtArgs["result"]["quotation"]>
 
   export type QuotationSelectScalar = {
     id?: boolean
     quotationNumber?: boolean
+    originalQuotationNumber?: boolean
+    version?: boolean
+    revisionNumber?: boolean
+    revisionName?: boolean
+    isLatest?: boolean
+    projectName?: boolean
+    revisionNotes?: boolean
+    parentQuotationId?: boolean
     contactId?: boolean
     contactName?: boolean
     contactEmail?: boolean
@@ -22222,26 +25347,45 @@ export namespace Prisma {
     salesOwnerName?: boolean
     convertedToOrderId?: boolean
     convertedAt?: boolean
+    sentAt?: boolean
+    acceptedAt?: boolean
+    supersededAt?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type QuotationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "quotationNumber" | "contactId" | "contactName" | "contactEmail" | "contactPhone" | "companyName" | "clientGst" | "clientAddress" | "leadId" | "quotationDate" | "validUntil" | "status" | "currency" | "subtotal" | "discountType" | "discountValue" | "discountAmount" | "taxAmount" | "grandTotal" | "paymentTerms" | "notes" | "termsConditions" | "salesOwnerId" | "salesOwnerName" | "convertedToOrderId" | "convertedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["quotation"]>
+  export type QuotationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "quotationNumber" | "originalQuotationNumber" | "version" | "revisionNumber" | "revisionName" | "isLatest" | "projectName" | "revisionNotes" | "parentQuotationId" | "contactId" | "contactName" | "contactEmail" | "contactPhone" | "companyName" | "clientGst" | "clientAddress" | "leadId" | "quotationDate" | "validUntil" | "status" | "currency" | "subtotal" | "discountType" | "discountValue" | "discountAmount" | "taxAmount" | "grandTotal" | "paymentTerms" | "notes" | "termsConditions" | "salesOwnerId" | "salesOwnerName" | "convertedToOrderId" | "convertedAt" | "sentAt" | "acceptedAt" | "supersededAt" | "createdAt" | "updatedAt", ExtArgs["result"]["quotation"]>
   export type QuotationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    parentQuotation?: boolean | Quotation$parentQuotationArgs<ExtArgs>
+    revisions?: boolean | Quotation$revisionsArgs<ExtArgs>
     items?: boolean | Quotation$itemsArgs<ExtArgs>
     _count?: boolean | QuotationCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type QuotationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
-  export type QuotationIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type QuotationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    parentQuotation?: boolean | Quotation$parentQuotationArgs<ExtArgs>
+  }
+  export type QuotationIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    parentQuotation?: boolean | Quotation$parentQuotationArgs<ExtArgs>
+  }
 
   export type $QuotationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Quotation"
     objects: {
+      parentQuotation: Prisma.$QuotationPayload<ExtArgs> | null
+      revisions: Prisma.$QuotationPayload<ExtArgs>[]
       items: Prisma.$QuotationItemPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       quotationNumber: string
+      originalQuotationNumber: string | null
+      version: number
+      revisionNumber: number
+      revisionName: string | null
+      isLatest: boolean
+      projectName: string | null
+      revisionNotes: string | null
+      parentQuotationId: string | null
       contactId: string | null
       contactName: string
       contactEmail: string | null
@@ -22267,6 +25411,9 @@ export namespace Prisma {
       salesOwnerName: string | null
       convertedToOrderId: string | null
       convertedAt: Date | null
+      sentAt: Date | null
+      acceptedAt: Date | null
+      supersededAt: Date | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["quotation"]>
@@ -22663,6 +25810,8 @@ export namespace Prisma {
    */
   export interface Prisma__QuotationClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
+    parentQuotation<T extends Quotation$parentQuotationArgs<ExtArgs> = {}>(args?: Subset<T, Quotation$parentQuotationArgs<ExtArgs>>): Prisma__QuotationClient<$Result.GetResult<Prisma.$QuotationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    revisions<T extends Quotation$revisionsArgs<ExtArgs> = {}>(args?: Subset<T, Quotation$revisionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$QuotationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     items<T extends Quotation$itemsArgs<ExtArgs> = {}>(args?: Subset<T, Quotation$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$QuotationItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -22695,6 +25844,14 @@ export namespace Prisma {
   interface QuotationFieldRefs {
     readonly id: FieldRef<"Quotation", 'String'>
     readonly quotationNumber: FieldRef<"Quotation", 'String'>
+    readonly originalQuotationNumber: FieldRef<"Quotation", 'String'>
+    readonly version: FieldRef<"Quotation", 'Int'>
+    readonly revisionNumber: FieldRef<"Quotation", 'Int'>
+    readonly revisionName: FieldRef<"Quotation", 'String'>
+    readonly isLatest: FieldRef<"Quotation", 'Boolean'>
+    readonly projectName: FieldRef<"Quotation", 'String'>
+    readonly revisionNotes: FieldRef<"Quotation", 'String'>
+    readonly parentQuotationId: FieldRef<"Quotation", 'String'>
     readonly contactId: FieldRef<"Quotation", 'String'>
     readonly contactName: FieldRef<"Quotation", 'String'>
     readonly contactEmail: FieldRef<"Quotation", 'String'>
@@ -22720,6 +25877,9 @@ export namespace Prisma {
     readonly salesOwnerName: FieldRef<"Quotation", 'String'>
     readonly convertedToOrderId: FieldRef<"Quotation", 'String'>
     readonly convertedAt: FieldRef<"Quotation", 'DateTime'>
+    readonly sentAt: FieldRef<"Quotation", 'DateTime'>
+    readonly acceptedAt: FieldRef<"Quotation", 'DateTime'>
+    readonly supersededAt: FieldRef<"Quotation", 'DateTime'>
     readonly createdAt: FieldRef<"Quotation", 'DateTime'>
     readonly updatedAt: FieldRef<"Quotation", 'DateTime'>
   }
@@ -22971,6 +26131,10 @@ export namespace Prisma {
      */
     data: QuotationCreateManyInput | QuotationCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: QuotationIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -23041,6 +26205,10 @@ export namespace Prisma {
      * Limit how many Quotations to update.
      */
     limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: QuotationIncludeUpdateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -23107,6 +26275,49 @@ export namespace Prisma {
      * Limit how many Quotations to delete.
      */
     limit?: number
+  }
+
+  /**
+   * Quotation.parentQuotation
+   */
+  export type Quotation$parentQuotationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Quotation
+     */
+    select?: QuotationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Quotation
+     */
+    omit?: QuotationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: QuotationInclude<ExtArgs> | null
+    where?: QuotationWhereInput
+  }
+
+  /**
+   * Quotation.revisions
+   */
+  export type Quotation$revisionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Quotation
+     */
+    select?: QuotationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Quotation
+     */
+    omit?: QuotationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: QuotationInclude<ExtArgs> | null
+    where?: QuotationWhereInput
+    orderBy?: QuotationOrderByWithRelationInput | QuotationOrderByWithRelationInput[]
+    cursor?: QuotationWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: QuotationScalarFieldEnum | QuotationScalarFieldEnum[]
   }
 
   /**
@@ -41697,6 +44908,1278 @@ export namespace Prisma {
 
 
   /**
+   * Model Activity
+   */
+
+  export type AggregateActivity = {
+    _count: ActivityCountAggregateOutputType | null
+    _avg: ActivityAvgAggregateOutputType | null
+    _sum: ActivitySumAggregateOutputType | null
+    _min: ActivityMinAggregateOutputType | null
+    _max: ActivityMaxAggregateOutputType | null
+  }
+
+  export type ActivityAvgAggregateOutputType = {
+    amount: number | null
+  }
+
+  export type ActivitySumAggregateOutputType = {
+    amount: number | null
+  }
+
+  export type ActivityMinAggregateOutputType = {
+    id: string | null
+    activityNumber: string | null
+    type: string | null
+    title: string | null
+    description: string | null
+    leadId: string | null
+    leadName: string | null
+    leadCode: string | null
+    customerId: string | null
+    customerName: string | null
+    contactId: string | null
+    contactName: string | null
+    entityId: string | null
+    entityType: string | null
+    entityNumber: string | null
+    status: string | null
+    amount: number | null
+    performedBy: string | null
+    performedById: string | null
+    activityDate: string | null
+    activityTime: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ActivityMaxAggregateOutputType = {
+    id: string | null
+    activityNumber: string | null
+    type: string | null
+    title: string | null
+    description: string | null
+    leadId: string | null
+    leadName: string | null
+    leadCode: string | null
+    customerId: string | null
+    customerName: string | null
+    contactId: string | null
+    contactName: string | null
+    entityId: string | null
+    entityType: string | null
+    entityNumber: string | null
+    status: string | null
+    amount: number | null
+    performedBy: string | null
+    performedById: string | null
+    activityDate: string | null
+    activityTime: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ActivityCountAggregateOutputType = {
+    id: number
+    activityNumber: number
+    type: number
+    title: number
+    description: number
+    leadId: number
+    leadName: number
+    leadCode: number
+    customerId: number
+    customerName: number
+    contactId: number
+    contactName: number
+    entityId: number
+    entityType: number
+    entityNumber: number
+    status: number
+    amount: number
+    performedBy: number
+    performedById: number
+    activityDate: number
+    activityTime: number
+    metadata: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ActivityAvgAggregateInputType = {
+    amount?: true
+  }
+
+  export type ActivitySumAggregateInputType = {
+    amount?: true
+  }
+
+  export type ActivityMinAggregateInputType = {
+    id?: true
+    activityNumber?: true
+    type?: true
+    title?: true
+    description?: true
+    leadId?: true
+    leadName?: true
+    leadCode?: true
+    customerId?: true
+    customerName?: true
+    contactId?: true
+    contactName?: true
+    entityId?: true
+    entityType?: true
+    entityNumber?: true
+    status?: true
+    amount?: true
+    performedBy?: true
+    performedById?: true
+    activityDate?: true
+    activityTime?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ActivityMaxAggregateInputType = {
+    id?: true
+    activityNumber?: true
+    type?: true
+    title?: true
+    description?: true
+    leadId?: true
+    leadName?: true
+    leadCode?: true
+    customerId?: true
+    customerName?: true
+    contactId?: true
+    contactName?: true
+    entityId?: true
+    entityType?: true
+    entityNumber?: true
+    status?: true
+    amount?: true
+    performedBy?: true
+    performedById?: true
+    activityDate?: true
+    activityTime?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ActivityCountAggregateInputType = {
+    id?: true
+    activityNumber?: true
+    type?: true
+    title?: true
+    description?: true
+    leadId?: true
+    leadName?: true
+    leadCode?: true
+    customerId?: true
+    customerName?: true
+    contactId?: true
+    contactName?: true
+    entityId?: true
+    entityType?: true
+    entityNumber?: true
+    status?: true
+    amount?: true
+    performedBy?: true
+    performedById?: true
+    activityDate?: true
+    activityTime?: true
+    metadata?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ActivityAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Activity to aggregate.
+     */
+    where?: ActivityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Activities to fetch.
+     */
+    orderBy?: ActivityOrderByWithRelationInput | ActivityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ActivityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Activities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Activities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned Activities
+    **/
+    _count?: true | ActivityCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ActivityAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ActivitySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ActivityMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ActivityMaxAggregateInputType
+  }
+
+  export type GetActivityAggregateType<T extends ActivityAggregateArgs> = {
+        [P in keyof T & keyof AggregateActivity]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateActivity[P]>
+      : GetScalarType<T[P], AggregateActivity[P]>
+  }
+
+
+
+
+  export type ActivityGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ActivityWhereInput
+    orderBy?: ActivityOrderByWithAggregationInput | ActivityOrderByWithAggregationInput[]
+    by: ActivityScalarFieldEnum[] | ActivityScalarFieldEnum
+    having?: ActivityScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ActivityCountAggregateInputType | true
+    _avg?: ActivityAvgAggregateInputType
+    _sum?: ActivitySumAggregateInputType
+    _min?: ActivityMinAggregateInputType
+    _max?: ActivityMaxAggregateInputType
+  }
+
+  export type ActivityGroupByOutputType = {
+    id: string
+    activityNumber: string | null
+    type: string
+    title: string
+    description: string | null
+    leadId: string | null
+    leadName: string | null
+    leadCode: string | null
+    customerId: string | null
+    customerName: string | null
+    contactId: string | null
+    contactName: string | null
+    entityId: string | null
+    entityType: string | null
+    entityNumber: string | null
+    status: string | null
+    amount: number | null
+    performedBy: string | null
+    performedById: string | null
+    activityDate: string
+    activityTime: string | null
+    metadata: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ActivityCountAggregateOutputType | null
+    _avg: ActivityAvgAggregateOutputType | null
+    _sum: ActivitySumAggregateOutputType | null
+    _min: ActivityMinAggregateOutputType | null
+    _max: ActivityMaxAggregateOutputType | null
+  }
+
+  type GetActivityGroupByPayload<T extends ActivityGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ActivityGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ActivityGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ActivityGroupByOutputType[P]>
+            : GetScalarType<T[P], ActivityGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ActivitySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    activityNumber?: boolean
+    type?: boolean
+    title?: boolean
+    description?: boolean
+    leadId?: boolean
+    leadName?: boolean
+    leadCode?: boolean
+    customerId?: boolean
+    customerName?: boolean
+    contactId?: boolean
+    contactName?: boolean
+    entityId?: boolean
+    entityType?: boolean
+    entityNumber?: boolean
+    status?: boolean
+    amount?: boolean
+    performedBy?: boolean
+    performedById?: boolean
+    activityDate?: boolean
+    activityTime?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["activity"]>
+
+  export type ActivitySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    activityNumber?: boolean
+    type?: boolean
+    title?: boolean
+    description?: boolean
+    leadId?: boolean
+    leadName?: boolean
+    leadCode?: boolean
+    customerId?: boolean
+    customerName?: boolean
+    contactId?: boolean
+    contactName?: boolean
+    entityId?: boolean
+    entityType?: boolean
+    entityNumber?: boolean
+    status?: boolean
+    amount?: boolean
+    performedBy?: boolean
+    performedById?: boolean
+    activityDate?: boolean
+    activityTime?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["activity"]>
+
+  export type ActivitySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    activityNumber?: boolean
+    type?: boolean
+    title?: boolean
+    description?: boolean
+    leadId?: boolean
+    leadName?: boolean
+    leadCode?: boolean
+    customerId?: boolean
+    customerName?: boolean
+    contactId?: boolean
+    contactName?: boolean
+    entityId?: boolean
+    entityType?: boolean
+    entityNumber?: boolean
+    status?: boolean
+    amount?: boolean
+    performedBy?: boolean
+    performedById?: boolean
+    activityDate?: boolean
+    activityTime?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["activity"]>
+
+  export type ActivitySelectScalar = {
+    id?: boolean
+    activityNumber?: boolean
+    type?: boolean
+    title?: boolean
+    description?: boolean
+    leadId?: boolean
+    leadName?: boolean
+    leadCode?: boolean
+    customerId?: boolean
+    customerName?: boolean
+    contactId?: boolean
+    contactName?: boolean
+    entityId?: boolean
+    entityType?: boolean
+    entityNumber?: boolean
+    status?: boolean
+    amount?: boolean
+    performedBy?: boolean
+    performedById?: boolean
+    activityDate?: boolean
+    activityTime?: boolean
+    metadata?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ActivityOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "activityNumber" | "type" | "title" | "description" | "leadId" | "leadName" | "leadCode" | "customerId" | "customerName" | "contactId" | "contactName" | "entityId" | "entityType" | "entityNumber" | "status" | "amount" | "performedBy" | "performedById" | "activityDate" | "activityTime" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["activity"]>
+
+  export type $ActivityPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "Activity"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      activityNumber: string | null
+      type: string
+      title: string
+      description: string | null
+      leadId: string | null
+      leadName: string | null
+      leadCode: string | null
+      customerId: string | null
+      customerName: string | null
+      contactId: string | null
+      contactName: string | null
+      entityId: string | null
+      entityType: string | null
+      entityNumber: string | null
+      status: string | null
+      amount: number | null
+      performedBy: string | null
+      performedById: string | null
+      activityDate: string
+      activityTime: string | null
+      metadata: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["activity"]>
+    composites: {}
+  }
+
+  type ActivityGetPayload<S extends boolean | null | undefined | ActivityDefaultArgs> = $Result.GetResult<Prisma.$ActivityPayload, S>
+
+  type ActivityCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ActivityFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ActivityCountAggregateInputType | true
+    }
+
+  export interface ActivityDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['Activity'], meta: { name: 'Activity' } }
+    /**
+     * Find zero or one Activity that matches the filter.
+     * @param {ActivityFindUniqueArgs} args - Arguments to find a Activity
+     * @example
+     * // Get one Activity
+     * const activity = await prisma.activity.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ActivityFindUniqueArgs>(args: SelectSubset<T, ActivityFindUniqueArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one Activity that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ActivityFindUniqueOrThrowArgs} args - Arguments to find a Activity
+     * @example
+     * // Get one Activity
+     * const activity = await prisma.activity.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ActivityFindUniqueOrThrowArgs>(args: SelectSubset<T, ActivityFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Activity that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityFindFirstArgs} args - Arguments to find a Activity
+     * @example
+     * // Get one Activity
+     * const activity = await prisma.activity.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ActivityFindFirstArgs>(args?: SelectSubset<T, ActivityFindFirstArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first Activity that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityFindFirstOrThrowArgs} args - Arguments to find a Activity
+     * @example
+     * // Get one Activity
+     * const activity = await prisma.activity.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ActivityFindFirstOrThrowArgs>(args?: SelectSubset<T, ActivityFindFirstOrThrowArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more Activities that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all Activities
+     * const activities = await prisma.activity.findMany()
+     * 
+     * // Get first 10 Activities
+     * const activities = await prisma.activity.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const activityWithIdOnly = await prisma.activity.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ActivityFindManyArgs>(args?: SelectSubset<T, ActivityFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a Activity.
+     * @param {ActivityCreateArgs} args - Arguments to create a Activity.
+     * @example
+     * // Create one Activity
+     * const Activity = await prisma.activity.create({
+     *   data: {
+     *     // ... data to create a Activity
+     *   }
+     * })
+     * 
+     */
+    create<T extends ActivityCreateArgs>(args: SelectSubset<T, ActivityCreateArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many Activities.
+     * @param {ActivityCreateManyArgs} args - Arguments to create many Activities.
+     * @example
+     * // Create many Activities
+     * const activity = await prisma.activity.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ActivityCreateManyArgs>(args?: SelectSubset<T, ActivityCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many Activities and returns the data saved in the database.
+     * @param {ActivityCreateManyAndReturnArgs} args - Arguments to create many Activities.
+     * @example
+     * // Create many Activities
+     * const activity = await prisma.activity.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many Activities and only return the `id`
+     * const activityWithIdOnly = await prisma.activity.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ActivityCreateManyAndReturnArgs>(args?: SelectSubset<T, ActivityCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a Activity.
+     * @param {ActivityDeleteArgs} args - Arguments to delete one Activity.
+     * @example
+     * // Delete one Activity
+     * const Activity = await prisma.activity.delete({
+     *   where: {
+     *     // ... filter to delete one Activity
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ActivityDeleteArgs>(args: SelectSubset<T, ActivityDeleteArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one Activity.
+     * @param {ActivityUpdateArgs} args - Arguments to update one Activity.
+     * @example
+     * // Update one Activity
+     * const activity = await prisma.activity.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ActivityUpdateArgs>(args: SelectSubset<T, ActivityUpdateArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more Activities.
+     * @param {ActivityDeleteManyArgs} args - Arguments to filter Activities to delete.
+     * @example
+     * // Delete a few Activities
+     * const { count } = await prisma.activity.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ActivityDeleteManyArgs>(args?: SelectSubset<T, ActivityDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Activities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many Activities
+     * const activity = await prisma.activity.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ActivityUpdateManyArgs>(args: SelectSubset<T, ActivityUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more Activities and returns the data updated in the database.
+     * @param {ActivityUpdateManyAndReturnArgs} args - Arguments to update many Activities.
+     * @example
+     * // Update many Activities
+     * const activity = await prisma.activity.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more Activities and only return the `id`
+     * const activityWithIdOnly = await prisma.activity.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ActivityUpdateManyAndReturnArgs>(args: SelectSubset<T, ActivityUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one Activity.
+     * @param {ActivityUpsertArgs} args - Arguments to update or create a Activity.
+     * @example
+     * // Update or create a Activity
+     * const activity = await prisma.activity.upsert({
+     *   create: {
+     *     // ... data to create a Activity
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the Activity we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ActivityUpsertArgs>(args: SelectSubset<T, ActivityUpsertArgs<ExtArgs>>): Prisma__ActivityClient<$Result.GetResult<Prisma.$ActivityPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of Activities.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityCountArgs} args - Arguments to filter Activities to count.
+     * @example
+     * // Count the number of Activities
+     * const count = await prisma.activity.count({
+     *   where: {
+     *     // ... the filter for the Activities we want to count
+     *   }
+     * })
+    **/
+    count<T extends ActivityCountArgs>(
+      args?: Subset<T, ActivityCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ActivityCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a Activity.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ActivityAggregateArgs>(args: Subset<T, ActivityAggregateArgs>): Prisma.PrismaPromise<GetActivityAggregateType<T>>
+
+    /**
+     * Group by Activity.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ActivityGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ActivityGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ActivityGroupByArgs['orderBy'] }
+        : { orderBy?: ActivityGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ActivityGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetActivityGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the Activity model
+   */
+  readonly fields: ActivityFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for Activity.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ActivityClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the Activity model
+   */
+  interface ActivityFieldRefs {
+    readonly id: FieldRef<"Activity", 'String'>
+    readonly activityNumber: FieldRef<"Activity", 'String'>
+    readonly type: FieldRef<"Activity", 'String'>
+    readonly title: FieldRef<"Activity", 'String'>
+    readonly description: FieldRef<"Activity", 'String'>
+    readonly leadId: FieldRef<"Activity", 'String'>
+    readonly leadName: FieldRef<"Activity", 'String'>
+    readonly leadCode: FieldRef<"Activity", 'String'>
+    readonly customerId: FieldRef<"Activity", 'String'>
+    readonly customerName: FieldRef<"Activity", 'String'>
+    readonly contactId: FieldRef<"Activity", 'String'>
+    readonly contactName: FieldRef<"Activity", 'String'>
+    readonly entityId: FieldRef<"Activity", 'String'>
+    readonly entityType: FieldRef<"Activity", 'String'>
+    readonly entityNumber: FieldRef<"Activity", 'String'>
+    readonly status: FieldRef<"Activity", 'String'>
+    readonly amount: FieldRef<"Activity", 'Float'>
+    readonly performedBy: FieldRef<"Activity", 'String'>
+    readonly performedById: FieldRef<"Activity", 'String'>
+    readonly activityDate: FieldRef<"Activity", 'String'>
+    readonly activityTime: FieldRef<"Activity", 'String'>
+    readonly metadata: FieldRef<"Activity", 'Json'>
+    readonly createdAt: FieldRef<"Activity", 'DateTime'>
+    readonly updatedAt: FieldRef<"Activity", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * Activity findUnique
+   */
+  export type ActivityFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * Filter, which Activity to fetch.
+     */
+    where: ActivityWhereUniqueInput
+  }
+
+  /**
+   * Activity findUniqueOrThrow
+   */
+  export type ActivityFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * Filter, which Activity to fetch.
+     */
+    where: ActivityWhereUniqueInput
+  }
+
+  /**
+   * Activity findFirst
+   */
+  export type ActivityFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * Filter, which Activity to fetch.
+     */
+    where?: ActivityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Activities to fetch.
+     */
+    orderBy?: ActivityOrderByWithRelationInput | ActivityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Activities.
+     */
+    cursor?: ActivityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Activities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Activities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Activities.
+     */
+    distinct?: ActivityScalarFieldEnum | ActivityScalarFieldEnum[]
+  }
+
+  /**
+   * Activity findFirstOrThrow
+   */
+  export type ActivityFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * Filter, which Activity to fetch.
+     */
+    where?: ActivityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Activities to fetch.
+     */
+    orderBy?: ActivityOrderByWithRelationInput | ActivityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for Activities.
+     */
+    cursor?: ActivityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Activities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Activities.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of Activities.
+     */
+    distinct?: ActivityScalarFieldEnum | ActivityScalarFieldEnum[]
+  }
+
+  /**
+   * Activity findMany
+   */
+  export type ActivityFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * Filter, which Activities to fetch.
+     */
+    where?: ActivityWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of Activities to fetch.
+     */
+    orderBy?: ActivityOrderByWithRelationInput | ActivityOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing Activities.
+     */
+    cursor?: ActivityWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` Activities from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` Activities.
+     */
+    skip?: number
+    distinct?: ActivityScalarFieldEnum | ActivityScalarFieldEnum[]
+  }
+
+  /**
+   * Activity create
+   */
+  export type ActivityCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * The data needed to create a Activity.
+     */
+    data: XOR<ActivityCreateInput, ActivityUncheckedCreateInput>
+  }
+
+  /**
+   * Activity createMany
+   */
+  export type ActivityCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many Activities.
+     */
+    data: ActivityCreateManyInput | ActivityCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Activity createManyAndReturn
+   */
+  export type ActivityCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * The data used to create many Activities.
+     */
+    data: ActivityCreateManyInput | ActivityCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * Activity update
+   */
+  export type ActivityUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * The data needed to update a Activity.
+     */
+    data: XOR<ActivityUpdateInput, ActivityUncheckedUpdateInput>
+    /**
+     * Choose, which Activity to update.
+     */
+    where: ActivityWhereUniqueInput
+  }
+
+  /**
+   * Activity updateMany
+   */
+  export type ActivityUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update Activities.
+     */
+    data: XOR<ActivityUpdateManyMutationInput, ActivityUncheckedUpdateManyInput>
+    /**
+     * Filter which Activities to update
+     */
+    where?: ActivityWhereInput
+    /**
+     * Limit how many Activities to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Activity updateManyAndReturn
+   */
+  export type ActivityUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * The data used to update Activities.
+     */
+    data: XOR<ActivityUpdateManyMutationInput, ActivityUncheckedUpdateManyInput>
+    /**
+     * Filter which Activities to update
+     */
+    where?: ActivityWhereInput
+    /**
+     * Limit how many Activities to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * Activity upsert
+   */
+  export type ActivityUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * The filter to search for the Activity to update in case it exists.
+     */
+    where: ActivityWhereUniqueInput
+    /**
+     * In case the Activity found by the `where` argument doesn't exist, create a new Activity with this data.
+     */
+    create: XOR<ActivityCreateInput, ActivityUncheckedCreateInput>
+    /**
+     * In case the Activity was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ActivityUpdateInput, ActivityUncheckedUpdateInput>
+  }
+
+  /**
+   * Activity delete
+   */
+  export type ActivityDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+    /**
+     * Filter which Activity to delete.
+     */
+    where: ActivityWhereUniqueInput
+  }
+
+  /**
+   * Activity deleteMany
+   */
+  export type ActivityDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which Activities to delete
+     */
+    where?: ActivityWhereInput
+    /**
+     * Limit how many Activities to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * Activity without action
+   */
+  export type ActivityDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Activity
+     */
+    select?: ActivitySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Activity
+     */
+    omit?: ActivityOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -41755,6 +46238,7 @@ export namespace Prisma {
     canDelete: 'canDelete',
     canExport: 'canExport',
     canApprove: 'canApprove',
+    dataScope: 'dataScope',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -41870,6 +46354,79 @@ export namespace Prisma {
   export type ContactScalarFieldEnum = (typeof ContactScalarFieldEnum)[keyof typeof ContactScalarFieldEnum]
 
 
+  export const BulkUploadContactScalarFieldEnum: {
+    id: 'id',
+    bulkId: 'bulkId',
+    batchId: 'batchId',
+    fileName: 'fileName',
+    name: 'name',
+    email: 'email',
+    phone: 'phone',
+    companyName: 'companyName',
+    contactPerson: 'contactPerson',
+    designation: 'designation',
+    profession: 'profession',
+    category: 'category',
+    source: 'source',
+    customSource: 'customSource',
+    contactType: 'contactType',
+    estimatedValue: 'estimatedValue',
+    expectedCloseDate: 'expectedCloseDate',
+    description: 'description',
+    remarks: 'remarks',
+    notes: 'notes',
+    gstNumber: 'gstNumber',
+    employeeCount: 'employeeCount',
+    companyPan: 'companyPan',
+    cinNumber: 'cinNumber',
+    companyWebsite: 'companyWebsite',
+    linkedinUrl: 'linkedinUrl',
+    annualTurnover: 'annualTurnover',
+    verificationStatus: 'verificationStatus',
+    registeredState: 'registeredState',
+    productList: 'productList',
+    serviceList: 'serviceList',
+    status: 'status',
+    stage: 'stage',
+    priority: 'priority',
+    assignedTo: 'assignedTo',
+    assignedToName: 'assignedToName',
+    assignmentStatus: 'assignmentStatus',
+    contactMode: 'contactMode',
+    street: 'street',
+    city: 'city',
+    zip: 'zip',
+    country: 'country',
+    isImportedToContact: 'isImportedToContact',
+    importedContactId: 'importedContactId',
+    createdBy: 'createdBy',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type BulkUploadContactScalarFieldEnum = (typeof BulkUploadContactScalarFieldEnum)[keyof typeof BulkUploadContactScalarFieldEnum]
+
+
+  export const ImportBatchScalarFieldEnum: {
+    id: 'id',
+    batchId: 'batchId',
+    fileName: 'fileName',
+    fileSize: 'fileSize',
+    totalRows: 'totalRows',
+    importedCount: 'importedCount',
+    failedCount: 'failedCount',
+    status: 'status',
+    failedRows: 'failedRows',
+    assignedTo: 'assignedTo',
+    assignedToName: 'assignedToName',
+    createdBy: 'createdBy',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ImportBatchScalarFieldEnum = (typeof ImportBatchScalarFieldEnum)[keyof typeof ImportBatchScalarFieldEnum]
+
+
   export const CompanyScalarFieldEnum: {
     id: 'id',
     name: 'name',
@@ -41901,6 +46458,7 @@ export namespace Prisma {
     serviceList: 'serviceList',
     status: 'status',
     stage: 'stage',
+    priority: 'priority',
     assignedTo: 'assignedTo',
     assignedToName: 'assignedToName',
     createdBy: 'createdBy',
@@ -42082,6 +46640,14 @@ export namespace Prisma {
   export const QuotationScalarFieldEnum: {
     id: 'id',
     quotationNumber: 'quotationNumber',
+    originalQuotationNumber: 'originalQuotationNumber',
+    version: 'version',
+    revisionNumber: 'revisionNumber',
+    revisionName: 'revisionName',
+    isLatest: 'isLatest',
+    projectName: 'projectName',
+    revisionNotes: 'revisionNotes',
+    parentQuotationId: 'parentQuotationId',
     contactId: 'contactId',
     contactName: 'contactName',
     contactEmail: 'contactEmail',
@@ -42107,6 +46673,9 @@ export namespace Prisma {
     salesOwnerName: 'salesOwnerName',
     convertedToOrderId: 'convertedToOrderId',
     convertedAt: 'convertedAt',
+    sentAt: 'sentAt',
+    acceptedAt: 'acceptedAt',
+    supersededAt: 'supersededAt',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -42514,6 +47083,36 @@ export namespace Prisma {
   export type ContractScalarFieldEnum = (typeof ContractScalarFieldEnum)[keyof typeof ContractScalarFieldEnum]
 
 
+  export const ActivityScalarFieldEnum: {
+    id: 'id',
+    activityNumber: 'activityNumber',
+    type: 'type',
+    title: 'title',
+    description: 'description',
+    leadId: 'leadId',
+    leadName: 'leadName',
+    leadCode: 'leadCode',
+    customerId: 'customerId',
+    customerName: 'customerName',
+    contactId: 'contactId',
+    contactName: 'contactName',
+    entityId: 'entityId',
+    entityType: 'entityType',
+    entityNumber: 'entityNumber',
+    status: 'status',
+    amount: 'amount',
+    performedBy: 'performedBy',
+    performedById: 'performedById',
+    activityDate: 'activityDate',
+    activityTime: 'activityTime',
+    metadata: 'metadata',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ActivityScalarFieldEnum = (typeof ActivityScalarFieldEnum)[keyof typeof ActivityScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -42836,6 +47435,7 @@ export namespace Prisma {
     canDelete?: BoolFilter<"RolePermission"> | boolean
     canExport?: BoolFilter<"RolePermission"> | boolean
     canApprove?: BoolFilter<"RolePermission"> | boolean
+    dataScope?: StringNullableFilter<"RolePermission"> | string | null
     createdAt?: DateTimeFilter<"RolePermission"> | Date | string
     updatedAt?: DateTimeFilter<"RolePermission"> | Date | string
     role?: XOR<RoleScalarRelationFilter, RoleWhereInput>
@@ -42853,6 +47453,7 @@ export namespace Prisma {
     canDelete?: SortOrder
     canExport?: SortOrder
     canApprove?: SortOrder
+    dataScope?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     role?: RoleOrderByWithRelationInput
@@ -42874,6 +47475,7 @@ export namespace Prisma {
     canDelete?: BoolFilter<"RolePermission"> | boolean
     canExport?: BoolFilter<"RolePermission"> | boolean
     canApprove?: BoolFilter<"RolePermission"> | boolean
+    dataScope?: StringNullableFilter<"RolePermission"> | string | null
     createdAt?: DateTimeFilter<"RolePermission"> | Date | string
     updatedAt?: DateTimeFilter<"RolePermission"> | Date | string
     role?: XOR<RoleScalarRelationFilter, RoleWhereInput>
@@ -42891,6 +47493,7 @@ export namespace Prisma {
     canDelete?: SortOrder
     canExport?: SortOrder
     canApprove?: SortOrder
+    dataScope?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: RolePermissionCountOrderByAggregateInput
@@ -42913,6 +47516,7 @@ export namespace Prisma {
     canDelete?: BoolWithAggregatesFilter<"RolePermission"> | boolean
     canExport?: BoolWithAggregatesFilter<"RolePermission"> | boolean
     canApprove?: BoolWithAggregatesFilter<"RolePermission"> | boolean
+    dataScope?: StringNullableWithAggregatesFilter<"RolePermission"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"RolePermission"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"RolePermission"> | Date | string
   }
@@ -43448,6 +48052,367 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"Contact"> | Date | string
   }
 
+  export type BulkUploadContactWhereInput = {
+    AND?: BulkUploadContactWhereInput | BulkUploadContactWhereInput[]
+    OR?: BulkUploadContactWhereInput[]
+    NOT?: BulkUploadContactWhereInput | BulkUploadContactWhereInput[]
+    id?: StringFilter<"BulkUploadContact"> | string
+    bulkId?: StringNullableFilter<"BulkUploadContact"> | string | null
+    batchId?: StringNullableFilter<"BulkUploadContact"> | string | null
+    fileName?: StringNullableFilter<"BulkUploadContact"> | string | null
+    name?: StringFilter<"BulkUploadContact"> | string
+    email?: StringNullableFilter<"BulkUploadContact"> | string | null
+    phone?: StringNullableFilter<"BulkUploadContact"> | string | null
+    companyName?: StringNullableFilter<"BulkUploadContact"> | string | null
+    contactPerson?: StringNullableFilter<"BulkUploadContact"> | string | null
+    designation?: StringNullableFilter<"BulkUploadContact"> | string | null
+    profession?: StringNullableFilter<"BulkUploadContact"> | string | null
+    category?: StringNullableFilter<"BulkUploadContact"> | string | null
+    source?: StringNullableFilter<"BulkUploadContact"> | string | null
+    customSource?: StringNullableFilter<"BulkUploadContact"> | string | null
+    contactType?: StringNullableFilter<"BulkUploadContact"> | string | null
+    estimatedValue?: StringNullableFilter<"BulkUploadContact"> | string | null
+    expectedCloseDate?: StringNullableFilter<"BulkUploadContact"> | string | null
+    description?: StringNullableFilter<"BulkUploadContact"> | string | null
+    remarks?: StringNullableFilter<"BulkUploadContact"> | string | null
+    notes?: StringNullableFilter<"BulkUploadContact"> | string | null
+    gstNumber?: StringNullableFilter<"BulkUploadContact"> | string | null
+    employeeCount?: StringNullableFilter<"BulkUploadContact"> | string | null
+    companyPan?: StringNullableFilter<"BulkUploadContact"> | string | null
+    cinNumber?: StringNullableFilter<"BulkUploadContact"> | string | null
+    companyWebsite?: StringNullableFilter<"BulkUploadContact"> | string | null
+    linkedinUrl?: StringNullableFilter<"BulkUploadContact"> | string | null
+    annualTurnover?: StringNullableFilter<"BulkUploadContact"> | string | null
+    verificationStatus?: StringNullableFilter<"BulkUploadContact"> | string | null
+    registeredState?: StringNullableFilter<"BulkUploadContact"> | string | null
+    productList?: StringNullableListFilter<"BulkUploadContact">
+    serviceList?: StringNullableListFilter<"BulkUploadContact">
+    status?: StringNullableFilter<"BulkUploadContact"> | string | null
+    stage?: StringNullableFilter<"BulkUploadContact"> | string | null
+    priority?: StringNullableFilter<"BulkUploadContact"> | string | null
+    assignedTo?: StringNullableFilter<"BulkUploadContact"> | string | null
+    assignedToName?: StringNullableFilter<"BulkUploadContact"> | string | null
+    assignmentStatus?: StringNullableFilter<"BulkUploadContact"> | string | null
+    contactMode?: StringNullableFilter<"BulkUploadContact"> | string | null
+    street?: StringNullableFilter<"BulkUploadContact"> | string | null
+    city?: StringNullableFilter<"BulkUploadContact"> | string | null
+    zip?: StringNullableFilter<"BulkUploadContact"> | string | null
+    country?: StringNullableFilter<"BulkUploadContact"> | string | null
+    isImportedToContact?: BoolFilter<"BulkUploadContact"> | boolean
+    importedContactId?: StringNullableFilter<"BulkUploadContact"> | string | null
+    createdBy?: StringNullableFilter<"BulkUploadContact"> | string | null
+    createdAt?: DateTimeFilter<"BulkUploadContact"> | Date | string
+    updatedAt?: DateTimeFilter<"BulkUploadContact"> | Date | string
+  }
+
+  export type BulkUploadContactOrderByWithRelationInput = {
+    id?: SortOrder
+    bulkId?: SortOrderInput | SortOrder
+    batchId?: SortOrderInput | SortOrder
+    fileName?: SortOrderInput | SortOrder
+    name?: SortOrder
+    email?: SortOrderInput | SortOrder
+    phone?: SortOrderInput | SortOrder
+    companyName?: SortOrderInput | SortOrder
+    contactPerson?: SortOrderInput | SortOrder
+    designation?: SortOrderInput | SortOrder
+    profession?: SortOrderInput | SortOrder
+    category?: SortOrderInput | SortOrder
+    source?: SortOrderInput | SortOrder
+    customSource?: SortOrderInput | SortOrder
+    contactType?: SortOrderInput | SortOrder
+    estimatedValue?: SortOrderInput | SortOrder
+    expectedCloseDate?: SortOrderInput | SortOrder
+    description?: SortOrderInput | SortOrder
+    remarks?: SortOrderInput | SortOrder
+    notes?: SortOrderInput | SortOrder
+    gstNumber?: SortOrderInput | SortOrder
+    employeeCount?: SortOrderInput | SortOrder
+    companyPan?: SortOrderInput | SortOrder
+    cinNumber?: SortOrderInput | SortOrder
+    companyWebsite?: SortOrderInput | SortOrder
+    linkedinUrl?: SortOrderInput | SortOrder
+    annualTurnover?: SortOrderInput | SortOrder
+    verificationStatus?: SortOrderInput | SortOrder
+    registeredState?: SortOrderInput | SortOrder
+    productList?: SortOrder
+    serviceList?: SortOrder
+    status?: SortOrderInput | SortOrder
+    stage?: SortOrderInput | SortOrder
+    priority?: SortOrderInput | SortOrder
+    assignedTo?: SortOrderInput | SortOrder
+    assignedToName?: SortOrderInput | SortOrder
+    assignmentStatus?: SortOrderInput | SortOrder
+    contactMode?: SortOrderInput | SortOrder
+    street?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
+    zip?: SortOrderInput | SortOrder
+    country?: SortOrderInput | SortOrder
+    isImportedToContact?: SortOrder
+    importedContactId?: SortOrderInput | SortOrder
+    createdBy?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BulkUploadContactWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: BulkUploadContactWhereInput | BulkUploadContactWhereInput[]
+    OR?: BulkUploadContactWhereInput[]
+    NOT?: BulkUploadContactWhereInput | BulkUploadContactWhereInput[]
+    bulkId?: StringNullableFilter<"BulkUploadContact"> | string | null
+    batchId?: StringNullableFilter<"BulkUploadContact"> | string | null
+    fileName?: StringNullableFilter<"BulkUploadContact"> | string | null
+    name?: StringFilter<"BulkUploadContact"> | string
+    email?: StringNullableFilter<"BulkUploadContact"> | string | null
+    phone?: StringNullableFilter<"BulkUploadContact"> | string | null
+    companyName?: StringNullableFilter<"BulkUploadContact"> | string | null
+    contactPerson?: StringNullableFilter<"BulkUploadContact"> | string | null
+    designation?: StringNullableFilter<"BulkUploadContact"> | string | null
+    profession?: StringNullableFilter<"BulkUploadContact"> | string | null
+    category?: StringNullableFilter<"BulkUploadContact"> | string | null
+    source?: StringNullableFilter<"BulkUploadContact"> | string | null
+    customSource?: StringNullableFilter<"BulkUploadContact"> | string | null
+    contactType?: StringNullableFilter<"BulkUploadContact"> | string | null
+    estimatedValue?: StringNullableFilter<"BulkUploadContact"> | string | null
+    expectedCloseDate?: StringNullableFilter<"BulkUploadContact"> | string | null
+    description?: StringNullableFilter<"BulkUploadContact"> | string | null
+    remarks?: StringNullableFilter<"BulkUploadContact"> | string | null
+    notes?: StringNullableFilter<"BulkUploadContact"> | string | null
+    gstNumber?: StringNullableFilter<"BulkUploadContact"> | string | null
+    employeeCount?: StringNullableFilter<"BulkUploadContact"> | string | null
+    companyPan?: StringNullableFilter<"BulkUploadContact"> | string | null
+    cinNumber?: StringNullableFilter<"BulkUploadContact"> | string | null
+    companyWebsite?: StringNullableFilter<"BulkUploadContact"> | string | null
+    linkedinUrl?: StringNullableFilter<"BulkUploadContact"> | string | null
+    annualTurnover?: StringNullableFilter<"BulkUploadContact"> | string | null
+    verificationStatus?: StringNullableFilter<"BulkUploadContact"> | string | null
+    registeredState?: StringNullableFilter<"BulkUploadContact"> | string | null
+    productList?: StringNullableListFilter<"BulkUploadContact">
+    serviceList?: StringNullableListFilter<"BulkUploadContact">
+    status?: StringNullableFilter<"BulkUploadContact"> | string | null
+    stage?: StringNullableFilter<"BulkUploadContact"> | string | null
+    priority?: StringNullableFilter<"BulkUploadContact"> | string | null
+    assignedTo?: StringNullableFilter<"BulkUploadContact"> | string | null
+    assignedToName?: StringNullableFilter<"BulkUploadContact"> | string | null
+    assignmentStatus?: StringNullableFilter<"BulkUploadContact"> | string | null
+    contactMode?: StringNullableFilter<"BulkUploadContact"> | string | null
+    street?: StringNullableFilter<"BulkUploadContact"> | string | null
+    city?: StringNullableFilter<"BulkUploadContact"> | string | null
+    zip?: StringNullableFilter<"BulkUploadContact"> | string | null
+    country?: StringNullableFilter<"BulkUploadContact"> | string | null
+    isImportedToContact?: BoolFilter<"BulkUploadContact"> | boolean
+    importedContactId?: StringNullableFilter<"BulkUploadContact"> | string | null
+    createdBy?: StringNullableFilter<"BulkUploadContact"> | string | null
+    createdAt?: DateTimeFilter<"BulkUploadContact"> | Date | string
+    updatedAt?: DateTimeFilter<"BulkUploadContact"> | Date | string
+  }, "id">
+
+  export type BulkUploadContactOrderByWithAggregationInput = {
+    id?: SortOrder
+    bulkId?: SortOrderInput | SortOrder
+    batchId?: SortOrderInput | SortOrder
+    fileName?: SortOrderInput | SortOrder
+    name?: SortOrder
+    email?: SortOrderInput | SortOrder
+    phone?: SortOrderInput | SortOrder
+    companyName?: SortOrderInput | SortOrder
+    contactPerson?: SortOrderInput | SortOrder
+    designation?: SortOrderInput | SortOrder
+    profession?: SortOrderInput | SortOrder
+    category?: SortOrderInput | SortOrder
+    source?: SortOrderInput | SortOrder
+    customSource?: SortOrderInput | SortOrder
+    contactType?: SortOrderInput | SortOrder
+    estimatedValue?: SortOrderInput | SortOrder
+    expectedCloseDate?: SortOrderInput | SortOrder
+    description?: SortOrderInput | SortOrder
+    remarks?: SortOrderInput | SortOrder
+    notes?: SortOrderInput | SortOrder
+    gstNumber?: SortOrderInput | SortOrder
+    employeeCount?: SortOrderInput | SortOrder
+    companyPan?: SortOrderInput | SortOrder
+    cinNumber?: SortOrderInput | SortOrder
+    companyWebsite?: SortOrderInput | SortOrder
+    linkedinUrl?: SortOrderInput | SortOrder
+    annualTurnover?: SortOrderInput | SortOrder
+    verificationStatus?: SortOrderInput | SortOrder
+    registeredState?: SortOrderInput | SortOrder
+    productList?: SortOrder
+    serviceList?: SortOrder
+    status?: SortOrderInput | SortOrder
+    stage?: SortOrderInput | SortOrder
+    priority?: SortOrderInput | SortOrder
+    assignedTo?: SortOrderInput | SortOrder
+    assignedToName?: SortOrderInput | SortOrder
+    assignmentStatus?: SortOrderInput | SortOrder
+    contactMode?: SortOrderInput | SortOrder
+    street?: SortOrderInput | SortOrder
+    city?: SortOrderInput | SortOrder
+    zip?: SortOrderInput | SortOrder
+    country?: SortOrderInput | SortOrder
+    isImportedToContact?: SortOrder
+    importedContactId?: SortOrderInput | SortOrder
+    createdBy?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: BulkUploadContactCountOrderByAggregateInput
+    _max?: BulkUploadContactMaxOrderByAggregateInput
+    _min?: BulkUploadContactMinOrderByAggregateInput
+  }
+
+  export type BulkUploadContactScalarWhereWithAggregatesInput = {
+    AND?: BulkUploadContactScalarWhereWithAggregatesInput | BulkUploadContactScalarWhereWithAggregatesInput[]
+    OR?: BulkUploadContactScalarWhereWithAggregatesInput[]
+    NOT?: BulkUploadContactScalarWhereWithAggregatesInput | BulkUploadContactScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BulkUploadContact"> | string
+    bulkId?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    batchId?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    fileName?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    name?: StringWithAggregatesFilter<"BulkUploadContact"> | string
+    email?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    phone?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    companyName?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    contactPerson?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    designation?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    profession?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    category?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    source?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    customSource?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    contactType?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    estimatedValue?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    expectedCloseDate?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    description?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    remarks?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    notes?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    gstNumber?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    employeeCount?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    companyPan?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    cinNumber?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    companyWebsite?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    linkedinUrl?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    annualTurnover?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    verificationStatus?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    registeredState?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    productList?: StringNullableListFilter<"BulkUploadContact">
+    serviceList?: StringNullableListFilter<"BulkUploadContact">
+    status?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    stage?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    priority?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    assignedTo?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    assignedToName?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    assignmentStatus?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    contactMode?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    street?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    city?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    zip?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    country?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    isImportedToContact?: BoolWithAggregatesFilter<"BulkUploadContact"> | boolean
+    importedContactId?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    createdBy?: StringNullableWithAggregatesFilter<"BulkUploadContact"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"BulkUploadContact"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"BulkUploadContact"> | Date | string
+  }
+
+  export type ImportBatchWhereInput = {
+    AND?: ImportBatchWhereInput | ImportBatchWhereInput[]
+    OR?: ImportBatchWhereInput[]
+    NOT?: ImportBatchWhereInput | ImportBatchWhereInput[]
+    id?: StringFilter<"ImportBatch"> | string
+    batchId?: StringFilter<"ImportBatch"> | string
+    fileName?: StringFilter<"ImportBatch"> | string
+    fileSize?: IntNullableFilter<"ImportBatch"> | number | null
+    totalRows?: IntFilter<"ImportBatch"> | number
+    importedCount?: IntFilter<"ImportBatch"> | number
+    failedCount?: IntFilter<"ImportBatch"> | number
+    status?: StringFilter<"ImportBatch"> | string
+    failedRows?: JsonNullableFilter<"ImportBatch">
+    assignedTo?: StringNullableFilter<"ImportBatch"> | string | null
+    assignedToName?: StringNullableFilter<"ImportBatch"> | string | null
+    createdBy?: StringNullableFilter<"ImportBatch"> | string | null
+    createdAt?: DateTimeFilter<"ImportBatch"> | Date | string
+    updatedAt?: DateTimeFilter<"ImportBatch"> | Date | string
+  }
+
+  export type ImportBatchOrderByWithRelationInput = {
+    id?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    fileSize?: SortOrderInput | SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+    status?: SortOrder
+    failedRows?: SortOrderInput | SortOrder
+    assignedTo?: SortOrderInput | SortOrder
+    assignedToName?: SortOrderInput | SortOrder
+    createdBy?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ImportBatchWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    batchId?: string
+    AND?: ImportBatchWhereInput | ImportBatchWhereInput[]
+    OR?: ImportBatchWhereInput[]
+    NOT?: ImportBatchWhereInput | ImportBatchWhereInput[]
+    fileName?: StringFilter<"ImportBatch"> | string
+    fileSize?: IntNullableFilter<"ImportBatch"> | number | null
+    totalRows?: IntFilter<"ImportBatch"> | number
+    importedCount?: IntFilter<"ImportBatch"> | number
+    failedCount?: IntFilter<"ImportBatch"> | number
+    status?: StringFilter<"ImportBatch"> | string
+    failedRows?: JsonNullableFilter<"ImportBatch">
+    assignedTo?: StringNullableFilter<"ImportBatch"> | string | null
+    assignedToName?: StringNullableFilter<"ImportBatch"> | string | null
+    createdBy?: StringNullableFilter<"ImportBatch"> | string | null
+    createdAt?: DateTimeFilter<"ImportBatch"> | Date | string
+    updatedAt?: DateTimeFilter<"ImportBatch"> | Date | string
+  }, "id" | "batchId">
+
+  export type ImportBatchOrderByWithAggregationInput = {
+    id?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    fileSize?: SortOrderInput | SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+    status?: SortOrder
+    failedRows?: SortOrderInput | SortOrder
+    assignedTo?: SortOrderInput | SortOrder
+    assignedToName?: SortOrderInput | SortOrder
+    createdBy?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ImportBatchCountOrderByAggregateInput
+    _avg?: ImportBatchAvgOrderByAggregateInput
+    _max?: ImportBatchMaxOrderByAggregateInput
+    _min?: ImportBatchMinOrderByAggregateInput
+    _sum?: ImportBatchSumOrderByAggregateInput
+  }
+
+  export type ImportBatchScalarWhereWithAggregatesInput = {
+    AND?: ImportBatchScalarWhereWithAggregatesInput | ImportBatchScalarWhereWithAggregatesInput[]
+    OR?: ImportBatchScalarWhereWithAggregatesInput[]
+    NOT?: ImportBatchScalarWhereWithAggregatesInput | ImportBatchScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ImportBatch"> | string
+    batchId?: StringWithAggregatesFilter<"ImportBatch"> | string
+    fileName?: StringWithAggregatesFilter<"ImportBatch"> | string
+    fileSize?: IntNullableWithAggregatesFilter<"ImportBatch"> | number | null
+    totalRows?: IntWithAggregatesFilter<"ImportBatch"> | number
+    importedCount?: IntWithAggregatesFilter<"ImportBatch"> | number
+    failedCount?: IntWithAggregatesFilter<"ImportBatch"> | number
+    status?: StringWithAggregatesFilter<"ImportBatch"> | string
+    failedRows?: JsonNullableWithAggregatesFilter<"ImportBatch">
+    assignedTo?: StringNullableWithAggregatesFilter<"ImportBatch"> | string | null
+    assignedToName?: StringNullableWithAggregatesFilter<"ImportBatch"> | string | null
+    createdBy?: StringNullableWithAggregatesFilter<"ImportBatch"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"ImportBatch"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ImportBatch"> | Date | string
+  }
+
   export type CompanyWhereInput = {
     AND?: CompanyWhereInput | CompanyWhereInput[]
     OR?: CompanyWhereInput[]
@@ -43531,6 +48496,7 @@ export namespace Prisma {
     serviceList?: StringNullableListFilter<"Lead">
     status?: StringNullableFilter<"Lead"> | string | null
     stage?: StringNullableFilter<"Lead"> | string | null
+    priority?: StringNullableFilter<"Lead"> | string | null
     assignedTo?: StringNullableFilter<"Lead"> | string | null
     assignedToName?: StringNullableFilter<"Lead"> | string | null
     createdBy?: StringNullableFilter<"Lead"> | string | null
@@ -43557,6 +48523,7 @@ export namespace Prisma {
     serviceList?: SortOrder
     status?: SortOrderInput | SortOrder
     stage?: SortOrderInput | SortOrder
+    priority?: SortOrderInput | SortOrder
     assignedTo?: SortOrderInput | SortOrder
     assignedToName?: SortOrderInput | SortOrder
     createdBy?: SortOrderInput | SortOrder
@@ -43586,6 +48553,7 @@ export namespace Prisma {
     serviceList?: StringNullableListFilter<"Lead">
     status?: StringNullableFilter<"Lead"> | string | null
     stage?: StringNullableFilter<"Lead"> | string | null
+    priority?: StringNullableFilter<"Lead"> | string | null
     assignedTo?: StringNullableFilter<"Lead"> | string | null
     assignedToName?: StringNullableFilter<"Lead"> | string | null
     createdBy?: StringNullableFilter<"Lead"> | string | null
@@ -43612,6 +48580,7 @@ export namespace Prisma {
     serviceList?: SortOrder
     status?: SortOrderInput | SortOrder
     stage?: SortOrderInput | SortOrder
+    priority?: SortOrderInput | SortOrder
     assignedTo?: SortOrderInput | SortOrder
     assignedToName?: SortOrderInput | SortOrder
     createdBy?: SortOrderInput | SortOrder
@@ -43644,6 +48613,7 @@ export namespace Prisma {
     serviceList?: StringNullableListFilter<"Lead">
     status?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     stage?: StringNullableWithAggregatesFilter<"Lead"> | string | null
+    priority?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     assignedTo?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     assignedToName?: StringNullableWithAggregatesFilter<"Lead"> | string | null
     createdBy?: StringNullableWithAggregatesFilter<"Lead"> | string | null
@@ -44480,6 +49450,14 @@ export namespace Prisma {
     NOT?: QuotationWhereInput | QuotationWhereInput[]
     id?: StringFilter<"Quotation"> | string
     quotationNumber?: StringFilter<"Quotation"> | string
+    originalQuotationNumber?: StringNullableFilter<"Quotation"> | string | null
+    version?: IntFilter<"Quotation"> | number
+    revisionNumber?: IntFilter<"Quotation"> | number
+    revisionName?: StringNullableFilter<"Quotation"> | string | null
+    isLatest?: BoolFilter<"Quotation"> | boolean
+    projectName?: StringNullableFilter<"Quotation"> | string | null
+    revisionNotes?: StringNullableFilter<"Quotation"> | string | null
+    parentQuotationId?: StringNullableFilter<"Quotation"> | string | null
     contactId?: StringNullableFilter<"Quotation"> | string | null
     contactName?: StringFilter<"Quotation"> | string
     contactEmail?: StringNullableFilter<"Quotation"> | string | null
@@ -44505,14 +49483,27 @@ export namespace Prisma {
     salesOwnerName?: StringNullableFilter<"Quotation"> | string | null
     convertedToOrderId?: StringNullableFilter<"Quotation"> | string | null
     convertedAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    sentAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    acceptedAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    supersededAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
     createdAt?: DateTimeFilter<"Quotation"> | Date | string
     updatedAt?: DateTimeFilter<"Quotation"> | Date | string
+    parentQuotation?: XOR<QuotationNullableScalarRelationFilter, QuotationWhereInput> | null
+    revisions?: QuotationListRelationFilter
     items?: QuotationItemListRelationFilter
   }
 
   export type QuotationOrderByWithRelationInput = {
     id?: SortOrder
     quotationNumber?: SortOrder
+    originalQuotationNumber?: SortOrderInput | SortOrder
+    version?: SortOrder
+    revisionNumber?: SortOrder
+    revisionName?: SortOrderInput | SortOrder
+    isLatest?: SortOrder
+    projectName?: SortOrderInput | SortOrder
+    revisionNotes?: SortOrderInput | SortOrder
+    parentQuotationId?: SortOrderInput | SortOrder
     contactId?: SortOrderInput | SortOrder
     contactName?: SortOrder
     contactEmail?: SortOrderInput | SortOrder
@@ -44538,8 +49529,13 @@ export namespace Prisma {
     salesOwnerName?: SortOrderInput | SortOrder
     convertedToOrderId?: SortOrderInput | SortOrder
     convertedAt?: SortOrderInput | SortOrder
+    sentAt?: SortOrderInput | SortOrder
+    acceptedAt?: SortOrderInput | SortOrder
+    supersededAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    parentQuotation?: QuotationOrderByWithRelationInput
+    revisions?: QuotationOrderByRelationAggregateInput
     items?: QuotationItemOrderByRelationAggregateInput
   }
 
@@ -44549,6 +49545,14 @@ export namespace Prisma {
     AND?: QuotationWhereInput | QuotationWhereInput[]
     OR?: QuotationWhereInput[]
     NOT?: QuotationWhereInput | QuotationWhereInput[]
+    originalQuotationNumber?: StringNullableFilter<"Quotation"> | string | null
+    version?: IntFilter<"Quotation"> | number
+    revisionNumber?: IntFilter<"Quotation"> | number
+    revisionName?: StringNullableFilter<"Quotation"> | string | null
+    isLatest?: BoolFilter<"Quotation"> | boolean
+    projectName?: StringNullableFilter<"Quotation"> | string | null
+    revisionNotes?: StringNullableFilter<"Quotation"> | string | null
+    parentQuotationId?: StringNullableFilter<"Quotation"> | string | null
     contactId?: StringNullableFilter<"Quotation"> | string | null
     contactName?: StringFilter<"Quotation"> | string
     contactEmail?: StringNullableFilter<"Quotation"> | string | null
@@ -44574,14 +49578,27 @@ export namespace Prisma {
     salesOwnerName?: StringNullableFilter<"Quotation"> | string | null
     convertedToOrderId?: StringNullableFilter<"Quotation"> | string | null
     convertedAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    sentAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    acceptedAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    supersededAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
     createdAt?: DateTimeFilter<"Quotation"> | Date | string
     updatedAt?: DateTimeFilter<"Quotation"> | Date | string
+    parentQuotation?: XOR<QuotationNullableScalarRelationFilter, QuotationWhereInput> | null
+    revisions?: QuotationListRelationFilter
     items?: QuotationItemListRelationFilter
   }, "id" | "quotationNumber">
 
   export type QuotationOrderByWithAggregationInput = {
     id?: SortOrder
     quotationNumber?: SortOrder
+    originalQuotationNumber?: SortOrderInput | SortOrder
+    version?: SortOrder
+    revisionNumber?: SortOrder
+    revisionName?: SortOrderInput | SortOrder
+    isLatest?: SortOrder
+    projectName?: SortOrderInput | SortOrder
+    revisionNotes?: SortOrderInput | SortOrder
+    parentQuotationId?: SortOrderInput | SortOrder
     contactId?: SortOrderInput | SortOrder
     contactName?: SortOrder
     contactEmail?: SortOrderInput | SortOrder
@@ -44607,6 +49624,9 @@ export namespace Prisma {
     salesOwnerName?: SortOrderInput | SortOrder
     convertedToOrderId?: SortOrderInput | SortOrder
     convertedAt?: SortOrderInput | SortOrder
+    sentAt?: SortOrderInput | SortOrder
+    acceptedAt?: SortOrderInput | SortOrder
+    supersededAt?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: QuotationCountOrderByAggregateInput
@@ -44622,6 +49642,14 @@ export namespace Prisma {
     NOT?: QuotationScalarWhereWithAggregatesInput | QuotationScalarWhereWithAggregatesInput[]
     id?: StringWithAggregatesFilter<"Quotation"> | string
     quotationNumber?: StringWithAggregatesFilter<"Quotation"> | string
+    originalQuotationNumber?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
+    version?: IntWithAggregatesFilter<"Quotation"> | number
+    revisionNumber?: IntWithAggregatesFilter<"Quotation"> | number
+    revisionName?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
+    isLatest?: BoolWithAggregatesFilter<"Quotation"> | boolean
+    projectName?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
+    revisionNotes?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
+    parentQuotationId?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
     contactId?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
     contactName?: StringWithAggregatesFilter<"Quotation"> | string
     contactEmail?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
@@ -44647,6 +49675,9 @@ export namespace Prisma {
     salesOwnerName?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
     convertedToOrderId?: StringNullableWithAggregatesFilter<"Quotation"> | string | null
     convertedAt?: DateTimeNullableWithAggregatesFilter<"Quotation"> | Date | string | null
+    sentAt?: DateTimeNullableWithAggregatesFilter<"Quotation"> | Date | string | null
+    acceptedAt?: DateTimeNullableWithAggregatesFilter<"Quotation"> | Date | string | null
+    supersededAt?: DateTimeNullableWithAggregatesFilter<"Quotation"> | Date | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Quotation"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Quotation"> | Date | string
   }
@@ -46680,6 +51711,155 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"Contract"> | Date | string
   }
 
+  export type ActivityWhereInput = {
+    AND?: ActivityWhereInput | ActivityWhereInput[]
+    OR?: ActivityWhereInput[]
+    NOT?: ActivityWhereInput | ActivityWhereInput[]
+    id?: StringFilter<"Activity"> | string
+    activityNumber?: StringNullableFilter<"Activity"> | string | null
+    type?: StringFilter<"Activity"> | string
+    title?: StringFilter<"Activity"> | string
+    description?: StringNullableFilter<"Activity"> | string | null
+    leadId?: StringNullableFilter<"Activity"> | string | null
+    leadName?: StringNullableFilter<"Activity"> | string | null
+    leadCode?: StringNullableFilter<"Activity"> | string | null
+    customerId?: StringNullableFilter<"Activity"> | string | null
+    customerName?: StringNullableFilter<"Activity"> | string | null
+    contactId?: StringNullableFilter<"Activity"> | string | null
+    contactName?: StringNullableFilter<"Activity"> | string | null
+    entityId?: StringNullableFilter<"Activity"> | string | null
+    entityType?: StringNullableFilter<"Activity"> | string | null
+    entityNumber?: StringNullableFilter<"Activity"> | string | null
+    status?: StringNullableFilter<"Activity"> | string | null
+    amount?: FloatNullableFilter<"Activity"> | number | null
+    performedBy?: StringNullableFilter<"Activity"> | string | null
+    performedById?: StringNullableFilter<"Activity"> | string | null
+    activityDate?: StringFilter<"Activity"> | string
+    activityTime?: StringNullableFilter<"Activity"> | string | null
+    metadata?: JsonNullableFilter<"Activity">
+    createdAt?: DateTimeFilter<"Activity"> | Date | string
+    updatedAt?: DateTimeFilter<"Activity"> | Date | string
+  }
+
+  export type ActivityOrderByWithRelationInput = {
+    id?: SortOrder
+    activityNumber?: SortOrderInput | SortOrder
+    type?: SortOrder
+    title?: SortOrder
+    description?: SortOrderInput | SortOrder
+    leadId?: SortOrderInput | SortOrder
+    leadName?: SortOrderInput | SortOrder
+    leadCode?: SortOrderInput | SortOrder
+    customerId?: SortOrderInput | SortOrder
+    customerName?: SortOrderInput | SortOrder
+    contactId?: SortOrderInput | SortOrder
+    contactName?: SortOrderInput | SortOrder
+    entityId?: SortOrderInput | SortOrder
+    entityType?: SortOrderInput | SortOrder
+    entityNumber?: SortOrderInput | SortOrder
+    status?: SortOrderInput | SortOrder
+    amount?: SortOrderInput | SortOrder
+    performedBy?: SortOrderInput | SortOrder
+    performedById?: SortOrderInput | SortOrder
+    activityDate?: SortOrder
+    activityTime?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ActivityWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    activityNumber?: string
+    AND?: ActivityWhereInput | ActivityWhereInput[]
+    OR?: ActivityWhereInput[]
+    NOT?: ActivityWhereInput | ActivityWhereInput[]
+    type?: StringFilter<"Activity"> | string
+    title?: StringFilter<"Activity"> | string
+    description?: StringNullableFilter<"Activity"> | string | null
+    leadId?: StringNullableFilter<"Activity"> | string | null
+    leadName?: StringNullableFilter<"Activity"> | string | null
+    leadCode?: StringNullableFilter<"Activity"> | string | null
+    customerId?: StringNullableFilter<"Activity"> | string | null
+    customerName?: StringNullableFilter<"Activity"> | string | null
+    contactId?: StringNullableFilter<"Activity"> | string | null
+    contactName?: StringNullableFilter<"Activity"> | string | null
+    entityId?: StringNullableFilter<"Activity"> | string | null
+    entityType?: StringNullableFilter<"Activity"> | string | null
+    entityNumber?: StringNullableFilter<"Activity"> | string | null
+    status?: StringNullableFilter<"Activity"> | string | null
+    amount?: FloatNullableFilter<"Activity"> | number | null
+    performedBy?: StringNullableFilter<"Activity"> | string | null
+    performedById?: StringNullableFilter<"Activity"> | string | null
+    activityDate?: StringFilter<"Activity"> | string
+    activityTime?: StringNullableFilter<"Activity"> | string | null
+    metadata?: JsonNullableFilter<"Activity">
+    createdAt?: DateTimeFilter<"Activity"> | Date | string
+    updatedAt?: DateTimeFilter<"Activity"> | Date | string
+  }, "id" | "activityNumber">
+
+  export type ActivityOrderByWithAggregationInput = {
+    id?: SortOrder
+    activityNumber?: SortOrderInput | SortOrder
+    type?: SortOrder
+    title?: SortOrder
+    description?: SortOrderInput | SortOrder
+    leadId?: SortOrderInput | SortOrder
+    leadName?: SortOrderInput | SortOrder
+    leadCode?: SortOrderInput | SortOrder
+    customerId?: SortOrderInput | SortOrder
+    customerName?: SortOrderInput | SortOrder
+    contactId?: SortOrderInput | SortOrder
+    contactName?: SortOrderInput | SortOrder
+    entityId?: SortOrderInput | SortOrder
+    entityType?: SortOrderInput | SortOrder
+    entityNumber?: SortOrderInput | SortOrder
+    status?: SortOrderInput | SortOrder
+    amount?: SortOrderInput | SortOrder
+    performedBy?: SortOrderInput | SortOrder
+    performedById?: SortOrderInput | SortOrder
+    activityDate?: SortOrder
+    activityTime?: SortOrderInput | SortOrder
+    metadata?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ActivityCountOrderByAggregateInput
+    _avg?: ActivityAvgOrderByAggregateInput
+    _max?: ActivityMaxOrderByAggregateInput
+    _min?: ActivityMinOrderByAggregateInput
+    _sum?: ActivitySumOrderByAggregateInput
+  }
+
+  export type ActivityScalarWhereWithAggregatesInput = {
+    AND?: ActivityScalarWhereWithAggregatesInput | ActivityScalarWhereWithAggregatesInput[]
+    OR?: ActivityScalarWhereWithAggregatesInput[]
+    NOT?: ActivityScalarWhereWithAggregatesInput | ActivityScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"Activity"> | string
+    activityNumber?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    type?: StringWithAggregatesFilter<"Activity"> | string
+    title?: StringWithAggregatesFilter<"Activity"> | string
+    description?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    leadId?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    leadName?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    leadCode?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    customerId?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    customerName?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    contactId?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    contactName?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    entityId?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    entityType?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    entityNumber?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    status?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    amount?: FloatNullableWithAggregatesFilter<"Activity"> | number | null
+    performedBy?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    performedById?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    activityDate?: StringWithAggregatesFilter<"Activity"> | string
+    activityTime?: StringNullableWithAggregatesFilter<"Activity"> | string | null
+    metadata?: JsonNullableWithAggregatesFilter<"Activity">
+    createdAt?: DateTimeWithAggregatesFilter<"Activity"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"Activity"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -46890,6 +52070,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     role: RoleCreateNestedOneWithoutPermissionsInput
@@ -46907,6 +52088,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -46922,6 +52104,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     role?: RoleUpdateOneRequiredWithoutPermissionsNestedInput
@@ -46939,6 +52122,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -46955,6 +52139,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -46970,6 +52155,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -46986,6 +52172,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -47683,6 +52870,475 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type BulkUploadContactCreateInput = {
+    id?: string
+    bulkId?: string | null
+    batchId?: string | null
+    fileName?: string | null
+    name: string
+    email?: string | null
+    phone?: string | null
+    companyName?: string | null
+    contactPerson?: string | null
+    designation?: string | null
+    profession?: string | null
+    category?: string | null
+    source?: string | null
+    customSource?: string | null
+    contactType?: string | null
+    estimatedValue?: string | null
+    expectedCloseDate?: string | null
+    description?: string | null
+    remarks?: string | null
+    notes?: string | null
+    gstNumber?: string | null
+    employeeCount?: string | null
+    companyPan?: string | null
+    cinNumber?: string | null
+    companyWebsite?: string | null
+    linkedinUrl?: string | null
+    annualTurnover?: string | null
+    verificationStatus?: string | null
+    registeredState?: string | null
+    productList?: BulkUploadContactCreateproductListInput | string[]
+    serviceList?: BulkUploadContactCreateserviceListInput | string[]
+    status?: string | null
+    stage?: string | null
+    priority?: string | null
+    assignedTo?: string | null
+    assignedToName?: string | null
+    assignmentStatus?: string | null
+    contactMode?: string | null
+    street?: string | null
+    city?: string | null
+    zip?: string | null
+    country?: string | null
+    isImportedToContact?: boolean
+    importedContactId?: string | null
+    createdBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BulkUploadContactUncheckedCreateInput = {
+    id?: string
+    bulkId?: string | null
+    batchId?: string | null
+    fileName?: string | null
+    name: string
+    email?: string | null
+    phone?: string | null
+    companyName?: string | null
+    contactPerson?: string | null
+    designation?: string | null
+    profession?: string | null
+    category?: string | null
+    source?: string | null
+    customSource?: string | null
+    contactType?: string | null
+    estimatedValue?: string | null
+    expectedCloseDate?: string | null
+    description?: string | null
+    remarks?: string | null
+    notes?: string | null
+    gstNumber?: string | null
+    employeeCount?: string | null
+    companyPan?: string | null
+    cinNumber?: string | null
+    companyWebsite?: string | null
+    linkedinUrl?: string | null
+    annualTurnover?: string | null
+    verificationStatus?: string | null
+    registeredState?: string | null
+    productList?: BulkUploadContactCreateproductListInput | string[]
+    serviceList?: BulkUploadContactCreateserviceListInput | string[]
+    status?: string | null
+    stage?: string | null
+    priority?: string | null
+    assignedTo?: string | null
+    assignedToName?: string | null
+    assignmentStatus?: string | null
+    contactMode?: string | null
+    street?: string | null
+    city?: string | null
+    zip?: string | null
+    country?: string | null
+    isImportedToContact?: boolean
+    importedContactId?: string | null
+    createdBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BulkUploadContactUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    bulkId?: NullableStringFieldUpdateOperationsInput | string | null
+    batchId?: NullableStringFieldUpdateOperationsInput | string | null
+    fileName?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPerson?: NullableStringFieldUpdateOperationsInput | string | null
+    designation?: NullableStringFieldUpdateOperationsInput | string | null
+    profession?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    customSource?: NullableStringFieldUpdateOperationsInput | string | null
+    contactType?: NullableStringFieldUpdateOperationsInput | string | null
+    estimatedValue?: NullableStringFieldUpdateOperationsInput | string | null
+    expectedCloseDate?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    remarks?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    gstNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    employeeCount?: NullableStringFieldUpdateOperationsInput | string | null
+    companyPan?: NullableStringFieldUpdateOperationsInput | string | null
+    cinNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    companyWebsite?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedinUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    annualTurnover?: NullableStringFieldUpdateOperationsInput | string | null
+    verificationStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    registeredState?: NullableStringFieldUpdateOperationsInput | string | null
+    productList?: BulkUploadContactUpdateproductListInput | string[]
+    serviceList?: BulkUploadContactUpdateserviceListInput | string[]
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    assignmentStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    contactMode?: NullableStringFieldUpdateOperationsInput | string | null
+    street?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    zip?: NullableStringFieldUpdateOperationsInput | string | null
+    country?: NullableStringFieldUpdateOperationsInput | string | null
+    isImportedToContact?: BoolFieldUpdateOperationsInput | boolean
+    importedContactId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BulkUploadContactUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    bulkId?: NullableStringFieldUpdateOperationsInput | string | null
+    batchId?: NullableStringFieldUpdateOperationsInput | string | null
+    fileName?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPerson?: NullableStringFieldUpdateOperationsInput | string | null
+    designation?: NullableStringFieldUpdateOperationsInput | string | null
+    profession?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    customSource?: NullableStringFieldUpdateOperationsInput | string | null
+    contactType?: NullableStringFieldUpdateOperationsInput | string | null
+    estimatedValue?: NullableStringFieldUpdateOperationsInput | string | null
+    expectedCloseDate?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    remarks?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    gstNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    employeeCount?: NullableStringFieldUpdateOperationsInput | string | null
+    companyPan?: NullableStringFieldUpdateOperationsInput | string | null
+    cinNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    companyWebsite?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedinUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    annualTurnover?: NullableStringFieldUpdateOperationsInput | string | null
+    verificationStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    registeredState?: NullableStringFieldUpdateOperationsInput | string | null
+    productList?: BulkUploadContactUpdateproductListInput | string[]
+    serviceList?: BulkUploadContactUpdateserviceListInput | string[]
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    assignmentStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    contactMode?: NullableStringFieldUpdateOperationsInput | string | null
+    street?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    zip?: NullableStringFieldUpdateOperationsInput | string | null
+    country?: NullableStringFieldUpdateOperationsInput | string | null
+    isImportedToContact?: BoolFieldUpdateOperationsInput | boolean
+    importedContactId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BulkUploadContactCreateManyInput = {
+    id?: string
+    bulkId?: string | null
+    batchId?: string | null
+    fileName?: string | null
+    name: string
+    email?: string | null
+    phone?: string | null
+    companyName?: string | null
+    contactPerson?: string | null
+    designation?: string | null
+    profession?: string | null
+    category?: string | null
+    source?: string | null
+    customSource?: string | null
+    contactType?: string | null
+    estimatedValue?: string | null
+    expectedCloseDate?: string | null
+    description?: string | null
+    remarks?: string | null
+    notes?: string | null
+    gstNumber?: string | null
+    employeeCount?: string | null
+    companyPan?: string | null
+    cinNumber?: string | null
+    companyWebsite?: string | null
+    linkedinUrl?: string | null
+    annualTurnover?: string | null
+    verificationStatus?: string | null
+    registeredState?: string | null
+    productList?: BulkUploadContactCreateproductListInput | string[]
+    serviceList?: BulkUploadContactCreateserviceListInput | string[]
+    status?: string | null
+    stage?: string | null
+    priority?: string | null
+    assignedTo?: string | null
+    assignedToName?: string | null
+    assignmentStatus?: string | null
+    contactMode?: string | null
+    street?: string | null
+    city?: string | null
+    zip?: string | null
+    country?: string | null
+    isImportedToContact?: boolean
+    importedContactId?: string | null
+    createdBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BulkUploadContactUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    bulkId?: NullableStringFieldUpdateOperationsInput | string | null
+    batchId?: NullableStringFieldUpdateOperationsInput | string | null
+    fileName?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPerson?: NullableStringFieldUpdateOperationsInput | string | null
+    designation?: NullableStringFieldUpdateOperationsInput | string | null
+    profession?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    customSource?: NullableStringFieldUpdateOperationsInput | string | null
+    contactType?: NullableStringFieldUpdateOperationsInput | string | null
+    estimatedValue?: NullableStringFieldUpdateOperationsInput | string | null
+    expectedCloseDate?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    remarks?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    gstNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    employeeCount?: NullableStringFieldUpdateOperationsInput | string | null
+    companyPan?: NullableStringFieldUpdateOperationsInput | string | null
+    cinNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    companyWebsite?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedinUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    annualTurnover?: NullableStringFieldUpdateOperationsInput | string | null
+    verificationStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    registeredState?: NullableStringFieldUpdateOperationsInput | string | null
+    productList?: BulkUploadContactUpdateproductListInput | string[]
+    serviceList?: BulkUploadContactUpdateserviceListInput | string[]
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    assignmentStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    contactMode?: NullableStringFieldUpdateOperationsInput | string | null
+    street?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    zip?: NullableStringFieldUpdateOperationsInput | string | null
+    country?: NullableStringFieldUpdateOperationsInput | string | null
+    isImportedToContact?: BoolFieldUpdateOperationsInput | boolean
+    importedContactId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BulkUploadContactUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    bulkId?: NullableStringFieldUpdateOperationsInput | string | null
+    batchId?: NullableStringFieldUpdateOperationsInput | string | null
+    fileName?: NullableStringFieldUpdateOperationsInput | string | null
+    name?: StringFieldUpdateOperationsInput | string
+    email?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPerson?: NullableStringFieldUpdateOperationsInput | string | null
+    designation?: NullableStringFieldUpdateOperationsInput | string | null
+    profession?: NullableStringFieldUpdateOperationsInput | string | null
+    category?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: NullableStringFieldUpdateOperationsInput | string | null
+    customSource?: NullableStringFieldUpdateOperationsInput | string | null
+    contactType?: NullableStringFieldUpdateOperationsInput | string | null
+    estimatedValue?: NullableStringFieldUpdateOperationsInput | string | null
+    expectedCloseDate?: NullableStringFieldUpdateOperationsInput | string | null
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    remarks?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    gstNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    employeeCount?: NullableStringFieldUpdateOperationsInput | string | null
+    companyPan?: NullableStringFieldUpdateOperationsInput | string | null
+    cinNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    companyWebsite?: NullableStringFieldUpdateOperationsInput | string | null
+    linkedinUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    annualTurnover?: NullableStringFieldUpdateOperationsInput | string | null
+    verificationStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    registeredState?: NullableStringFieldUpdateOperationsInput | string | null
+    productList?: BulkUploadContactUpdateproductListInput | string[]
+    serviceList?: BulkUploadContactUpdateserviceListInput | string[]
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    assignmentStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    contactMode?: NullableStringFieldUpdateOperationsInput | string | null
+    street?: NullableStringFieldUpdateOperationsInput | string | null
+    city?: NullableStringFieldUpdateOperationsInput | string | null
+    zip?: NullableStringFieldUpdateOperationsInput | string | null
+    country?: NullableStringFieldUpdateOperationsInput | string | null
+    isImportedToContact?: BoolFieldUpdateOperationsInput | boolean
+    importedContactId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ImportBatchCreateInput = {
+    id?: string
+    batchId: string
+    fileName: string
+    fileSize?: number | null
+    totalRows?: number
+    importedCount?: number
+    failedCount?: number
+    status?: string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: string | null
+    assignedToName?: string | null
+    createdBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ImportBatchUncheckedCreateInput = {
+    id?: string
+    batchId: string
+    fileName: string
+    fileSize?: number | null
+    totalRows?: number
+    importedCount?: number
+    failedCount?: number
+    status?: string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: string | null
+    assignedToName?: string | null
+    createdBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ImportBatchUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    batchId?: StringFieldUpdateOperationsInput | string
+    fileName?: StringFieldUpdateOperationsInput | string
+    fileSize?: NullableIntFieldUpdateOperationsInput | number | null
+    totalRows?: IntFieldUpdateOperationsInput | number
+    importedCount?: IntFieldUpdateOperationsInput | number
+    failedCount?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ImportBatchUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    batchId?: StringFieldUpdateOperationsInput | string
+    fileName?: StringFieldUpdateOperationsInput | string
+    fileSize?: NullableIntFieldUpdateOperationsInput | number | null
+    totalRows?: IntFieldUpdateOperationsInput | number
+    importedCount?: IntFieldUpdateOperationsInput | number
+    failedCount?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ImportBatchCreateManyInput = {
+    id?: string
+    batchId: string
+    fileName: string
+    fileSize?: number | null
+    totalRows?: number
+    importedCount?: number
+    failedCount?: number
+    status?: string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: string | null
+    assignedToName?: string | null
+    createdBy?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ImportBatchUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    batchId?: StringFieldUpdateOperationsInput | string
+    fileName?: StringFieldUpdateOperationsInput | string
+    fileSize?: NullableIntFieldUpdateOperationsInput | number | null
+    totalRows?: IntFieldUpdateOperationsInput | number
+    importedCount?: IntFieldUpdateOperationsInput | number
+    failedCount?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ImportBatchUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    batchId?: StringFieldUpdateOperationsInput | string
+    fileName?: StringFieldUpdateOperationsInput | string
+    fileSize?: NullableIntFieldUpdateOperationsInput | number | null
+    totalRows?: IntFieldUpdateOperationsInput | number
+    importedCount?: IntFieldUpdateOperationsInput | number
+    failedCount?: IntFieldUpdateOperationsInput | number
+    status?: StringFieldUpdateOperationsInput | string
+    failedRows?: NullableJsonNullValueInput | InputJsonValue
+    assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
+    assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
+    createdBy?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CompanyCreateInput = {
     id?: string
     name: string
@@ -47771,6 +53427,7 @@ export namespace Prisma {
     serviceList?: LeadCreateserviceListInput | string[]
     status?: string | null
     stage?: string | null
+    priority?: string | null
     assignedTo?: string | null
     assignedToName?: string | null
     createdBy?: string | null
@@ -47797,6 +53454,7 @@ export namespace Prisma {
     serviceList?: LeadCreateserviceListInput | string[]
     status?: string | null
     stage?: string | null
+    priority?: string | null
     assignedTo?: string | null
     assignedToName?: string | null
     createdBy?: string | null
@@ -47823,6 +53481,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -47849,6 +53508,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -47875,6 +53535,7 @@ export namespace Prisma {
     serviceList?: LeadCreateserviceListInput | string[]
     status?: string | null
     stage?: string | null
+    priority?: string | null
     assignedTo?: string | null
     assignedToName?: string | null
     createdBy?: string | null
@@ -47901,6 +53562,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -47927,6 +53589,7 @@ export namespace Prisma {
     serviceList?: LeadUpdateserviceListInput | string[]
     status?: NullableStringFieldUpdateOperationsInput | string | null
     stage?: NullableStringFieldUpdateOperationsInput | string | null
+    priority?: NullableStringFieldUpdateOperationsInput | string | null
     assignedTo?: NullableStringFieldUpdateOperationsInput | string | null
     assignedToName?: NullableStringFieldUpdateOperationsInput | string | null
     createdBy?: NullableStringFieldUpdateOperationsInput | string | null
@@ -48960,6 +54623,13 @@ export namespace Prisma {
   export type QuotationCreateInput = {
     id?: string
     quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
     contactId?: string | null
     contactName: string
     contactEmail?: string | null
@@ -48985,14 +54655,27 @@ export namespace Prisma {
     salesOwnerName?: string | null
     convertedToOrderId?: string | null
     convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    parentQuotation?: QuotationCreateNestedOneWithoutRevisionsInput
+    revisions?: QuotationCreateNestedManyWithoutParentQuotationInput
     items?: QuotationItemCreateNestedManyWithoutQuotationInput
   }
 
   export type QuotationUncheckedCreateInput = {
     id?: string
     quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    parentQuotationId?: string | null
     contactId?: string | null
     contactName: string
     contactEmail?: string | null
@@ -49018,14 +54701,25 @@ export namespace Prisma {
     salesOwnerName?: string | null
     convertedToOrderId?: string | null
     convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    revisions?: QuotationUncheckedCreateNestedManyWithoutParentQuotationInput
     items?: QuotationItemUncheckedCreateNestedManyWithoutQuotationInput
   }
 
   export type QuotationUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
     contactId?: NullableStringFieldUpdateOperationsInput | string | null
     contactName?: StringFieldUpdateOperationsInput | string
     contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
@@ -49051,14 +54745,27 @@ export namespace Prisma {
     salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
     convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
     convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    parentQuotation?: QuotationUpdateOneWithoutRevisionsNestedInput
+    revisions?: QuotationUpdateManyWithoutParentQuotationNestedInput
     items?: QuotationItemUpdateManyWithoutQuotationNestedInput
   }
 
   export type QuotationUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    parentQuotationId?: NullableStringFieldUpdateOperationsInput | string | null
     contactId?: NullableStringFieldUpdateOperationsInput | string | null
     contactName?: StringFieldUpdateOperationsInput | string
     contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
@@ -49084,14 +54791,26 @@ export namespace Prisma {
     salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
     convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
     convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    revisions?: QuotationUncheckedUpdateManyWithoutParentQuotationNestedInput
     items?: QuotationItemUncheckedUpdateManyWithoutQuotationNestedInput
   }
 
   export type QuotationCreateManyInput = {
     id?: string
     quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    parentQuotationId?: string | null
     contactId?: string | null
     contactName: string
     contactEmail?: string | null
@@ -49117,6 +54836,9 @@ export namespace Prisma {
     salesOwnerName?: string | null
     convertedToOrderId?: string | null
     convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -49124,6 +54846,13 @@ export namespace Prisma {
   export type QuotationUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
     quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
     contactId?: NullableStringFieldUpdateOperationsInput | string | null
     contactName?: StringFieldUpdateOperationsInput | string
     contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
@@ -49149,6 +54878,9 @@ export namespace Prisma {
     salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
     convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
     convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -49156,6 +54888,14 @@ export namespace Prisma {
   export type QuotationUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    parentQuotationId?: NullableStringFieldUpdateOperationsInput | string | null
     contactId?: NullableStringFieldUpdateOperationsInput | string | null
     contactName?: StringFieldUpdateOperationsInput | string
     contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
@@ -49181,6 +54921,9 @@ export namespace Prisma {
     salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
     convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
     convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -51711,6 +57454,195 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ActivityCreateInput = {
+    id?: string
+    activityNumber?: string | null
+    type: string
+    title: string
+    description?: string | null
+    leadId?: string | null
+    leadName?: string | null
+    leadCode?: string | null
+    customerId?: string | null
+    customerName?: string | null
+    contactId?: string | null
+    contactName?: string | null
+    entityId?: string | null
+    entityType?: string | null
+    entityNumber?: string | null
+    status?: string | null
+    amount?: number | null
+    performedBy?: string | null
+    performedById?: string | null
+    activityDate: string
+    activityTime?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ActivityUncheckedCreateInput = {
+    id?: string
+    activityNumber?: string | null
+    type: string
+    title: string
+    description?: string | null
+    leadId?: string | null
+    leadName?: string | null
+    leadCode?: string | null
+    customerId?: string | null
+    customerName?: string | null
+    contactId?: string | null
+    contactName?: string | null
+    entityId?: string | null
+    entityType?: string | null
+    entityNumber?: string | null
+    status?: string | null
+    amount?: number | null
+    performedBy?: string | null
+    performedById?: string | null
+    activityDate: string
+    activityTime?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ActivityUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    leadName?: NullableStringFieldUpdateOperationsInput | string | null
+    leadCode?: NullableStringFieldUpdateOperationsInput | string | null
+    customerId?: NullableStringFieldUpdateOperationsInput | string | null
+    customerName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: NullableStringFieldUpdateOperationsInput | string | null
+    entityId?: NullableStringFieldUpdateOperationsInput | string | null
+    entityType?: NullableStringFieldUpdateOperationsInput | string | null
+    entityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    amount?: NullableFloatFieldUpdateOperationsInput | number | null
+    performedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    performedById?: NullableStringFieldUpdateOperationsInput | string | null
+    activityDate?: StringFieldUpdateOperationsInput | string
+    activityTime?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ActivityUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    leadName?: NullableStringFieldUpdateOperationsInput | string | null
+    leadCode?: NullableStringFieldUpdateOperationsInput | string | null
+    customerId?: NullableStringFieldUpdateOperationsInput | string | null
+    customerName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: NullableStringFieldUpdateOperationsInput | string | null
+    entityId?: NullableStringFieldUpdateOperationsInput | string | null
+    entityType?: NullableStringFieldUpdateOperationsInput | string | null
+    entityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    amount?: NullableFloatFieldUpdateOperationsInput | number | null
+    performedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    performedById?: NullableStringFieldUpdateOperationsInput | string | null
+    activityDate?: StringFieldUpdateOperationsInput | string
+    activityTime?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ActivityCreateManyInput = {
+    id?: string
+    activityNumber?: string | null
+    type: string
+    title: string
+    description?: string | null
+    leadId?: string | null
+    leadName?: string | null
+    leadCode?: string | null
+    customerId?: string | null
+    customerName?: string | null
+    contactId?: string | null
+    contactName?: string | null
+    entityId?: string | null
+    entityType?: string | null
+    entityNumber?: string | null
+    status?: string | null
+    amount?: number | null
+    performedBy?: string | null
+    performedById?: string | null
+    activityDate: string
+    activityTime?: string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ActivityUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    leadName?: NullableStringFieldUpdateOperationsInput | string | null
+    leadCode?: NullableStringFieldUpdateOperationsInput | string | null
+    customerId?: NullableStringFieldUpdateOperationsInput | string | null
+    customerName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: NullableStringFieldUpdateOperationsInput | string | null
+    entityId?: NullableStringFieldUpdateOperationsInput | string | null
+    entityType?: NullableStringFieldUpdateOperationsInput | string | null
+    entityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    amount?: NullableFloatFieldUpdateOperationsInput | number | null
+    performedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    performedById?: NullableStringFieldUpdateOperationsInput | string | null
+    activityDate?: StringFieldUpdateOperationsInput | string
+    activityTime?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ActivityUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    activityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    description?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    leadName?: NullableStringFieldUpdateOperationsInput | string | null
+    leadCode?: NullableStringFieldUpdateOperationsInput | string | null
+    customerId?: NullableStringFieldUpdateOperationsInput | string | null
+    customerName?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: NullableStringFieldUpdateOperationsInput | string | null
+    entityId?: NullableStringFieldUpdateOperationsInput | string | null
+    entityType?: NullableStringFieldUpdateOperationsInput | string | null
+    entityNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    status?: NullableStringFieldUpdateOperationsInput | string | null
+    amount?: NullableFloatFieldUpdateOperationsInput | number | null
+    performedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    performedById?: NullableStringFieldUpdateOperationsInput | string | null
+    activityDate?: StringFieldUpdateOperationsInput | string
+    activityTime?: NullableStringFieldUpdateOperationsInput | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -51958,6 +57890,7 @@ export namespace Prisma {
     canDelete?: SortOrder
     canExport?: SortOrder
     canApprove?: SortOrder
+    dataScope?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -51974,6 +57907,7 @@ export namespace Prisma {
     canDelete?: SortOrder
     canExport?: SortOrder
     canApprove?: SortOrder
+    dataScope?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -51990,6 +57924,7 @@ export namespace Prisma {
     canDelete?: SortOrder
     canExport?: SortOrder
     canApprove?: SortOrder
+    dataScope?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -52293,6 +58228,318 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type BulkUploadContactCountOrderByAggregateInput = {
+    id?: SortOrder
+    bulkId?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    name?: SortOrder
+    email?: SortOrder
+    phone?: SortOrder
+    companyName?: SortOrder
+    contactPerson?: SortOrder
+    designation?: SortOrder
+    profession?: SortOrder
+    category?: SortOrder
+    source?: SortOrder
+    customSource?: SortOrder
+    contactType?: SortOrder
+    estimatedValue?: SortOrder
+    expectedCloseDate?: SortOrder
+    description?: SortOrder
+    remarks?: SortOrder
+    notes?: SortOrder
+    gstNumber?: SortOrder
+    employeeCount?: SortOrder
+    companyPan?: SortOrder
+    cinNumber?: SortOrder
+    companyWebsite?: SortOrder
+    linkedinUrl?: SortOrder
+    annualTurnover?: SortOrder
+    verificationStatus?: SortOrder
+    registeredState?: SortOrder
+    productList?: SortOrder
+    serviceList?: SortOrder
+    status?: SortOrder
+    stage?: SortOrder
+    priority?: SortOrder
+    assignedTo?: SortOrder
+    assignedToName?: SortOrder
+    assignmentStatus?: SortOrder
+    contactMode?: SortOrder
+    street?: SortOrder
+    city?: SortOrder
+    zip?: SortOrder
+    country?: SortOrder
+    isImportedToContact?: SortOrder
+    importedContactId?: SortOrder
+    createdBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BulkUploadContactMaxOrderByAggregateInput = {
+    id?: SortOrder
+    bulkId?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    name?: SortOrder
+    email?: SortOrder
+    phone?: SortOrder
+    companyName?: SortOrder
+    contactPerson?: SortOrder
+    designation?: SortOrder
+    profession?: SortOrder
+    category?: SortOrder
+    source?: SortOrder
+    customSource?: SortOrder
+    contactType?: SortOrder
+    estimatedValue?: SortOrder
+    expectedCloseDate?: SortOrder
+    description?: SortOrder
+    remarks?: SortOrder
+    notes?: SortOrder
+    gstNumber?: SortOrder
+    employeeCount?: SortOrder
+    companyPan?: SortOrder
+    cinNumber?: SortOrder
+    companyWebsite?: SortOrder
+    linkedinUrl?: SortOrder
+    annualTurnover?: SortOrder
+    verificationStatus?: SortOrder
+    registeredState?: SortOrder
+    status?: SortOrder
+    stage?: SortOrder
+    priority?: SortOrder
+    assignedTo?: SortOrder
+    assignedToName?: SortOrder
+    assignmentStatus?: SortOrder
+    contactMode?: SortOrder
+    street?: SortOrder
+    city?: SortOrder
+    zip?: SortOrder
+    country?: SortOrder
+    isImportedToContact?: SortOrder
+    importedContactId?: SortOrder
+    createdBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BulkUploadContactMinOrderByAggregateInput = {
+    id?: SortOrder
+    bulkId?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    name?: SortOrder
+    email?: SortOrder
+    phone?: SortOrder
+    companyName?: SortOrder
+    contactPerson?: SortOrder
+    designation?: SortOrder
+    profession?: SortOrder
+    category?: SortOrder
+    source?: SortOrder
+    customSource?: SortOrder
+    contactType?: SortOrder
+    estimatedValue?: SortOrder
+    expectedCloseDate?: SortOrder
+    description?: SortOrder
+    remarks?: SortOrder
+    notes?: SortOrder
+    gstNumber?: SortOrder
+    employeeCount?: SortOrder
+    companyPan?: SortOrder
+    cinNumber?: SortOrder
+    companyWebsite?: SortOrder
+    linkedinUrl?: SortOrder
+    annualTurnover?: SortOrder
+    verificationStatus?: SortOrder
+    registeredState?: SortOrder
+    status?: SortOrder
+    stage?: SortOrder
+    priority?: SortOrder
+    assignedTo?: SortOrder
+    assignedToName?: SortOrder
+    assignmentStatus?: SortOrder
+    contactMode?: SortOrder
+    street?: SortOrder
+    city?: SortOrder
+    zip?: SortOrder
+    country?: SortOrder
+    isImportedToContact?: SortOrder
+    importedContactId?: SortOrder
+    createdBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type IntNullableFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+  export type JsonNullableFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+  }
+
+  export type ImportBatchCountOrderByAggregateInput = {
+    id?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    fileSize?: SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+    status?: SortOrder
+    failedRows?: SortOrder
+    assignedTo?: SortOrder
+    assignedToName?: SortOrder
+    createdBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ImportBatchAvgOrderByAggregateInput = {
+    fileSize?: SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+  }
+
+  export type ImportBatchMaxOrderByAggregateInput = {
+    id?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    fileSize?: SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+    status?: SortOrder
+    assignedTo?: SortOrder
+    assignedToName?: SortOrder
+    createdBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ImportBatchMinOrderByAggregateInput = {
+    id?: SortOrder
+    batchId?: SortOrder
+    fileName?: SortOrder
+    fileSize?: SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+    status?: SortOrder
+    assignedTo?: SortOrder
+    assignedToName?: SortOrder
+    createdBy?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ImportBatchSumOrderByAggregateInput = {
+    fileSize?: SortOrder
+    totalRows?: SortOrder
+    importedCount?: SortOrder
+    failedCount?: SortOrder
+  }
+
+  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
+  }
+  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
+    | PatchUndefined<
+        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
+        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
+      >
+    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
+
+  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
+    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    path?: string[]
+    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
+    string_contains?: string | StringFieldRefInput<$PrismaModel>
+    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
+    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
+    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
+    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
+    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedJsonNullableFilter<$PrismaModel>
+    _max?: NestedJsonNullableFilter<$PrismaModel>
+  }
+
   export type CompanyCountOrderByAggregateInput = {
     id?: SortOrder
     name?: SortOrder
@@ -52341,6 +58588,7 @@ export namespace Prisma {
     serviceList?: SortOrder
     status?: SortOrder
     stage?: SortOrder
+    priority?: SortOrder
     assignedTo?: SortOrder
     assignedToName?: SortOrder
     createdBy?: SortOrder
@@ -52365,6 +58613,7 @@ export namespace Prisma {
     category?: SortOrder
     status?: SortOrder
     stage?: SortOrder
+    priority?: SortOrder
     assignedTo?: SortOrder
     assignedToName?: SortOrder
     createdBy?: SortOrder
@@ -52389,6 +58638,7 @@ export namespace Prisma {
     category?: SortOrder
     status?: SortOrder
     stage?: SortOrder
+    priority?: SortOrder
     assignedTo?: SortOrder
     assignedToName?: SortOrder
     createdBy?: SortOrder
@@ -52473,40 +58723,6 @@ export namespace Prisma {
     requirementFileSize?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
-  }
-
-  export type IntFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntFilter<$PrismaModel> | number
-  }
-  export type JsonNullableFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
   }
 
   export type FloatNullableFilter<$PrismaModel = never> = {
@@ -52625,48 +58841,6 @@ export namespace Prisma {
     progress?: SortOrder
     estimatedBudget?: SortOrder
     actualCost?: SortOrder
-  }
-
-  export type IntWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel>
-    in?: number[] | ListIntFieldRefInput<$PrismaModel>
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
-    _count?: NestedIntFilter<$PrismaModel>
-    _avg?: NestedFloatFilter<$PrismaModel>
-    _sum?: NestedIntFilter<$PrismaModel>
-    _min?: NestedIntFilter<$PrismaModel>
-    _max?: NestedIntFilter<$PrismaModel>
-  }
-  export type JsonNullableWithAggregatesFilter<$PrismaModel = never> =
-    | PatchUndefined<
-        Either<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, Exclude<keyof Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>,
-        Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>
-      >
-    | OptionalFlat<Omit<Required<JsonNullableWithAggregatesFilterBase<$PrismaModel>>, 'path'>>
-
-  export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
-    equals?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    path?: string[]
-    mode?: QueryMode | EnumQueryModeFieldRefInput<$PrismaModel>
-    string_contains?: string | StringFieldRefInput<$PrismaModel>
-    string_starts_with?: string | StringFieldRefInput<$PrismaModel>
-    string_ends_with?: string | StringFieldRefInput<$PrismaModel>
-    array_starts_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_ends_with?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    array_contains?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | null
-    lt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    lte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gt?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    gte?: InputJsonValue | JsonFieldRefInput<$PrismaModel>
-    not?: InputJsonValue | JsonFieldRefInput<$PrismaModel> | JsonNullValueFilter
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedJsonNullableFilter<$PrismaModel>
-    _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
   export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -53049,10 +59223,25 @@ export namespace Prisma {
     not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
   }
 
+  export type QuotationNullableScalarRelationFilter = {
+    is?: QuotationWhereInput | null
+    isNot?: QuotationWhereInput | null
+  }
+
+  export type QuotationListRelationFilter = {
+    every?: QuotationWhereInput
+    some?: QuotationWhereInput
+    none?: QuotationWhereInput
+  }
+
   export type QuotationItemListRelationFilter = {
     every?: QuotationItemWhereInput
     some?: QuotationItemWhereInput
     none?: QuotationItemWhereInput
+  }
+
+  export type QuotationOrderByRelationAggregateInput = {
+    _count?: SortOrder
   }
 
   export type QuotationItemOrderByRelationAggregateInput = {
@@ -53062,6 +59251,14 @@ export namespace Prisma {
   export type QuotationCountOrderByAggregateInput = {
     id?: SortOrder
     quotationNumber?: SortOrder
+    originalQuotationNumber?: SortOrder
+    version?: SortOrder
+    revisionNumber?: SortOrder
+    revisionName?: SortOrder
+    isLatest?: SortOrder
+    projectName?: SortOrder
+    revisionNotes?: SortOrder
+    parentQuotationId?: SortOrder
     contactId?: SortOrder
     contactName?: SortOrder
     contactEmail?: SortOrder
@@ -53087,11 +59284,16 @@ export namespace Prisma {
     salesOwnerName?: SortOrder
     convertedToOrderId?: SortOrder
     convertedAt?: SortOrder
+    sentAt?: SortOrder
+    acceptedAt?: SortOrder
+    supersededAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
   export type QuotationAvgOrderByAggregateInput = {
+    version?: SortOrder
+    revisionNumber?: SortOrder
     subtotal?: SortOrder
     discountValue?: SortOrder
     discountAmount?: SortOrder
@@ -53102,6 +59304,14 @@ export namespace Prisma {
   export type QuotationMaxOrderByAggregateInput = {
     id?: SortOrder
     quotationNumber?: SortOrder
+    originalQuotationNumber?: SortOrder
+    version?: SortOrder
+    revisionNumber?: SortOrder
+    revisionName?: SortOrder
+    isLatest?: SortOrder
+    projectName?: SortOrder
+    revisionNotes?: SortOrder
+    parentQuotationId?: SortOrder
     contactId?: SortOrder
     contactName?: SortOrder
     contactEmail?: SortOrder
@@ -53127,6 +59337,9 @@ export namespace Prisma {
     salesOwnerName?: SortOrder
     convertedToOrderId?: SortOrder
     convertedAt?: SortOrder
+    sentAt?: SortOrder
+    acceptedAt?: SortOrder
+    supersededAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -53134,6 +59347,14 @@ export namespace Prisma {
   export type QuotationMinOrderByAggregateInput = {
     id?: SortOrder
     quotationNumber?: SortOrder
+    originalQuotationNumber?: SortOrder
+    version?: SortOrder
+    revisionNumber?: SortOrder
+    revisionName?: SortOrder
+    isLatest?: SortOrder
+    projectName?: SortOrder
+    revisionNotes?: SortOrder
+    parentQuotationId?: SortOrder
     contactId?: SortOrder
     contactName?: SortOrder
     contactEmail?: SortOrder
@@ -53159,11 +59380,16 @@ export namespace Prisma {
     salesOwnerName?: SortOrder
     convertedToOrderId?: SortOrder
     convertedAt?: SortOrder
+    sentAt?: SortOrder
+    acceptedAt?: SortOrder
+    supersededAt?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
   export type QuotationSumOrderByAggregateInput = {
+    version?: SortOrder
+    revisionNumber?: SortOrder
     subtotal?: SortOrder
     discountValue?: SortOrder
     discountAmount?: SortOrder
@@ -54280,17 +60506,6 @@ export namespace Prisma {
     discountAmount?: SortOrder
   }
 
-  export type IntNullableFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableFilter<$PrismaModel> | number | null
-  }
-
   export type ContractCountOrderByAggregateInput = {
     id?: SortOrder
     contractId?: SortOrder
@@ -54538,20 +60753,91 @@ export namespace Prisma {
     advancePaymentAmount?: SortOrder
   }
 
-  export type IntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedIntNullableFilter<$PrismaModel>
-    _max?: NestedIntNullableFilter<$PrismaModel>
+  export type ActivityCountOrderByAggregateInput = {
+    id?: SortOrder
+    activityNumber?: SortOrder
+    type?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    leadId?: SortOrder
+    leadName?: SortOrder
+    leadCode?: SortOrder
+    customerId?: SortOrder
+    customerName?: SortOrder
+    contactId?: SortOrder
+    contactName?: SortOrder
+    entityId?: SortOrder
+    entityType?: SortOrder
+    entityNumber?: SortOrder
+    status?: SortOrder
+    amount?: SortOrder
+    performedBy?: SortOrder
+    performedById?: SortOrder
+    activityDate?: SortOrder
+    activityTime?: SortOrder
+    metadata?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ActivityAvgOrderByAggregateInput = {
+    amount?: SortOrder
+  }
+
+  export type ActivityMaxOrderByAggregateInput = {
+    id?: SortOrder
+    activityNumber?: SortOrder
+    type?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    leadId?: SortOrder
+    leadName?: SortOrder
+    leadCode?: SortOrder
+    customerId?: SortOrder
+    customerName?: SortOrder
+    contactId?: SortOrder
+    contactName?: SortOrder
+    entityId?: SortOrder
+    entityType?: SortOrder
+    entityNumber?: SortOrder
+    status?: SortOrder
+    amount?: SortOrder
+    performedBy?: SortOrder
+    performedById?: SortOrder
+    activityDate?: SortOrder
+    activityTime?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ActivityMinOrderByAggregateInput = {
+    id?: SortOrder
+    activityNumber?: SortOrder
+    type?: SortOrder
+    title?: SortOrder
+    description?: SortOrder
+    leadId?: SortOrder
+    leadName?: SortOrder
+    leadCode?: SortOrder
+    customerId?: SortOrder
+    customerName?: SortOrder
+    contactId?: SortOrder
+    contactName?: SortOrder
+    entityId?: SortOrder
+    entityType?: SortOrder
+    entityNumber?: SortOrder
+    status?: SortOrder
+    amount?: SortOrder
+    performedBy?: SortOrder
+    performedById?: SortOrder
+    activityDate?: SortOrder
+    activityTime?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ActivitySumOrderByAggregateInput = {
+    amount?: SortOrder
   }
 
   export type RoleCreateNestedOneWithoutUsersInput = {
@@ -54769,6 +61055,40 @@ export namespace Prisma {
     push?: string | string[]
   }
 
+  export type BulkUploadContactCreateproductListInput = {
+    set: string[]
+  }
+
+  export type BulkUploadContactCreateserviceListInput = {
+    set: string[]
+  }
+
+  export type BulkUploadContactUpdateproductListInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type BulkUploadContactUpdateserviceListInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type NullableIntFieldUpdateOperationsInput = {
+    set?: number | null
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
+  }
+
   export type LeadCreateproductListInput = {
     set: string[]
   }
@@ -54794,14 +61114,6 @@ export namespace Prisma {
   export type ProjectUpdateteamMembersInput = {
     set?: string[]
     push?: string | string[]
-  }
-
-  export type IntFieldUpdateOperationsInput = {
-    set?: number
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
   }
 
   export type NullableFloatFieldUpdateOperationsInput = {
@@ -54838,11 +61150,31 @@ export namespace Prisma {
     divide?: number
   }
 
+  export type QuotationCreateNestedOneWithoutRevisionsInput = {
+    create?: XOR<QuotationCreateWithoutRevisionsInput, QuotationUncheckedCreateWithoutRevisionsInput>
+    connectOrCreate?: QuotationCreateOrConnectWithoutRevisionsInput
+    connect?: QuotationWhereUniqueInput
+  }
+
+  export type QuotationCreateNestedManyWithoutParentQuotationInput = {
+    create?: XOR<QuotationCreateWithoutParentQuotationInput, QuotationUncheckedCreateWithoutParentQuotationInput> | QuotationCreateWithoutParentQuotationInput[] | QuotationUncheckedCreateWithoutParentQuotationInput[]
+    connectOrCreate?: QuotationCreateOrConnectWithoutParentQuotationInput | QuotationCreateOrConnectWithoutParentQuotationInput[]
+    createMany?: QuotationCreateManyParentQuotationInputEnvelope
+    connect?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+  }
+
   export type QuotationItemCreateNestedManyWithoutQuotationInput = {
     create?: XOR<QuotationItemCreateWithoutQuotationInput, QuotationItemUncheckedCreateWithoutQuotationInput> | QuotationItemCreateWithoutQuotationInput[] | QuotationItemUncheckedCreateWithoutQuotationInput[]
     connectOrCreate?: QuotationItemCreateOrConnectWithoutQuotationInput | QuotationItemCreateOrConnectWithoutQuotationInput[]
     createMany?: QuotationItemCreateManyQuotationInputEnvelope
     connect?: QuotationItemWhereUniqueInput | QuotationItemWhereUniqueInput[]
+  }
+
+  export type QuotationUncheckedCreateNestedManyWithoutParentQuotationInput = {
+    create?: XOR<QuotationCreateWithoutParentQuotationInput, QuotationUncheckedCreateWithoutParentQuotationInput> | QuotationCreateWithoutParentQuotationInput[] | QuotationUncheckedCreateWithoutParentQuotationInput[]
+    connectOrCreate?: QuotationCreateOrConnectWithoutParentQuotationInput | QuotationCreateOrConnectWithoutParentQuotationInput[]
+    createMany?: QuotationCreateManyParentQuotationInputEnvelope
+    connect?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
   }
 
   export type QuotationItemUncheckedCreateNestedManyWithoutQuotationInput = {
@@ -54854,6 +61186,30 @@ export namespace Prisma {
 
   export type NullableDateTimeFieldUpdateOperationsInput = {
     set?: Date | string | null
+  }
+
+  export type QuotationUpdateOneWithoutRevisionsNestedInput = {
+    create?: XOR<QuotationCreateWithoutRevisionsInput, QuotationUncheckedCreateWithoutRevisionsInput>
+    connectOrCreate?: QuotationCreateOrConnectWithoutRevisionsInput
+    upsert?: QuotationUpsertWithoutRevisionsInput
+    disconnect?: QuotationWhereInput | boolean
+    delete?: QuotationWhereInput | boolean
+    connect?: QuotationWhereUniqueInput
+    update?: XOR<XOR<QuotationUpdateToOneWithWhereWithoutRevisionsInput, QuotationUpdateWithoutRevisionsInput>, QuotationUncheckedUpdateWithoutRevisionsInput>
+  }
+
+  export type QuotationUpdateManyWithoutParentQuotationNestedInput = {
+    create?: XOR<QuotationCreateWithoutParentQuotationInput, QuotationUncheckedCreateWithoutParentQuotationInput> | QuotationCreateWithoutParentQuotationInput[] | QuotationUncheckedCreateWithoutParentQuotationInput[]
+    connectOrCreate?: QuotationCreateOrConnectWithoutParentQuotationInput | QuotationCreateOrConnectWithoutParentQuotationInput[]
+    upsert?: QuotationUpsertWithWhereUniqueWithoutParentQuotationInput | QuotationUpsertWithWhereUniqueWithoutParentQuotationInput[]
+    createMany?: QuotationCreateManyParentQuotationInputEnvelope
+    set?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    disconnect?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    delete?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    connect?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    update?: QuotationUpdateWithWhereUniqueWithoutParentQuotationInput | QuotationUpdateWithWhereUniqueWithoutParentQuotationInput[]
+    updateMany?: QuotationUpdateManyWithWhereWithoutParentQuotationInput | QuotationUpdateManyWithWhereWithoutParentQuotationInput[]
+    deleteMany?: QuotationScalarWhereInput | QuotationScalarWhereInput[]
   }
 
   export type QuotationItemUpdateManyWithoutQuotationNestedInput = {
@@ -54868,6 +61224,20 @@ export namespace Prisma {
     update?: QuotationItemUpdateWithWhereUniqueWithoutQuotationInput | QuotationItemUpdateWithWhereUniqueWithoutQuotationInput[]
     updateMany?: QuotationItemUpdateManyWithWhereWithoutQuotationInput | QuotationItemUpdateManyWithWhereWithoutQuotationInput[]
     deleteMany?: QuotationItemScalarWhereInput | QuotationItemScalarWhereInput[]
+  }
+
+  export type QuotationUncheckedUpdateManyWithoutParentQuotationNestedInput = {
+    create?: XOR<QuotationCreateWithoutParentQuotationInput, QuotationUncheckedCreateWithoutParentQuotationInput> | QuotationCreateWithoutParentQuotationInput[] | QuotationUncheckedCreateWithoutParentQuotationInput[]
+    connectOrCreate?: QuotationCreateOrConnectWithoutParentQuotationInput | QuotationCreateOrConnectWithoutParentQuotationInput[]
+    upsert?: QuotationUpsertWithWhereUniqueWithoutParentQuotationInput | QuotationUpsertWithWhereUniqueWithoutParentQuotationInput[]
+    createMany?: QuotationCreateManyParentQuotationInputEnvelope
+    set?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    disconnect?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    delete?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    connect?: QuotationWhereUniqueInput | QuotationWhereUniqueInput[]
+    update?: QuotationUpdateWithWhereUniqueWithoutParentQuotationInput | QuotationUpdateWithWhereUniqueWithoutParentQuotationInput[]
+    updateMany?: QuotationUpdateManyWithWhereWithoutParentQuotationInput | QuotationUpdateManyWithWhereWithoutParentQuotationInput[]
+    deleteMany?: QuotationScalarWhereInput | QuotationScalarWhereInput[]
   }
 
   export type QuotationItemUncheckedUpdateManyWithoutQuotationNestedInput = {
@@ -55294,14 +61664,6 @@ export namespace Prisma {
     update?: XOR<XOR<InvoiceUpdateToOneWithWhereWithoutAllocationsInput, InvoiceUpdateWithoutAllocationsInput>, InvoiceUncheckedUpdateWithoutAllocationsInput>
   }
 
-  export type NullableIntFieldUpdateOperationsInput = {
-    set?: number | null
-    increment?: number
-    decrement?: number
-    multiply?: number
-    divide?: number
-  }
-
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -55422,6 +61784,22 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedBoolFilter<$PrismaModel>
     _max?: NestedBoolFilter<$PrismaModel>
+  }
+
+  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel> | null
+    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _avg?: NestedFloatNullableFilter<$PrismaModel>
+    _sum?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedIntNullableFilter<$PrismaModel>
+    _max?: NestedIntNullableFilter<$PrismaModel>
   }
 
   export type NestedFloatNullableFilter<$PrismaModel = never> = {
@@ -55563,22 +61941,6 @@ export namespace Prisma {
     _count?: NestedIntNullableFilter<$PrismaModel>
     _min?: NestedDateTimeNullableFilter<$PrismaModel>
     _max?: NestedDateTimeNullableFilter<$PrismaModel>
-  }
-
-  export type NestedIntNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: number | IntFieldRefInput<$PrismaModel> | null
-    in?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    notIn?: number[] | ListIntFieldRefInput<$PrismaModel> | null
-    lt?: number | IntFieldRefInput<$PrismaModel>
-    lte?: number | IntFieldRefInput<$PrismaModel>
-    gt?: number | IntFieldRefInput<$PrismaModel>
-    gte?: number | IntFieldRefInput<$PrismaModel>
-    not?: NestedIntNullableWithAggregatesFilter<$PrismaModel> | number | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _avg?: NestedFloatNullableFilter<$PrismaModel>
-    _sum?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedIntNullableFilter<$PrismaModel>
-    _max?: NestedIntNullableFilter<$PrismaModel>
   }
 
   export type RoleCreateWithoutUsersInput = {
@@ -55735,6 +62097,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -55750,6 +62113,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -55903,6 +62267,7 @@ export namespace Prisma {
     canDelete?: BoolFilter<"RolePermission"> | boolean
     canExport?: BoolFilter<"RolePermission"> | boolean
     canApprove?: BoolFilter<"RolePermission"> | boolean
+    dataScope?: StringNullableFilter<"RolePermission"> | string | null
     createdAt?: DateTimeFilter<"RolePermission"> | Date | string
     updatedAt?: DateTimeFilter<"RolePermission"> | Date | string
   }
@@ -56013,6 +62378,197 @@ export namespace Prisma {
     users?: UserUncheckedUpdateManyWithoutRoleRelationNestedInput
   }
 
+  export type QuotationCreateWithoutRevisionsInput = {
+    id?: string
+    quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    contactId?: string | null
+    contactName: string
+    contactEmail?: string | null
+    contactPhone?: string | null
+    companyName?: string | null
+    clientGst?: string | null
+    clientAddress?: string | null
+    leadId?: string | null
+    quotationDate: string
+    validUntil: string
+    status?: string
+    currency?: string
+    subtotal?: number
+    discountType?: string
+    discountValue?: number
+    discountAmount?: number
+    taxAmount?: number
+    grandTotal?: number
+    paymentTerms?: string | null
+    notes?: string | null
+    termsConditions?: string | null
+    salesOwnerId?: string | null
+    salesOwnerName?: string | null
+    convertedToOrderId?: string | null
+    convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    parentQuotation?: QuotationCreateNestedOneWithoutRevisionsInput
+    items?: QuotationItemCreateNestedManyWithoutQuotationInput
+  }
+
+  export type QuotationUncheckedCreateWithoutRevisionsInput = {
+    id?: string
+    quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    parentQuotationId?: string | null
+    contactId?: string | null
+    contactName: string
+    contactEmail?: string | null
+    contactPhone?: string | null
+    companyName?: string | null
+    clientGst?: string | null
+    clientAddress?: string | null
+    leadId?: string | null
+    quotationDate: string
+    validUntil: string
+    status?: string
+    currency?: string
+    subtotal?: number
+    discountType?: string
+    discountValue?: number
+    discountAmount?: number
+    taxAmount?: number
+    grandTotal?: number
+    paymentTerms?: string | null
+    notes?: string | null
+    termsConditions?: string | null
+    salesOwnerId?: string | null
+    salesOwnerName?: string | null
+    convertedToOrderId?: string | null
+    convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    items?: QuotationItemUncheckedCreateNestedManyWithoutQuotationInput
+  }
+
+  export type QuotationCreateOrConnectWithoutRevisionsInput = {
+    where: QuotationWhereUniqueInput
+    create: XOR<QuotationCreateWithoutRevisionsInput, QuotationUncheckedCreateWithoutRevisionsInput>
+  }
+
+  export type QuotationCreateWithoutParentQuotationInput = {
+    id?: string
+    quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    contactId?: string | null
+    contactName: string
+    contactEmail?: string | null
+    contactPhone?: string | null
+    companyName?: string | null
+    clientGst?: string | null
+    clientAddress?: string | null
+    leadId?: string | null
+    quotationDate: string
+    validUntil: string
+    status?: string
+    currency?: string
+    subtotal?: number
+    discountType?: string
+    discountValue?: number
+    discountAmount?: number
+    taxAmount?: number
+    grandTotal?: number
+    paymentTerms?: string | null
+    notes?: string | null
+    termsConditions?: string | null
+    salesOwnerId?: string | null
+    salesOwnerName?: string | null
+    convertedToOrderId?: string | null
+    convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    revisions?: QuotationCreateNestedManyWithoutParentQuotationInput
+    items?: QuotationItemCreateNestedManyWithoutQuotationInput
+  }
+
+  export type QuotationUncheckedCreateWithoutParentQuotationInput = {
+    id?: string
+    quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    contactId?: string | null
+    contactName: string
+    contactEmail?: string | null
+    contactPhone?: string | null
+    companyName?: string | null
+    clientGst?: string | null
+    clientAddress?: string | null
+    leadId?: string | null
+    quotationDate: string
+    validUntil: string
+    status?: string
+    currency?: string
+    subtotal?: number
+    discountType?: string
+    discountValue?: number
+    discountAmount?: number
+    taxAmount?: number
+    grandTotal?: number
+    paymentTerms?: string | null
+    notes?: string | null
+    termsConditions?: string | null
+    salesOwnerId?: string | null
+    salesOwnerName?: string | null
+    convertedToOrderId?: string | null
+    convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    revisions?: QuotationUncheckedCreateNestedManyWithoutParentQuotationInput
+    items?: QuotationItemUncheckedCreateNestedManyWithoutQuotationInput
+  }
+
+  export type QuotationCreateOrConnectWithoutParentQuotationInput = {
+    where: QuotationWhereUniqueInput
+    create: XOR<QuotationCreateWithoutParentQuotationInput, QuotationUncheckedCreateWithoutParentQuotationInput>
+  }
+
+  export type QuotationCreateManyParentQuotationInputEnvelope = {
+    data: QuotationCreateManyParentQuotationInput | QuotationCreateManyParentQuotationInput[]
+    skipDuplicates?: boolean
+  }
+
   export type QuotationItemCreateWithoutQuotationInput = {
     id?: string
     productId?: string | null
@@ -56059,6 +62615,167 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type QuotationUpsertWithoutRevisionsInput = {
+    update: XOR<QuotationUpdateWithoutRevisionsInput, QuotationUncheckedUpdateWithoutRevisionsInput>
+    create: XOR<QuotationCreateWithoutRevisionsInput, QuotationUncheckedCreateWithoutRevisionsInput>
+    where?: QuotationWhereInput
+  }
+
+  export type QuotationUpdateToOneWithWhereWithoutRevisionsInput = {
+    where?: QuotationWhereInput
+    data: XOR<QuotationUpdateWithoutRevisionsInput, QuotationUncheckedUpdateWithoutRevisionsInput>
+  }
+
+  export type QuotationUpdateWithoutRevisionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: StringFieldUpdateOperationsInput | string
+    contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    clientGst?: NullableStringFieldUpdateOperationsInput | string | null
+    clientAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    quotationDate?: StringFieldUpdateOperationsInput | string
+    validUntil?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    currency?: StringFieldUpdateOperationsInput | string
+    subtotal?: FloatFieldUpdateOperationsInput | number
+    discountType?: StringFieldUpdateOperationsInput | string
+    discountValue?: FloatFieldUpdateOperationsInput | number
+    discountAmount?: FloatFieldUpdateOperationsInput | number
+    taxAmount?: FloatFieldUpdateOperationsInput | number
+    grandTotal?: FloatFieldUpdateOperationsInput | number
+    paymentTerms?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    termsConditions?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerId?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    parentQuotation?: QuotationUpdateOneWithoutRevisionsNestedInput
+    items?: QuotationItemUpdateManyWithoutQuotationNestedInput
+  }
+
+  export type QuotationUncheckedUpdateWithoutRevisionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    parentQuotationId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: StringFieldUpdateOperationsInput | string
+    contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    clientGst?: NullableStringFieldUpdateOperationsInput | string | null
+    clientAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    quotationDate?: StringFieldUpdateOperationsInput | string
+    validUntil?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    currency?: StringFieldUpdateOperationsInput | string
+    subtotal?: FloatFieldUpdateOperationsInput | number
+    discountType?: StringFieldUpdateOperationsInput | string
+    discountValue?: FloatFieldUpdateOperationsInput | number
+    discountAmount?: FloatFieldUpdateOperationsInput | number
+    taxAmount?: FloatFieldUpdateOperationsInput | number
+    grandTotal?: FloatFieldUpdateOperationsInput | number
+    paymentTerms?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    termsConditions?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerId?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    items?: QuotationItemUncheckedUpdateManyWithoutQuotationNestedInput
+  }
+
+  export type QuotationUpsertWithWhereUniqueWithoutParentQuotationInput = {
+    where: QuotationWhereUniqueInput
+    update: XOR<QuotationUpdateWithoutParentQuotationInput, QuotationUncheckedUpdateWithoutParentQuotationInput>
+    create: XOR<QuotationCreateWithoutParentQuotationInput, QuotationUncheckedCreateWithoutParentQuotationInput>
+  }
+
+  export type QuotationUpdateWithWhereUniqueWithoutParentQuotationInput = {
+    where: QuotationWhereUniqueInput
+    data: XOR<QuotationUpdateWithoutParentQuotationInput, QuotationUncheckedUpdateWithoutParentQuotationInput>
+  }
+
+  export type QuotationUpdateManyWithWhereWithoutParentQuotationInput = {
+    where: QuotationScalarWhereInput
+    data: XOR<QuotationUpdateManyMutationInput, QuotationUncheckedUpdateManyWithoutParentQuotationInput>
+  }
+
+  export type QuotationScalarWhereInput = {
+    AND?: QuotationScalarWhereInput | QuotationScalarWhereInput[]
+    OR?: QuotationScalarWhereInput[]
+    NOT?: QuotationScalarWhereInput | QuotationScalarWhereInput[]
+    id?: StringFilter<"Quotation"> | string
+    quotationNumber?: StringFilter<"Quotation"> | string
+    originalQuotationNumber?: StringNullableFilter<"Quotation"> | string | null
+    version?: IntFilter<"Quotation"> | number
+    revisionNumber?: IntFilter<"Quotation"> | number
+    revisionName?: StringNullableFilter<"Quotation"> | string | null
+    isLatest?: BoolFilter<"Quotation"> | boolean
+    projectName?: StringNullableFilter<"Quotation"> | string | null
+    revisionNotes?: StringNullableFilter<"Quotation"> | string | null
+    parentQuotationId?: StringNullableFilter<"Quotation"> | string | null
+    contactId?: StringNullableFilter<"Quotation"> | string | null
+    contactName?: StringFilter<"Quotation"> | string
+    contactEmail?: StringNullableFilter<"Quotation"> | string | null
+    contactPhone?: StringNullableFilter<"Quotation"> | string | null
+    companyName?: StringNullableFilter<"Quotation"> | string | null
+    clientGst?: StringNullableFilter<"Quotation"> | string | null
+    clientAddress?: StringNullableFilter<"Quotation"> | string | null
+    leadId?: StringNullableFilter<"Quotation"> | string | null
+    quotationDate?: StringFilter<"Quotation"> | string
+    validUntil?: StringFilter<"Quotation"> | string
+    status?: StringFilter<"Quotation"> | string
+    currency?: StringFilter<"Quotation"> | string
+    subtotal?: FloatFilter<"Quotation"> | number
+    discountType?: StringFilter<"Quotation"> | string
+    discountValue?: FloatFilter<"Quotation"> | number
+    discountAmount?: FloatFilter<"Quotation"> | number
+    taxAmount?: FloatFilter<"Quotation"> | number
+    grandTotal?: FloatFilter<"Quotation"> | number
+    paymentTerms?: StringNullableFilter<"Quotation"> | string | null
+    notes?: StringNullableFilter<"Quotation"> | string | null
+    termsConditions?: StringNullableFilter<"Quotation"> | string | null
+    salesOwnerId?: StringNullableFilter<"Quotation"> | string | null
+    salesOwnerName?: StringNullableFilter<"Quotation"> | string | null
+    convertedToOrderId?: StringNullableFilter<"Quotation"> | string | null
+    convertedAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    sentAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    acceptedAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    supersededAt?: DateTimeNullableFilter<"Quotation"> | Date | string | null
+    createdAt?: DateTimeFilter<"Quotation"> | Date | string
+    updatedAt?: DateTimeFilter<"Quotation"> | Date | string
+  }
+
   export type QuotationItemUpsertWithWhereUniqueWithoutQuotationInput = {
     where: QuotationItemWhereUniqueInput
     update: XOR<QuotationItemUpdateWithoutQuotationInput, QuotationItemUncheckedUpdateWithoutQuotationInput>
@@ -56100,6 +62817,13 @@ export namespace Prisma {
   export type QuotationCreateWithoutItemsInput = {
     id?: string
     quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
     contactId?: string | null
     contactName: string
     contactEmail?: string | null
@@ -56125,13 +62849,26 @@ export namespace Prisma {
     salesOwnerName?: string | null
     convertedToOrderId?: string | null
     convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    parentQuotation?: QuotationCreateNestedOneWithoutRevisionsInput
+    revisions?: QuotationCreateNestedManyWithoutParentQuotationInput
   }
 
   export type QuotationUncheckedCreateWithoutItemsInput = {
     id?: string
     quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    parentQuotationId?: string | null
     contactId?: string | null
     contactName: string
     contactEmail?: string | null
@@ -56157,8 +62894,12 @@ export namespace Prisma {
     salesOwnerName?: string | null
     convertedToOrderId?: string | null
     convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    revisions?: QuotationUncheckedCreateNestedManyWithoutParentQuotationInput
   }
 
   export type QuotationCreateOrConnectWithoutItemsInput = {
@@ -56180,6 +62921,13 @@ export namespace Prisma {
   export type QuotationUpdateWithoutItemsInput = {
     id?: StringFieldUpdateOperationsInput | string
     quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
     contactId?: NullableStringFieldUpdateOperationsInput | string | null
     contactName?: StringFieldUpdateOperationsInput | string
     contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
@@ -56205,13 +62953,26 @@ export namespace Prisma {
     salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
     convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
     convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    parentQuotation?: QuotationUpdateOneWithoutRevisionsNestedInput
+    revisions?: QuotationUpdateManyWithoutParentQuotationNestedInput
   }
 
   export type QuotationUncheckedUpdateWithoutItemsInput = {
     id?: StringFieldUpdateOperationsInput | string
     quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    parentQuotationId?: NullableStringFieldUpdateOperationsInput | string | null
     contactId?: NullableStringFieldUpdateOperationsInput | string | null
     contactName?: StringFieldUpdateOperationsInput | string
     contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
@@ -56237,8 +62998,12 @@ export namespace Prisma {
     salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
     convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
     convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    revisions?: QuotationUncheckedUpdateManyWithoutParentQuotationNestedInput
   }
 
   export type ProposalItemCreateWithoutProposalInput = {
@@ -57779,6 +64544,7 @@ export namespace Prisma {
     canDelete?: boolean
     canExport?: boolean
     canApprove?: boolean
+    dataScope?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -57847,6 +64613,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -57862,6 +64629,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -57877,6 +64645,7 @@ export namespace Prisma {
     canDelete?: BoolFieldUpdateOperationsInput | boolean
     canExport?: BoolFieldUpdateOperationsInput | boolean
     canApprove?: BoolFieldUpdateOperationsInput | boolean
+    dataScope?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -57923,6 +64692,48 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type QuotationCreateManyParentQuotationInput = {
+    id?: string
+    quotationNumber: string
+    originalQuotationNumber?: string | null
+    version?: number
+    revisionNumber?: number
+    revisionName?: string | null
+    isLatest?: boolean
+    projectName?: string | null
+    revisionNotes?: string | null
+    contactId?: string | null
+    contactName: string
+    contactEmail?: string | null
+    contactPhone?: string | null
+    companyName?: string | null
+    clientGst?: string | null
+    clientAddress?: string | null
+    leadId?: string | null
+    quotationDate: string
+    validUntil: string
+    status?: string
+    currency?: string
+    subtotal?: number
+    discountType?: string
+    discountValue?: number
+    discountAmount?: number
+    taxAmount?: number
+    grandTotal?: number
+    paymentTerms?: string | null
+    notes?: string | null
+    termsConditions?: string | null
+    salesOwnerId?: string | null
+    salesOwnerName?: string | null
+    convertedToOrderId?: string | null
+    convertedAt?: Date | string | null
+    sentAt?: Date | string | null
+    acceptedAt?: Date | string | null
+    supersededAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type QuotationItemCreateManyQuotationInput = {
     id?: string
     productId?: string | null
@@ -57939,6 +64750,136 @@ export namespace Prisma {
     totalAmount?: number
     createdAt?: Date | string
     updatedAt?: Date | string
+  }
+
+  export type QuotationUpdateWithoutParentQuotationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: StringFieldUpdateOperationsInput | string
+    contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    clientGst?: NullableStringFieldUpdateOperationsInput | string | null
+    clientAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    quotationDate?: StringFieldUpdateOperationsInput | string
+    validUntil?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    currency?: StringFieldUpdateOperationsInput | string
+    subtotal?: FloatFieldUpdateOperationsInput | number
+    discountType?: StringFieldUpdateOperationsInput | string
+    discountValue?: FloatFieldUpdateOperationsInput | number
+    discountAmount?: FloatFieldUpdateOperationsInput | number
+    taxAmount?: FloatFieldUpdateOperationsInput | number
+    grandTotal?: FloatFieldUpdateOperationsInput | number
+    paymentTerms?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    termsConditions?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerId?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    revisions?: QuotationUpdateManyWithoutParentQuotationNestedInput
+    items?: QuotationItemUpdateManyWithoutQuotationNestedInput
+  }
+
+  export type QuotationUncheckedUpdateWithoutParentQuotationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: StringFieldUpdateOperationsInput | string
+    contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    clientGst?: NullableStringFieldUpdateOperationsInput | string | null
+    clientAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    quotationDate?: StringFieldUpdateOperationsInput | string
+    validUntil?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    currency?: StringFieldUpdateOperationsInput | string
+    subtotal?: FloatFieldUpdateOperationsInput | number
+    discountType?: StringFieldUpdateOperationsInput | string
+    discountValue?: FloatFieldUpdateOperationsInput | number
+    discountAmount?: FloatFieldUpdateOperationsInput | number
+    taxAmount?: FloatFieldUpdateOperationsInput | number
+    grandTotal?: FloatFieldUpdateOperationsInput | number
+    paymentTerms?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    termsConditions?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerId?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    revisions?: QuotationUncheckedUpdateManyWithoutParentQuotationNestedInput
+    items?: QuotationItemUncheckedUpdateManyWithoutQuotationNestedInput
+  }
+
+  export type QuotationUncheckedUpdateManyWithoutParentQuotationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    quotationNumber?: StringFieldUpdateOperationsInput | string
+    originalQuotationNumber?: NullableStringFieldUpdateOperationsInput | string | null
+    version?: IntFieldUpdateOperationsInput | number
+    revisionNumber?: IntFieldUpdateOperationsInput | number
+    revisionName?: NullableStringFieldUpdateOperationsInput | string | null
+    isLatest?: BoolFieldUpdateOperationsInput | boolean
+    projectName?: NullableStringFieldUpdateOperationsInput | string | null
+    revisionNotes?: NullableStringFieldUpdateOperationsInput | string | null
+    contactId?: NullableStringFieldUpdateOperationsInput | string | null
+    contactName?: StringFieldUpdateOperationsInput | string
+    contactEmail?: NullableStringFieldUpdateOperationsInput | string | null
+    contactPhone?: NullableStringFieldUpdateOperationsInput | string | null
+    companyName?: NullableStringFieldUpdateOperationsInput | string | null
+    clientGst?: NullableStringFieldUpdateOperationsInput | string | null
+    clientAddress?: NullableStringFieldUpdateOperationsInput | string | null
+    leadId?: NullableStringFieldUpdateOperationsInput | string | null
+    quotationDate?: StringFieldUpdateOperationsInput | string
+    validUntil?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    currency?: StringFieldUpdateOperationsInput | string
+    subtotal?: FloatFieldUpdateOperationsInput | number
+    discountType?: StringFieldUpdateOperationsInput | string
+    discountValue?: FloatFieldUpdateOperationsInput | number
+    discountAmount?: FloatFieldUpdateOperationsInput | number
+    taxAmount?: FloatFieldUpdateOperationsInput | number
+    grandTotal?: FloatFieldUpdateOperationsInput | number
+    paymentTerms?: NullableStringFieldUpdateOperationsInput | string | null
+    notes?: NullableStringFieldUpdateOperationsInput | string | null
+    termsConditions?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerId?: NullableStringFieldUpdateOperationsInput | string | null
+    salesOwnerName?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedToOrderId?: NullableStringFieldUpdateOperationsInput | string | null
+    convertedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    sentAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    acceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    supersededAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type QuotationItemUpdateWithoutQuotationInput = {

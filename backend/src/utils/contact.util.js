@@ -25,9 +25,65 @@ export function buildContactFilterQuery(queryParams = {}) {
     priority,
     assignedTo,
     assignmentStatus,
+    tab,
+    section,
   } = queryParams;
 
   const andConditions = [];
+
+  const activeTabUpper = String(tab || section || '').toUpperCase().trim();
+  if (activeTabUpper === 'NEW') {
+    // 1. Exclude Bulk Import contacts
+    andConditions.push({
+      NOT: [
+        { source: { in: ['Bulk Import', 'Import', 'bulk import', 'import'] } },
+        { contactId: { startsWith: 'BLK-' } },
+      ],
+    });
+    andConditions.push({
+      OR: [
+        { internalReference: null },
+        { NOT: { internalReference: { startsWith: 'BLK-' } } },
+      ],
+    });
+    // 2. Exclude Qualified contacts (they belong in Qualification tab)
+    andConditions.push({
+      NOT: [
+        { status: { in: ['Qualified', 'qualified'] } },
+        { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+      ],
+    });
+    // 3. Exclude Not Interested contacts
+    andConditions.push({
+      NOT: [
+        { status: { in: ['Not Interested', 'not interested'] } },
+        { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
+      ],
+    });
+  } else if (activeTabUpper === 'ASSIGNED' || activeTabUpper === 'QUALIFICATION') {
+    // 1. Must be Qualified
+    andConditions.push({
+      OR: [
+        { status: { in: ['Qualified', 'qualified'] } },
+        { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+      ],
+    });
+    // 2. Exclude Not Interested
+    andConditions.push({
+      NOT: [
+        { status: { in: ['Not Interested', 'not interested'] } },
+        { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
+      ],
+    });
+  } else if (activeTabUpper === 'BULK_IMPORT') {
+    andConditions.push({
+      OR: [
+        { source: { in: ['Bulk Import', 'Import', 'bulk import', 'import'] } },
+        { contactId: { startsWith: 'BLK-' } },
+        { internalReference: { startsWith: 'BLK-' } },
+      ],
+    });
+  }
 
   if (companyName && companyName !== 'All' && companyName.trim() !== '') {
     andConditions.push({ companyName: { equals: companyName.trim(), mode: 'insensitive' } });
@@ -39,7 +95,17 @@ export function buildContactFilterQuery(queryParams = {}) {
     andConditions.push({ category: { equals: category.trim(), mode: 'insensitive' } });
   }
   if (source && source !== 'All' && source.trim() !== '') {
-    andConditions.push({ source: { equals: source.trim(), mode: 'insensitive' } });
+    const s = source.trim();
+    if (s.toLowerCase() === 'bulk import' || s.toLowerCase() === 'import') {
+      andConditions.push({
+        OR: [
+          { source: { equals: 'Bulk Import', mode: 'insensitive' } },
+          { source: { equals: 'Import', mode: 'insensitive' } },
+        ],
+      });
+    } else {
+      andConditions.push({ source: { equals: s, mode: 'insensitive' } });
+    }
   }
   if (status && status !== 'All' && status.trim() !== '') {
     const s = status.trim();
@@ -66,15 +132,14 @@ export function buildContactFilterQuery(queryParams = {}) {
     andConditions.push({ priority: { equals: priority.trim(), mode: 'insensitive' } });
   }
   if (assignedTo && assignedTo !== 'All') {
-    andConditions.push({
-      OR: [
-        { assignedTo },
-        { assignedToName: { equals: assignedTo, mode: 'insensitive' } },
-      ],
-    });
-  }
-  if (assignmentStatus && assignmentStatus !== 'All') {
-    if (assignmentStatus === 'Unassigned') {
+    if (assignedTo.toLowerCase() === 'assigned') {
+      andConditions.push({
+        OR: [
+          { assignmentStatus: 'Assigned' },
+          { AND: [{ assignedTo: { not: null } }, { assignedTo: { not: '' } }, { assignedTo: { not: 'none' } }] },
+        ],
+      });
+    } else if (assignedTo.toLowerCase() === 'unassigned') {
       andConditions.push({
         OR: [
           { assignmentStatus: 'Unassigned' },
@@ -84,13 +149,49 @@ export function buildContactFilterQuery(queryParams = {}) {
           { assignedTo: 'none' },
         ],
       });
-    } else if (assignmentStatus === 'Assigned') {
+    } else {
+      andConditions.push({
+        OR: [
+          { assignedTo: { equals: assignedTo, mode: 'insensitive' } },
+          { assignedToName: { equals: assignedTo, mode: 'insensitive' } },
+          { createdBy: { equals: assignedTo, mode: 'insensitive' } },
+        ],
+      });
+    }
+  }
+  if (assignmentStatus && assignmentStatus !== 'All') {
+    if (assignmentStatus === 'Unassigned') {
       andConditions.push({
         AND: [
-          { assignmentStatus: 'Assigned' },
-          { assignedTo: { not: null } },
-          { assignedTo: { not: '' } },
-          { assignedTo: { not: 'none' } },
+          {
+            OR: [
+              { assignmentStatus: 'Unassigned' },
+              { assignmentStatus: null },
+              { assignedTo: null },
+              { assignedTo: '' },
+              { assignedTo: 'none' },
+            ],
+          },
+          {
+            status: { notIn: ['Qualified', 'qualified', 'Disqualified', 'disqualified', 'Unqualified', 'unqualified'] },
+          },
+          {
+            OR: [
+              { qualificationStatus: 'New' },
+              { qualificationStatus: null },
+              { qualificationStatus: '' },
+            ],
+          },
+          {
+            stage: { not: 'Qualification' },
+          },
+        ],
+      });
+    } else if (assignmentStatus === 'Assigned') {
+      andConditions.push({
+        OR: [
+          { status: { in: ['Qualified', 'qualified'] } },
+          { qualificationStatus: { in: ['Qualified', 'qualified'] } },
         ],
       });
     }
@@ -121,8 +222,18 @@ export function buildContactFilterQuery(queryParams = {}) {
  */
 export function formatContactResponse(contact) {
   if (!contact) return null;
+  const loc = contact.location || contact.city || contact.street || contact.address || null;
+  const contactPriority = (contact.priority || contact.tagPriority || 'Medium').trim();
   return {
     ...contact,
+    tagPriority: contactPriority,
+    priority: contactPriority,
+    location: loc,
+    city: contact.city || loc,
+    street: contact.street || loc,
+    address: contact.address || loc,
+    website: contact.website || contact.companyWebsite || null,
+    companyWebsite: contact.companyWebsite || contact.website || null,
     displayCompany: contact.companyName || contact.profession || 'Individual',
     isAssigned: Boolean(contact.assignedTo && contact.assignedTo !== 'none'),
   };

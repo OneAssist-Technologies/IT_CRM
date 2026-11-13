@@ -30,6 +30,10 @@ import { useEmployee } from '../../context/EmployeeContext';
 import { usePermissions } from '../../context/AccessControlContext';
 import { LeadTableView } from './components/LeadTableView';
 import { LeadModal } from './components/LeadModal';
+import { ContactModal } from '../contacts/components/ContactModal';
+import { useContact } from '../../context/ContactContext';
+import { contactService } from '../../services/contactService';
+import { Contact } from '../../types/contact';
 import {
   DateFilterControl,
   DateFilterValue,
@@ -46,6 +50,10 @@ export const LeadsPage: React.FC = () => {
   const { currentUser } = useCRM();
   const { employees } = useEmployee();
   const { isSuperAdmin } = usePermissions();
+  const { contacts, fetchContacts } = useContact();
+
+  const [updateLogsModalOpened, setUpdateLogsModalOpened] = useState(false);
+  const [selectedContactForLogs, setSelectedContactForLogs] = useState<Contact | null>(null);
 
   const canFilterAssignee = Boolean(
     isSuperAdmin ||
@@ -105,8 +113,16 @@ export const LeadsPage: React.FC = () => {
       fetchStats();
     };
     window.addEventListener('crm_leads_updated', handleUpdated);
+    window.addEventListener('crm_meetings_updated', handleUpdated);
+    window.addEventListener('crm:meeting-updated', handleUpdated);
+    window.addEventListener('crm_activities_updated', handleUpdated);
+    window.addEventListener('crm_call_logs_updated', handleUpdated);
     return () => {
       window.removeEventListener('crm_leads_updated', handleUpdated);
+      window.removeEventListener('crm_meetings_updated', handleUpdated);
+      window.removeEventListener('crm:meeting-updated', handleUpdated);
+      window.removeEventListener('crm_activities_updated', handleUpdated);
+      window.removeEventListener('crm_call_logs_updated', handleUpdated);
     };
   }, [fetchLeads, fetchStats]);
   const [modalOpened, setModalOpened] = useState<boolean>(false);
@@ -169,6 +185,69 @@ export const LeadsPage: React.FC = () => {
   const handleOpenEditModal = (lead: Lead) => {
     setSelectedLeadForEdit(lead);
     setModalOpened(true);
+  };
+
+  const handleOpenUpdateLead = async (lead: Lead) => {
+    const cleanPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
+    const cleanEmail = lead.email ? lead.email.toLowerCase().trim() : '';
+
+    let matchedContact = (contacts || []).find((c) => {
+      if (cleanEmail && c.email && c.email.toLowerCase().trim() === cleanEmail) return true;
+      if (cleanPhone && c.phone && c.phone.replace(/\D/g, '') === cleanPhone) return true;
+      if (c.id === lead.id || c.contactId === lead.leadId) return true;
+      return false;
+    });
+
+    if (!matchedContact && (cleanPhone || cleanEmail || lead.id)) {
+      try {
+        const res = await contactService.getContactById(lead.id || lead.leadId || cleanPhone || cleanEmail);
+        if (res?.success && res.data) {
+          matchedContact = res.data;
+        }
+      } catch {}
+    }
+
+    const contactData: Contact = {
+      id: matchedContact?.id || lead.id,
+      contactId: matchedContact?.contactId || lead.leadId || lead.id,
+      bulkId: matchedContact?.bulkId || null,
+      batchId: matchedContact?.batchId || null,
+      importedContactId: matchedContact?.importedContactId || null,
+      isImportedToContact: matchedContact?.isImportedToContact || null,
+      name: lead.name,
+      email: lead.email || null,
+      phone: lead.phone || '',
+      companyName: lead.companyName || null,
+      contactPerson: lead.name || null,
+      address: lead.address || null,
+      location: lead.address || null,
+      source: lead.source || 'Lead',
+      category: (lead.category as any) || 'Product',
+      status: (lead.status as any) || 'Qualified',
+      stage: (lead.stage as any) || 'Qualification',
+
+
+      assignedTo: lead.assignedTo || null,
+      assignedToName: lead.assignedToName || null,
+      description: (matchedContact as any)?.description || lead.notes || '',
+      remarks: (matchedContact as any)?.remarks || lead.notes || '',
+      notes: lead.notes || '',
+      contactMode: (matchedContact as any)?.contactMode || null,
+      ...(matchedContact || {}),
+      designation: lead.designation || matchedContact?.designation || (lead as any).profession || (matchedContact as any)?.profession || null,
+      profession: lead.profession || matchedContact?.profession || lead.designation || matchedContact?.designation || null,
+      priority: (lead.priority || (lead as any).tag || matchedContact?.priority || 'Medium') as any,
+      tagPriority: (lead.priority || (lead as any).tag || matchedContact?.priority || 'Medium') as any,
+
+
+      productList: matchedContact?.productList || lead.productList || [],
+      serviceList: matchedContact?.serviceList || lead.serviceList || [],
+      leadId: lead.id,
+      leadCode: lead.leadId || lead.id,
+    } as any;
+
+    setSelectedContactForLogs(contactData);
+    setUpdateLogsModalOpened(true);
   };
 
   const handleConfirmDelete = async () => {
@@ -586,6 +665,7 @@ export const LeadsPage: React.FC = () => {
       <LeadTableView
         leads={filteredLeads}
         onEdit={handleOpenEditModal}
+        onUpdateLead={handleOpenUpdateLead}
         onDelete={(lead) => setDeleteTarget(lead)}
         onAddNew={handleOpenAddModal}
         loading={loading}
@@ -672,6 +752,23 @@ export const LeadsPage: React.FC = () => {
         opened={modalOpened}
         onClose={() => setModalOpened(false)}
         lead={selectedLeadForEdit}
+      />
+
+      {/* Update Logs (ContactModal) for Lead */}
+      <ContactModal
+        opened={updateLogsModalOpened}
+        onClose={() => {
+          setUpdateLogsModalOpened(false);
+          setSelectedContactForLogs(null);
+        }}
+        contact={selectedContactForLogs}
+        title="Update logs"
+        showContactMode={true}
+        onSuccess={async () => {
+          setUpdateLogsModalOpened(false);
+          setSelectedContactForLogs(null);
+          await Promise.all([fetchLeads(), fetchStats(), fetchContacts?.()]);
+        }}
       />
 
       {/* Delete Confirmation Modal */}

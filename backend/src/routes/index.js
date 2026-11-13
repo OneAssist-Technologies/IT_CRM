@@ -13,6 +13,8 @@ import customerRouter from './customer.routes.js';
 import billingRouter, { invoiceRouter } from './invoice.routes.js';
 import crmRouter from './crm.routes.js';
 import settingsRouter from './settings.routes.js';
+import activityRouter from './activity.routes.js';
+import supportTicketRouter from './supportTicket.routes.js';
 
 const apiRouter = Router();
 
@@ -26,10 +28,13 @@ apiRouter.use('/leads', leadRouter);
 apiRouter.use('/tasks', taskRouter);
 apiRouter.use('/meetings', meetingRouter);
 apiRouter.use('/call-logs', callLogRouter);
+apiRouter.use('/activity-logs', callLogRouter);
 apiRouter.use('/customers', customerRouter);
 apiRouter.use('/billing', billingRouter);
 apiRouter.use('/invoices', invoiceRouter);
 apiRouter.use('/settings', settingsRouter);
+apiRouter.use('/activities', activityRouter);
+apiRouter.use('/support-tickets', supportTicketRouter);
 apiRouter.use('/', crmRouter);
 
 export default apiRouter;
@@ -48,4 +53,6 @@ export {
   billingRouter,
   crmRouter,
   settingsRouter,
+  activityRouter,
+  supportTicketRouter,
 };

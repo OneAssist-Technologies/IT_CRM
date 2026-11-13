@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../../meetings/components/MeetingDatePicker';
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -282,13 +283,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, sm: 6 }}>
-                <TextInput
+                <MeetingDatePicker
                   label="Payment Date"
-                  type="date"
+                  placeholder="DD-MM-YYYY"
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.currentTarget.value)}
+                  onChange={(val: string) => setPaymentDate(val)}
                   required
-                  radius="md"
+                  zIndex={3000}
                 />
               </Grid.Col>
               <Grid.Col span={{ base: 12, sm: 4 }}>

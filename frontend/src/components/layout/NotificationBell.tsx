@@ -89,7 +89,9 @@ export const NotificationBell: React.FC = () => {
     }
   });
 
-  const pillBg = isDark ? '#1E293B' : '#F5F8FA';
+  const pillBg = isDark ? 'rgba(30, 41, 59, 0.7)' : '#FFFFFF';
+  const pillBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(226, 232, 240, 0.9)';
+  const pillShadow = isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.04)';
   const textColor = isDark ? '#F8FAFC' : '#0F172A';
   const subtextColor = isDark ? '#94A3B8' : '#64748B';
 
@@ -613,8 +615,9 @@ export const NotificationBell: React.FC = () => {
               radius="100px"
               style={{
                 background: pillBg,
-                border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(15, 23, 42, 0.08)',
-                color: unreadCount > 0 ? '#4F46E5' : textColor,
+                border: `1px solid ${pillBorder}`,
+                boxShadow: pillShadow,
+                color: unreadCount > 0 ? '#0066FF' : textColor,
                 width: 38,
                 height: 38,
                 transition: 'all 0.15s ease',
@@ -694,9 +697,9 @@ export const NotificationBell: React.FC = () => {
               style={{
                 borderRadius: 10,
                 background: isDark
-                  ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.16) 0%, rgba(59, 130, 246, 0.16) 100%)'
-                  : 'linear-gradient(135deg, #EEF2FF 0%, #EFF6FF 100%)',
-                border: isDark ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid #C7D2FE',
+                  ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(59, 130, 246, 0.16) 100%)'
+                  : 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                border: isDark ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid #BFDBFE',
               }}
             >
               <Group justify="space-between" align="center" wrap="nowrap">
@@ -706,7 +709,7 @@ export const NotificationBell: React.FC = () => {
                       width: 26,
                       height: 26,
                       borderRadius: 8,
-                      background: '#4F46E5',
+                      background: 'var(--crm-primary, #2563EB)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',

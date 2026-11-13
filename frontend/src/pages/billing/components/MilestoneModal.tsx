@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../../meetings/components/MeetingDatePicker';
 import React, { useState, useEffect } from 'react';
 import {
   Modal,
@@ -287,12 +288,12 @@ export const MilestoneModal: React.FC<MilestoneModalProps> = ({
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 4 }}>
-              <TextInput
+              <MeetingDatePicker
                 label="Due Date"
-                type="date"
+                placeholder="DD-MM-YYYY"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.currentTarget.value)}
-                radius="md"
+                onChange={(val: string) => setDueDate(val)}
+                zIndex={3000}
               />
             </Grid.Col>
             <Grid.Col span={12}>

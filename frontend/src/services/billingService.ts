@@ -11,7 +11,9 @@ import {
   BillingAuditLog,
 } from '../types/billing';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/billing';
+import { API_BASE_URL } from '../config/env';
+
+const API_BASE = `${API_BASE_URL}/billing`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;
@@ -52,20 +54,26 @@ export const billingService = {
   deleteProduct: (id: string) =>
     request<null>(`/products-services/${id}`, { method: 'DELETE' }),
 
-  // 3. Quotations
-  getQuotations: (params?: { search?: string; status?: string; contactId?: string; leadId?: string }) => {
+  // 3. Quotations & Revisions
+  getQuotations: (params?: { search?: string; status?: string; contactId?: string; leadId?: string; flat?: boolean }) => {
     const q = new URLSearchParams();
     if (params?.search) q.append('search', params.search);
     if (params?.status && params.status !== 'All') q.append('status', params.status);
     if (params?.contactId && params.contactId !== 'All') q.append('contactId', params.contactId);
     if (params?.leadId && params.leadId !== 'All') q.append('leadId', params.leadId);
+    if (params?.flat) q.append('flat', 'true');
     return request<Quotation[]>(`/quotations?${q.toString()}`);
   },
   getQuotationById: (id: string) => request<Quotation>(`/quotations/${id}`),
+  getQuotationRevisions: (id: string) => request<Quotation[]>(`/quotations/${id}/revisions`),
   createQuotation: (data: Partial<Quotation>) =>
     request<Quotation>('/quotations', { method: 'POST', body: JSON.stringify(data) }),
+  createQuotationRevision: (id: string, data?: Partial<Quotation>) =>
+    request<Quotation>(`/quotations/${id}/revise`, { method: 'POST', body: JSON.stringify(data || {}) }),
   updateQuotation: (id: string, data: Partial<Quotation>) =>
     request<Quotation>(`/quotations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateQuotationStatus: (id: string, status: string, notes?: string) =>
+    request<Quotation>(`/quotations/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, notes }) }),
   deleteQuotation: (id: string) =>
     request<null>(`/quotations/${id}`, { method: 'DELETE' }),
   convertQuotationToOrder: (id: string, data?: { billingMethod?: string; startDate?: string; endDate?: string }) =>

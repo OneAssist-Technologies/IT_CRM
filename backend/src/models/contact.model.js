@@ -77,6 +77,8 @@ export class ContactModel {
       dbQualificationStatuses,
       dbContacts,
       dbLeads,
+      dbBillingProducts,
+      dbMasterProjects,
     ] = await Promise.all([
       prisma.contact.findMany({ select: { source: true }, distinct: ['source'] }),
       prisma.contact.findMany({ select: { status: true }, distinct: ['status'] }),
@@ -91,10 +93,49 @@ export class ContactModel {
       prisma.lead.findMany({
         select: { productList: true, serviceList: true, category: true },
       }),
+      prisma.billingProduct.findMany({
+        where: { status: 'Active' },
+        select: { name: true, type: true, modules: true },
+      }),
+      prisma.masterProject.findMany({
+        where: { status: 'Active' },
+        select: { name: true, category: true, modules: true },
+      }),
     ]);
 
-    const dynamicProducts = new Set();
-    const dynamicServices = new Set();
+    const catalogProducts = new Set();
+    const catalogServices = new Set();
+
+    dbBillingProducts.forEach((bp) => {
+      if (bp.name) {
+        if (bp.type === 'Service') {
+          catalogServices.add(bp.name.trim());
+        } else {
+          catalogProducts.add(bp.name.trim());
+        }
+      }
+      if (Array.isArray(bp.modules)) {
+        bp.modules.forEach((m) => {
+          const mName = typeof m === 'string' ? m : m?.name;
+          if (mName) catalogServices.add(mName.trim());
+        });
+      }
+    });
+
+    dbMasterProjects.forEach((mp) => {
+      if (mp.name) {
+        catalogProducts.add(mp.name.trim());
+      }
+      if (Array.isArray(mp.modules)) {
+        mp.modules.forEach((m) => {
+          const mName = typeof m === 'string' ? m : m?.name;
+          if (mName) catalogServices.add(mName.trim());
+        });
+      }
+    });
+
+    const dynamicProducts = new Set([...catalogProducts]);
+    const dynamicServices = new Set([...catalogServices]);
 
     dbContacts.forEach((c) => {
       if (Array.isArray(c.productList)) c.productList.forEach((p) => p && dynamicProducts.add(p.trim()));
@@ -135,6 +176,8 @@ export class ContactModel {
       contactTypes,
       priorities,
       qualificationStatuses,
+      catalogProducts: Array.from(catalogProducts).filter(Boolean),
+      catalogServices: Array.from(catalogServices).filter(Boolean),
       productOptions: Array.from(dynamicProducts).filter(Boolean),
       serviceOptions: Array.from(dynamicServices).filter(Boolean),
       // Verified Odoo Dropdown Options

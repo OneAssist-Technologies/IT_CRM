@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
-import { Box, Container, Drawer, Paper, Text, Button } from '@mantine/core';
+import React from 'react';
+import { Box, Container, Drawer, Paper, Text, Button, useComputedColorScheme } from '@mantine/core';
 import { IconShieldLock } from '@tabler/icons-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { AnimatedCanvasBackdrop } from '../common/AnimatedCanvasBackdrop';
 import { useCRM } from '../../context/CRMContext';
 import { usePermissions } from '../../context/AccessControlContext';
 import { DashboardPage } from '../../pages/DashboardPage';
@@ -20,7 +21,10 @@ import { BillingPage } from '../../pages/billing';
 import { InvoicesPage, CreateInvoicePage, InvoiceDetailsPage } from '../../pages/invoices';
 import { Invoice } from '../../types/billing';
 import { LeadNegotiationSection, LeadContractSection } from '../../pages/leads/components/LeadDealSections';
-import { AuthPage, SignupPage, LoginPage } from '../../pages/auth';
+import { AuthPage, SignupPage, LoginPage, ResetPasswordPage } from '../../pages/auth';
+import { ActivityTimelinePage } from '../../pages/activity-timeline';
+import { TicketsPage, TicketDetailsPage } from '../../pages/support-tickets';
+import { SupportTicketProvider } from '../../context/SupportTicketContext';
 import { useContact } from '../../context/ContactContext';
 import { useLead } from '../../context/LeadContext';
 import { useProject } from '../../context/ProjectContext';
@@ -57,7 +61,9 @@ const AccessRestrictedView: React.FC<{ moduleName: string; onGoAllowed: () => vo
 );
 
 export const AppLayout: React.FC = () => {
-  const { activeNav, setActiveNav, sidebarMobileOpened, setSidebarMobileOpened } = useCRM();
+  const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
+  const isDark = computedColorScheme === 'dark';
+  const { activeNav, setActiveNav, sidebarMobileOpened, setSidebarMobileOpened, sidebarCollapsed } = useCRM();
   const { selectedContact, deleteContact } = useContact();
   const { isSuperAdmin, can } = usePermissions();
   const { selectedLead } = useLead();
@@ -65,6 +71,46 @@ export const AppLayout: React.FC = () => {
   const { selectedCustomer, setSelectedCustomer, customers, deleteCustomer: deleteCust } = useCustomer();
   const [selectedInvoice, setSelectedInvoice] = React.useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = React.useState<Invoice | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(null);
+
+  const findFirstAllowedNav = React.useCallback((): string => {
+    const candidateModules: { nav: string; id: string }[] = [
+      { nav: 'dashboard', id: 'dashboard' },
+      { nav: 'employee-dashboard', id: 'employee_dashboard' },
+      { nav: 'contacts', id: 'contacts' },
+      { nav: 'leads', id: 'leads' },
+      { nav: 'scheduled-meetings', id: 'scheduled_meetings' },
+      { nav: 'call-logs', id: 'call_logs' },
+      { nav: 'customers', id: 'customers' },
+      { nav: 'projects', id: 'projects' },
+      { nav: 'support-tickets', id: 'support_tickets' },
+      { nav: 'negotiations', id: 'negotiations' },
+      { nav: 'invoices', id: 'invoices' },
+      { nav: 'activity-timeline', id: 'activity_timeline' },
+      { nav: 'employees', id: 'employee_management' },
+      { nav: 'access-control', id: 'access_control' },
+      { nav: 'settings', id: 'settings' },
+    ];
+    for (const m of candidateModules) {
+      if (can(m.id, 'view')) return m.nav;
+    }
+    return isSuperAdmin ? 'dashboard' : 'employee-dashboard';
+  }, [can, isSuperAdmin]);
+
+  // Automatically redirect non-admin users to Employee Dashboard or their first permitted screen
+  // (MUST be called before any conditional return to satisfy Rules of Hooks)
+  React.useEffect(() => {
+    if (activeNav === 'dashboard' && !isSuperAdmin && !can('dashboard', 'view')) {
+      if (can('employee_dashboard', 'view')) {
+        setActiveNav('employee-dashboard');
+      } else {
+        const allowed = findFirstAllowedNav();
+        if (allowed && allowed !== 'dashboard') {
+          setActiveNav(allowed);
+        }
+      }
+    }
+  }, [activeNav, isSuperAdmin, can, findFirstAllowedNav]);
 
   if (activeNav === 'signup') {
     return (
@@ -78,8 +124,25 @@ export const AppLayout: React.FC = () => {
   if (activeNav === 'login') {
     return (
       <LoginPage
-        onSuccess={() => setActiveNav('dashboard')}
+        onSuccess={() => {
+          if (isSuperAdmin || can('dashboard', 'view')) {
+            setActiveNav('dashboard');
+          } else if (can('employee_dashboard', 'view')) {
+            setActiveNav('employee-dashboard');
+          } else {
+            setActiveNav(findFirstAllowedNav());
+          }
+        }}
         onSwitchToSignup={() => setActiveNav('signup')}
+      />
+    );
+  }
+
+  if (activeNav === 'reset-password') {
+    return (
+      <ResetPasswordPage
+        onSuccess={() => setActiveNav('login')}
+        onBackToLogin={() => setActiveNav('login')}
       />
     );
   }
@@ -88,32 +151,13 @@ export const AppLayout: React.FC = () => {
     return <AuthPage onSuccess={() => setActiveNav('dashboard')} />;
   }
 
-  const findFirstAllowedNav = (): string => {
-    const candidateModules: { nav: string; id: string }[] = [
-      { nav: 'dashboard', id: 'dashboard' },
-      { nav: 'employee-dashboard', id: 'employee_dashboard' },
-      { nav: 'contacts', id: 'contacts' },
-      { nav: 'leads', id: 'leads' },
-      { nav: 'scheduled-meetings', id: 'scheduled_meetings' },
-      { nav: 'call-logs', id: 'call_logs' },
-      { nav: 'customers', id: 'customers' },
-      { nav: 'projects', id: 'projects' },
-      { nav: 'negotiations', id: 'negotiations' },
-      { nav: 'invoices', id: 'invoices' },
-      { nav: 'employees', id: 'employee_management' },
-      { nav: 'access-control', id: 'access_control' },
-      { nav: 'settings', id: 'settings' },
-    ];
-    for (const m of candidateModules) {
-      if (can(m.id, 'view')) return m.nav;
-    }
-    return 'dashboard';
-  };
-
   const renderActiveScreen = () => {
     switch (activeNav) {
       case 'dashboard':
         if (!can('dashboard', 'view') && !isSuperAdmin) {
+          if (can('employee_dashboard', 'view')) {
+            return <EmployeeDashboard onNavigate={(nav) => setActiveNav(nav)} />;
+          }
           return (
             <AccessRestrictedView
               moduleName="Dashboard"
@@ -171,6 +215,7 @@ export const AppLayout: React.FC = () => {
         );
       }
       case 'contacts':
+      case 'contact':
         if (!can('contacts', 'view')) {
           return (
             <AccessRestrictedView
@@ -196,21 +241,33 @@ export const AppLayout: React.FC = () => {
       case 'leads/schedule':
       case 'schedule-meeting': {
         let activeLead = selectedLead;
-        if (!activeLead && typeof window !== 'undefined') {
+        let navSource: string | null = null;
+        if (typeof window !== 'undefined') {
           try {
-            const saved = sessionStorage.getItem('crm_selected_lead');
-            if (saved) activeLead = JSON.parse(saved);
+            if (!activeLead) {
+              const saved = sessionStorage.getItem('crm_selected_lead');
+              if (saved) activeLead = JSON.parse(saved);
+            }
+            navSource = sessionStorage.getItem('crm_lead_nav_source');
           } catch (e) {}
         }
+        const handleBackFromSchedule = () => {
+          if (navSource === 'activity-timeline') {
+            setActiveNav('activity-timeline');
+          } else {
+            setActiveNav('leads');
+          }
+        };
         return (
           <LeadSchedulePage
             lead={activeLead}
-            onBack={() => setActiveNav('leads')}
-            onSuccess={() => setActiveNav('leads')}
+            onBack={handleBackFromSchedule}
+            onSuccess={handleBackFromSchedule}
           />
         );
       }
       case 'add-contact':
+      case 'contact/add':
       case 'contacts/add': {
         let editData = null;
         try {
@@ -228,7 +285,9 @@ export const AppLayout: React.FC = () => {
           />
         );
       }
-      case 'contact-details': {
+      case 'contact-details':
+      case 'contact/details':
+      case 'contacts/details': {
         let activeContact = selectedContact;
         if (!activeContact && typeof window !== 'undefined') {
           try {
@@ -263,6 +322,8 @@ export const AppLayout: React.FC = () => {
         return <ContactsPage />;
       }
       case 'contact-qualification':
+      case 'contact/qualification':
+      case 'contact/qualify':
       case 'contacts/qualification':
       case 'contacts/qualify':
       case 'qualification': {
@@ -286,19 +347,15 @@ export const AppLayout: React.FC = () => {
               }
               setActiveNav('contacts');
             }}
-            onSuccess={(resultStatus) => {
+            onSuccess={(_resultStatus) => {
               if (typeof window !== 'undefined') {
                 sessionStorage.removeItem('crm_qualifying_contact');
                 sessionStorage.removeItem('crm_selected_contact');
+                localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
+                sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
               }
-              if (resultStatus === 'Qualified') {
-                if (typeof window !== 'undefined') {
-                  sessionStorage.setItem('crm_leads_tab', 'NEW');
-                }
-                setActiveNav('leads');
-              } else {
-                setActiveNav('contacts');
-              }
+              setActiveNav('contacts');
+              window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
             }}
           />
         );
@@ -463,7 +520,7 @@ export const AppLayout: React.FC = () => {
         if (!can('scheduled_meetings', 'view')) {
           return (
             <AccessRestrictedView
-              moduleName="Scheduled Meetings"
+              moduleName="Meetings"
               onGoAllowed={() => setActiveNav(findFirstAllowedNav())}
             />
           );
@@ -472,10 +529,12 @@ export const AppLayout: React.FC = () => {
       case 'call-logs':
       case 'calls':
       case 'call-log':
+      case 'activity-logs':
+      case 'activity-log':
         if (!can('call_logs', 'view')) {
           return (
             <AccessRestrictedView
-              moduleName="Call Logs"
+              moduleName="Activity Logs"
               onGoAllowed={() => setActiveNav(findFirstAllowedNav())}
             />
           );
@@ -687,6 +746,63 @@ export const AppLayout: React.FC = () => {
           );
         }
         return <BillingPage />;
+            case 'support-tickets':
+      case 'tickets':
+      case 'support':
+        return (
+          <TicketsPage
+            onViewTicket={(ticket) => {
+              setSelectedTicketId(ticket.id);
+              if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_ticket_id', ticket.id);
+              setActiveNav('ticket-details');
+            }}
+          />
+        );
+
+      case 'support-tickets/details':
+      case 'ticket-details': {
+        let viewId = selectedTicketId;
+        if (!viewId && typeof window !== 'undefined') {
+          viewId = sessionStorage.getItem('crm_selected_ticket_id');
+        }
+        if (viewId) {
+          return (
+            <SupportTicketProvider>
+              <TicketDetailsPage
+                ticketId={viewId}
+                onBack={() => {
+                  if (typeof window !== 'undefined') sessionStorage.removeItem('crm_selected_ticket_id');
+                  setSelectedTicketId(null);
+                  setActiveNav('support-tickets');
+                }}
+                onNavigateToCustomer={(cust) => {
+                  if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_customer', JSON.stringify({ id: cust }));
+                  setActiveNav('customer-details');
+                }}
+                onNavigateToProject={(proj) => {
+                  if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_project', JSON.stringify({ id: proj }));
+                  setActiveNav('project-details');
+                }}
+              />
+            </SupportTicketProvider>
+          );
+        }
+        return (
+          <TicketsPage
+            onViewTicket={(ticket) => {
+              setSelectedTicketId(ticket.id);
+              if (typeof window !== 'undefined') sessionStorage.setItem('crm_selected_ticket_id', ticket.id);
+              setActiveNav('ticket-details');
+            }}
+          />
+        );
+      }
+
+      case 'activity-timeline':
+      case 'activities':
+      case 'activity':
+      case 'timeline':
+        return <ActivityTimelinePage />;
       default:
         return <DashboardPage onNavigate={(nav) => setActiveNav(nav)} />;
     }
@@ -704,17 +820,19 @@ export const AppLayout: React.FC = () => {
         background: 'transparent',
       }}
     >
-      {/* 1. Desktop Left Fixed Sidebar (Fixed 260px, Hidden on Mobile) */}
+      {/* 1. Desktop Left Fixed Sidebar (Collapsible: 275px or 72px, Hidden on Mobile) */}
       <Box
         visibleFrom="md"
         style={{
-          width: 260,
-          minWidth: 260,
-          maxWidth: 260,
+          width: sidebarCollapsed ? 72 : 275,
+          minWidth: sidebarCollapsed ? 72 : 275,
+          maxWidth: sidebarCollapsed ? 72 : 275,
           height: '100vh',
           flexShrink: 0,
           zIndex: 110,
           overflow: 'hidden',
+          transition:
+            'width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <Sidebar onSelectNav={(nav) => setActiveNav(nav)} />
@@ -745,6 +863,9 @@ export const AppLayout: React.FC = () => {
           flexDirection: 'column',
           overflow: 'hidden',
           position: 'relative',
+          background: isDark
+            ? '#070D1E'
+            : 'radial-gradient(ellipse at 85% 15%, #E1EEFD 0%, #F5F9FE 45%, #EAF2FC 100%)',
         }}
       >
         {/* Top Header Bar (64px Fixed, never scrolls) */}
@@ -777,6 +898,9 @@ export const AppLayout: React.FC = () => {
             position: 'relative',
           }}
         >
+          {/* High-Tech Animated Canvas Background (Strictly behind cards: zIndex 0, pointer-events none) */}
+          <AnimatedCanvasBackdrop />
+
           <Container
             fluid
             px={{ base: 'xs', sm: 'md', md: 'lg', xl: 'xl' }}
@@ -788,6 +912,8 @@ export const AppLayout: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               paddingBottom: 48,
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             {renderActiveScreen()}

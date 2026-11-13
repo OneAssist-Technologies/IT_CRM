@@ -353,10 +353,18 @@ export const ContactDetailsPage: React.FC<ContactDetailsPageProps> = ({
                   </Text>
                   <Select
                     placeholder="Assign owner"
-                    data={[
-                      { value: 'none', label: '— Unassigned —' },
-                      ...(metadata?.employees?.map((emp) => ({ value: emp.id, label: `${emp.name} (${emp.empCode})` })) || []),
-                    ]}
+                    data={(() => {
+                      const list = [
+                        { value: 'none', label: '— Unassigned —' },
+                        ...(metadata?.employees?.map((emp) => ({ value: emp.id, label: `${emp.name} (${emp.empCode})` })) || []),
+                      ];
+                      const seen = new Set<string>();
+                      return list.filter((opt) => {
+                        if (!opt.value || seen.has(opt.value)) return false;
+                        seen.add(opt.value);
+                        return true;
+                      });
+                    })()}
                     value={contact.assignedTo || 'none'}
                     onChange={async (val) => {
                       await assignContact(contact.id, val === 'none' ? null : val);
@@ -643,6 +651,39 @@ export const ContactDetailsPage: React.FC<ContactDetailsPageProps> = ({
                     {contact.qualificationDate || '—'}
                   </Text>
                 </div>
+
+                {contact.address && (
+                  <div>
+                    <Text size="12px" fw={600} style={{ color: labelColor }}>
+                      9. Address
+                    </Text>
+                    <Text size="sm" fw={600} style={{ color: valueColor }} mt={3}>
+                      {contact.address}
+                    </Text>
+                  </div>
+                )}
+
+                {contact.gstNumber && (
+                  <div>
+                    <Text size="12px" fw={600} style={{ color: labelColor }}>
+                      10. GST Number
+                    </Text>
+                    <Text size="sm" fw={600} style={{ color: valueColor }} mt={3}>
+                      {contact.gstNumber}
+                    </Text>
+                  </div>
+                )}
+
+                {contact.companyPan && (
+                  <div>
+                    <Text size="12px" fw={600} style={{ color: labelColor }}>
+                      11. PAN Number
+                    </Text>
+                    <Text size="sm" fw={600} style={{ color: valueColor }} mt={3}>
+                      {contact.companyPan}
+                    </Text>
+                  </div>
+                )}
               </SimpleGrid>
 
               {contact.unqualifiedReason && (

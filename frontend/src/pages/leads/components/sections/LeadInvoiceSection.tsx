@@ -24,6 +24,7 @@ import {
   IconPrinter,
   IconDownload,
   IconCheck,
+  IconRefresh,
   IconClock,
   IconEye,
   IconEdit,
@@ -34,7 +35,8 @@ import {
   IconCash,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-import { Lead, LeadInvoiceItem } from '../../../../types/lead';
+import { Lead, LeadInvoiceItem, Contract } from '../../../../types/lead';
+import { leadService } from '../../../../services/leadService';
 import { Invoice, BillingSettings } from '../../../../types/billing';
 import { billingService } from '../../../../services/billingService';
 import { useInvoicePdfDownload } from '../../../../hooks/useInvoicePdfDownload';
@@ -43,6 +45,17 @@ import { InvoicePrintModal } from '../../../billing/components/InvoicePrintModal
 import { InvoiceDocument } from '../../../billing/components/InvoiceDocument';
 import { RecordPaymentModal } from '../../../invoices/components/RecordPaymentModal';
 import dayjs from 'dayjs';
+
+export const INVOICE_STATUS_OPTIONS = [
+  { value: 'Draft', label: 'Draft', color: '#64748B' },
+  { value: 'Sent', label: 'Sent', color: '#3B82F6' },
+  { value: 'Viewed', label: 'Viewed', color: '#8B5CF6' },
+  { value: 'Partially Paid', label: 'Partially Paid', color: '#F59E0B' },
+  { value: 'Paid', label: 'Paid', color: '#10B981' },
+  { value: 'Overdue', label: 'Overdue', color: '#EF4444' },
+  { value: 'Cancelled', label: 'Cancelled', color: '#94A3B8' },
+  { value: 'Void', label: 'Void', color: '#DC2626' },
+];
 
 export interface LeadInvoiceSectionProps {
   lead: Lead;
@@ -73,6 +86,36 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
   const [autoPrint, setAutoPrint] = useState<boolean>(false);
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null);
   const [recordPaymentOpened, setRecordPaymentOpened] = useState<boolean>(false);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+
+  useEffect(() => {
+    if (lead?.id) {
+      leadService
+        .getContracts({ leadId: lead.id, limit: 100 })
+        .then((res) => {
+          if (res && res.data) setContracts(res.data);
+        })
+        .catch(() => {});
+    }
+  }, [lead?.id]);
+
+  const leadContractValue = useMemo(() => {
+    if (contracts.length > 0) {
+      const matched = payingInvoice
+        ? contracts.find(
+            (c) =>
+              (payingInvoice.projectName && c.projectName?.toLowerCase() === payingInvoice.projectName.toLowerCase()) ||
+              c.id === payingInvoice.projectId
+          ) || contracts[0]
+        : contracts[0];
+      const val = Number(matched.finalContractAmount || matched.contractValue || (matched as any).totalAmount || 0);
+      if (val > 0) return val;
+    }
+    if ((lead as any)?.dealValue) {
+      return Number((lead as any).dealValue);
+    }
+    return payingInvoice?.grandTotal || 0;
+  }, [contracts, payingInvoice, lead]);
 
   const { triggerDownload, HiddenInvoiceDownloadContainer } = useInvoicePdfDownload();
 
@@ -149,13 +192,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
           amount: inv.subtotal || 0,
           taxAmount: inv.taxAmount || 0,
           totalAmount: inv.grandTotal || 0,
-          status: (inv.status === 'Paid'
-            ? 'Paid'
-            : inv.status === 'Partially Paid'
-            ? 'Partially Paid'
-            : inv.status === 'Overdue'
-            ? 'Overdue'
-            : 'Unpaid') as any,
+          status: (inv.status || 'Draft') as any,
           type: 'Tax Invoice' as const,
           description: inv.notes || '',
           rawInvoice: inv,
@@ -168,13 +205,13 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
   }, [backendInvoices]);
 
   const renderStatusBadge = (status: string) => {
-    const s = (status || 'Unpaid').toLowerCase();
+    const s = (status || 'Draft').toLowerCase();
 
     let bg = isDark ? 'rgba(148, 163, 184, 0.12)' : '#F8FAFC';
     let color = isDark ? '#94A3B8' : '#64748B';
     let border = isDark ? 'rgba(148, 163, 184, 0.25)' : '#E2E8F0';
     let dotColor = '#94A3B8';
-    let label = status || 'Unpaid';
+    let label = status || 'Draft';
 
     if (s === 'paid') {
       bg = isDark ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5';
@@ -188,18 +225,48 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
       border = isDark ? 'rgba(245, 158, 11, 0.3)' : '#FDE68A';
       dotColor = '#F59E0B';
       label = 'Partially Paid';
-    } else if (s === 'unpaid' || s === 'issued' || s === 'pending') {
-      bg = isDark ? 'rgba(249, 115, 22, 0.12)' : '#FFF7ED';
-      color = isDark ? '#FB923C' : '#C2410C';
-      border = isDark ? 'rgba(249, 115, 22, 0.25)' : '#FFEDD5';
-      dotColor = '#EA580C';
-      label = 'Unpaid';
+    } else if (s === 'sent') {
+      bg = isDark ? 'rgba(59, 130, 246, 0.14)' : '#EFF6FF';
+      color = isDark ? '#60A5FA' : '#1D4ED8';
+      border = isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE';
+      dotColor = '#3B82F6';
+      label = 'Sent';
+    } else if (s === 'viewed') {
+      bg = isDark ? 'rgba(139, 92, 246, 0.14)' : '#F5F3FF';
+      color = isDark ? '#A78BFA' : '#6D28D9';
+      border = isDark ? 'rgba(139, 92, 246, 0.3)' : '#DDD6FE';
+      dotColor = '#8B5CF6';
+      label = 'Viewed';
     } else if (s === 'overdue') {
       bg = isDark ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2';
       color = isDark ? '#F87171' : '#B91C1C';
       border = isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA';
       dotColor = '#EF4444';
       label = 'Overdue';
+    } else if (s === 'cancelled') {
+      bg = isDark ? 'rgba(148, 163, 184, 0.12)' : '#F1F5F9';
+      color = isDark ? '#94A3B8' : '#475569';
+      border = isDark ? 'rgba(148, 163, 184, 0.25)' : '#CBD5E1';
+      dotColor = '#94A3B8';
+      label = 'Cancelled';
+    } else if (s === 'void') {
+      bg = isDark ? 'rgba(220, 38, 38, 0.14)' : '#FEF2F2';
+      color = isDark ? '#F87171' : '#991B1B';
+      border = isDark ? 'rgba(220, 38, 38, 0.3)' : '#FCA5A5';
+      dotColor = '#DC2626';
+      label = 'Void';
+    } else if (s === 'draft') {
+      bg = isDark ? 'rgba(100, 116, 139, 0.14)' : '#F8FAFC';
+      color = isDark ? '#94A3B8' : '#475569';
+      border = isDark ? 'rgba(100, 116, 139, 0.25)' : '#E2E8F0';
+      dotColor = '#64748B';
+      label = 'Draft';
+    } else if (s === 'unpaid' || s === 'issued' || s === 'pending') {
+      bg = isDark ? 'rgba(249, 115, 22, 0.12)' : '#FFF7ED';
+      color = isDark ? '#FB923C' : '#C2410C';
+      border = isDark ? 'rgba(249, 115, 22, 0.25)' : '#FFEDD5';
+      dotColor = '#EA580C';
+      label = status || 'Unpaid';
     }
 
     return (
@@ -245,6 +312,44 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
     });
     if (onUpdateInvoices) {
       onUpdateInvoices(backendInvoices as any);
+    }
+  };
+
+  const handleStatusChange = async (inv: any, newStatus: string) => {
+    try {
+      setLoading(true);
+      const invoiceObj = resolveInvoiceObject(inv);
+      const patchData: any = { status: newStatus };
+      if (newStatus === 'Paid') {
+        patchData.amountPaid = invoiceObj.grandTotal;
+        patchData.outstandingBalance = 0;
+      } else if (newStatus === 'Issued' || newStatus === 'Unpaid') {
+        patchData.status = 'Issued';
+        patchData.amountPaid = 0;
+        patchData.outstandingBalance = invoiceObj.grandTotal;
+      }
+
+      await billingService.updateInvoice(invoiceObj.id, patchData);
+
+      notifications.show({
+        title: 'Invoice Status Updated',
+        message: `${invoiceObj.invoiceNumber} status updated to ${newStatus}.`,
+        color: 'teal',
+        icon: <IconCheck size={16} />,
+      });
+
+      await fetchInvoices();
+      if (onUpdateInvoices) {
+        onUpdateInvoices(backendInvoices as any);
+      }
+    } catch (err: any) {
+      notifications.show({
+        title: 'Update Failed',
+        message: err.message || 'Could not update invoice status.',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -567,52 +672,48 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
                     </Table.Td>
 
                     <Table.Td onClick={(e) => e.stopPropagation()}>
-                      <Menu shadow="md" width={220} position="bottom-start" withinPortal radius="md">
+                      <Menu shadow="md" width={200} position="bottom-start" withinPortal radius="md">
                         <Menu.Target>
-                          <Tooltip label="Click to change payment status" withArrow>
+                          <Tooltip label="Click to update status" withArrow>
                             <Box style={{ display: 'inline-block', cursor: 'pointer' }}>
                               {renderStatusBadge(inv.status)}
                             </Box>
                           </Tooltip>
                         </Menu.Target>
                         <Menu.Dropdown p="xs">
-                          <Menu.Label>Change Payment Status</Menu.Label>
-                          {inv.status !== 'Paid' && (
-                            <Menu.Item
-                              leftSection={<IconCheck size={14} color="#10B981" />}
-                              onClick={() => handleQuickMarkPaid(inv)}
-                            >
-                              <Text size="13px" fw={600} c="teal">
-                                Mark as Paid (Quick Settle)
-                              </Text>
-                            </Menu.Item>
-                          )}
-                          {inv.status !== 'Partially Paid' && (
-                            <Menu.Item
-                              leftSection={<IconCash size={14} color="#F59E0B" />}
-                              onClick={() => handleOpenRecordPayment(inv)}
-                            >
-                              <Text size="13px" fw={500} style={{ color: '#D97706' }}>
-                                Record Partial Payment...
-                              </Text>
-                            </Menu.Item>
-                          )}
-                          {inv.status !== 'Unpaid' && (
-                            <Menu.Item
-                              leftSection={<IconClock size={14} color="#EA580C" />}
-                              onClick={() => handleMarkUnpaid(inv)}
-                            >
-                              <Text size="13px" fw={500} c="orange">
-                                Mark as Unpaid / Issued
-                              </Text>
-                            </Menu.Item>
-                          )}
+                          <Menu.Label>Update Status</Menu.Label>
+                          {INVOICE_STATUS_OPTIONS.map((opt) => {
+                            const isSelected = (inv.status || '').toLowerCase() === opt.value.toLowerCase();
+                            return (
+                              <Menu.Item
+                                key={opt.value}
+                                leftSection={
+                                  <Box
+                                    style={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: '50%',
+                                      backgroundColor: opt.color,
+                                    }}
+                                  />
+                                }
+                                rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                onClick={() => handleStatusChange(inv, opt.value)}
+                                style={{
+                                  fontWeight: isSelected ? 700 : 500,
+                                  backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                                }}
+                              >
+                                {opt.label}
+                              </Menu.Item>
+                            );
+                          })}
                           <Divider my={4} />
                           <Menu.Item
                             leftSection={<IconCreditCard size={14} color="#2563EB" />}
                             onClick={() => handleOpenRecordPayment(inv)}
                           >
-                            <Text size="13px" fw={500}>
+                            <Text size="12px" fw={500}>
                               Record Custom Payment...
                             </Text>
                           </Menu.Item>
@@ -636,31 +737,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
                           </Tooltip>
                         )}
 
-                        <Tooltip label="View Invoice" withArrow>
-                          <ActionIcon
-                            variant="subtle"
-                            color="blue"
-                            size="sm"
-                            radius="md"
-                            onClick={() => setViewingInvoice(resolveInvoiceObject(inv))}
-                          >
-                            <IconEye size={15} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Download PDF" withArrow>
-                          <ActionIcon
-                            variant="subtle"
-                            color="indigo"
-                            size="sm"
-                            radius="md"
-                            onClick={() => triggerDownload(resolveInvoiceObject(inv))}
-                          >
-                            <IconDownload size={15} />
-                          </ActionIcon>
-                        </Tooltip>
-
-                        <Tooltip label="Print Tax Invoice" withArrow>
+                        <Tooltip label="View Invoice (Full Screen & PDF)" withArrow>
                           <ActionIcon
                             variant="subtle"
                             color="blue"
@@ -671,9 +748,87 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
                               setPrintingInvoice(resolveInvoiceObject(inv));
                             }}
                           >
-                            <IconPrinter size={15} />
+                            <IconEye size={15} />
                           </ActionIcon>
                         </Tooltip>
+
+                        {/* Unified Print / Download Single Button */}
+                        <Menu shadow="md" width={190} position="bottom-end" withinPortal radius="md">
+                          <Menu.Target>
+                            <Tooltip label="Print / Download Invoice" withArrow>
+                              <ActionIcon
+                                variant="subtle"
+                                color="indigo"
+                                size="sm"
+                                radius="md"
+                              >
+                                <IconPrinter size={15} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Label>Print & Download</Menu.Label>
+                            <Menu.Item
+                              leftSection={<IconDownload size={14} color="#4F46E5" />}
+                              onClick={() => triggerDownload(resolveInvoiceObject(inv))}
+                            >
+                              Download PDF
+                            </Menu.Item>
+                            <Menu.Item
+                              leftSection={<IconPrinter size={14} color="#2563EB" />}
+                              onClick={() => {
+                                setAutoPrint(false);
+                                setPrintingInvoice(resolveInvoiceObject(inv));
+                              }}
+                            >
+                              Print Tax Invoice
+                            </Menu.Item>
+                          </Menu.Dropdown>
+                        </Menu>
+
+                        <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                          <Menu.Target>
+                            <Tooltip label="Update Status" withArrow>
+                              <ActionIcon
+                                variant="subtle"
+                                color="teal"
+                                size="sm"
+                                radius="md"
+                              >
+                                <IconRefresh size={15} />
+                              </ActionIcon>
+                            </Tooltip>
+                          </Menu.Target>
+                          <Menu.Dropdown>
+                            <Menu.Label>Update Status</Menu.Label>
+                            {INVOICE_STATUS_OPTIONS.map((opt) => {
+                              const isSelected = (inv.status || '').toLowerCase() === opt.value.toLowerCase();
+                              return (
+                                <Menu.Item
+                                  key={opt.value}
+                                  leftSection={
+                                    <Box
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: '50%',
+                                        backgroundColor: opt.color,
+                                      }}
+                                    />
+                                  }
+                                  rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                  onClick={() => handleStatusChange(inv, opt.value)}
+                                  style={{
+                                    fontWeight: isSelected ? 700 : 500,
+                                    backgroundColor: isSelected ? 'rgba(16, 185, 129, 0.08)' : undefined,
+                                  }}
+                                >
+                                  {opt.label}
+                                </Menu.Item>
+                              );
+                            })}
+                          </Menu.Dropdown>
+                        </Menu>
 
                         {inv.rawInvoice && (
                           <Tooltip label="Edit Invoice" withArrow>
@@ -702,140 +857,19 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         )}
       </Paper>
 
-      {/* Invoice Print & PDF Modal */}
-      {printingInvoice && (
+      {/* Full-Screen Invoice Document Viewer, Print & PDF Modal */}
+      {(printingInvoice || viewingInvoice) && (
         <InvoicePrintModal
-          opened={!!printingInvoice}
+          opened={Boolean(printingInvoice || viewingInvoice)}
           onClose={() => {
             setPrintingInvoice(null);
+            setViewingInvoice(null);
             setAutoPrint(false);
           }}
-          invoice={printingInvoice}
+          invoice={printingInvoice || viewingInvoice}
           autoPrint={autoPrint}
         />
       )}
-
-      {/* Invoice View Popup Modal */}
-      <Modal
-        opened={Boolean(viewingInvoice)}
-        onClose={() => setViewingInvoice(null)}
-        size="960px"
-        radius="16px"
-        centered
-        withCloseButton={false}
-        padding={0}
-        overlayProps={{
-          backgroundOpacity: 0.6,
-          blur: 5,
-        }}
-        styles={{
-          content: {
-            overflow: 'hidden',
-            backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-            borderRadius: 16,
-            border: isDark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-          },
-          body: {
-            padding: 0,
-          },
-        }}
-      >
-        {viewingInvoice && (
-          <Box>
-            {/* Modal Top Header - Completely Flush */}
-            <Box
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '16px 24px',
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                borderBottom: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-              }}
-            >
-              <Group gap="sm" align="center" wrap="nowrap">
-                <Box
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    backgroundColor: isDark ? 'rgba(99, 102, 241, 0.15)' : '#EEF2FF',
-                    border: isDark ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid #C7D2FE',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <img
-                    src="/oneassist-logo.png"
-                    alt="OneAssist"
-                    style={{ width: 18, height: 18, objectFit: 'contain' }}
-                  />
-                </Box>
-                <Text fw={800} size="md" c={isDark ? '#FFFFFF' : '#0F172A'} style={{ whiteSpace: 'nowrap' }}>
-                  Invoice #{viewingInvoice.invoiceNumber}
-                </Text>
-                {renderStatusBadge(viewingInvoice.status)}
-              </Group>
-
-              <Group gap="xs" align="center" wrap="nowrap">
-                <Button
-                  size="xs"
-                  variant="filled"
-                  color="indigo"
-                  leftSection={<IconDownload size={14} />}
-                  onClick={() => triggerDownload(viewingInvoice)}
-                  style={{
-                    background: '#4F46E5',
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)',
-                  }}
-                >
-                  Download PDF
-                </Button>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  size="lg"
-                  radius="md"
-                  onClick={() => setViewingInvoice(null)}
-                >
-                  <IconX size={18} />
-                </ActionIcon>
-              </Group>
-            </Box>
-
-            {/* Modal Body with Scrollable Invoice Preview */}
-            <Box
-              style={{
-                maxHeight: 'calc(88vh - 75px)',
-                overflowY: 'auto',
-                padding: '24px 20px 40px 20px',
-                display: 'flex',
-                justifyContent: 'center',
-                backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-              }}
-            >
-              <Box
-                style={{
-                  width: '100%',
-                  maxWidth: 880,
-                  boxShadow: isDark
-                    ? '0 8px 30px rgba(0,0,0,0.35)'
-                    : '0 8px 30px rgba(15,23,42,0.06)',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                }}
-              >
-                <InvoiceDocument invoice={viewingInvoice} settings={settings} />
-              </Box>
-            </Box>
-          </Box>
-        )}
-      </Modal>
 
       {/* Create / Edit Invoice Modal */}
       {createModalOpened && (
@@ -857,6 +891,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         opened={recordPaymentOpened}
         onClose={() => setRecordPaymentOpened(false)}
         invoice={payingInvoice}
+        contractValue={leadContractValue}
         onSuccess={async () => {
           await fetchInvoices();
           setRecordPaymentOpened(false);

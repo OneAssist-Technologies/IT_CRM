@@ -29,11 +29,13 @@ import {
   useComputedColorScheme,
   ComboboxItem,
   Alert,
+  Menu,
 } from '@mantine/core';
 import {
   IconScale,
   IconPlus,
   IconCheck,
+  IconRefresh,
   IconArrowRight,
   IconArrowLeft,
   IconCash,
@@ -101,6 +103,7 @@ import {
   ContractStatus,
 } from '../../../types/lead';
 import { Quotation } from '../../../types/billing';
+import { QuotationModal } from '../../billing/components/QuotationModal';
 import { useEmployee } from '../../../context/EmployeeContext';
 import { useContact } from '../../../context/ContactContext';
 import { useLead } from '../../../context/LeadContext';
@@ -385,37 +388,25 @@ export const getInitialLeadDealData = (lead: Lead): LeadDealData => {
 
 export const loadLeadDealData = (lead: Lead): LeadDealData => {
   try {
+    cleanupLocalStorageQuota();
     const saved = localStorage.getItem(`crm_lead_deal_${lead.id}`);
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Clean up legacy mock invoices, payments, proposals, and quotations
-      if (Array.isArray(parsed.invoices)) {
-        parsed.invoices = parsed.invoices.filter((inv: any) => !inv.id?.startsWith('inv-'));
-      }
-      if (Array.isArray(parsed.payments)) {
-        parsed.payments = parsed.payments.filter((pay: any) => !pay.id?.startsWith('pay-'));
-      }
-      if (Array.isArray(parsed.proposals)) {
-        parsed.proposals = parsed.proposals.filter((p: any) => !p.id?.startsWith('prop-'));
-      }
-      if (Array.isArray(parsed.quotations)) {
-        parsed.quotations = parsed.quotations.filter((q: any) => !q.id?.startsWith('quo-'));
-      }
       // Clean up legacy mockup demo items from previous prototypes
       if (parsed.proposals && parsed.proposals.some((p: any) => p.id === `prop-${lead.id}-1`)) {
-        parsed.proposals = [];
+        parsed.proposals = parsed.proposals.filter((p: any) => p.id !== `prop-${lead.id}-1`);
       }
       if (parsed.quotations && parsed.quotations.some((q: any) => q.id === `quo-${lead.id}-1`)) {
-        parsed.quotations = [];
+        parsed.quotations = parsed.quotations.filter((q: any) => q.id !== `quo-${lead.id}-1`);
       }
       if (parsed.contract && parsed.contract.id === `cnt-${lead.id}-1`) {
         parsed.contract = null;
       }
       if (parsed.invoices && parsed.invoices.some((i: any) => i.id === `inv-${lead.id}-1`)) {
-        parsed.invoices = [];
+        parsed.invoices = parsed.invoices.filter((i: any) => i.id !== `inv-${lead.id}-1`);
       }
       if (parsed.payments && parsed.payments.some((p: any) => p.id === `pay-${lead.id}-1`)) {
-        parsed.payments = [];
+        parsed.payments = parsed.payments.filter((p: any) => p.id !== `pay-${lead.id}-1`);
       }
       if (parsed.negotiation && parsed.negotiation.leadId === lead.id && parsed.negotiation.originalQuotedAmount === 150000) {
         parsed.negotiation = null;
@@ -445,11 +436,64 @@ export const loadLeadDealData = (lead: Lead): LeadDealData => {
   return defaultData;
 };
 
+/**
+ * Strips large base64 data URLs from objects before saving to localStorage
+ * to prevent QuotaExceededError while keeping all metadata intact.
+ */
+function stripLargeDataUrls(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(stripLargeDataUrls);
+  }
+  const copy: any = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string' && (val.startsWith('data:') || (val.length > 2000 && !val.startsWith('http')))) {
+      copy[key] = '';
+    } else if (typeof val === 'object' && val !== null) {
+      copy[key] = stripLargeDataUrls(val);
+    } else {
+      copy[key] = val;
+    }
+  }
+  return copy;
+}
+
+/**
+ * Clean up oversized/bloated legacy keys from localStorage to free up space.
+ */
+export const cleanupLocalStorageQuota = (): void => {
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('crm_lead_deal_') || k.startsWith('crm_meetings_') || k.startsWith('crm_activities_'))) {
+        const val = localStorage.getItem(k);
+        if (val && (val.includes('data:') || val.length > 100000)) {
+          toRemove.push(k);
+        }
+      }
+    }
+    toRemove.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch (_) {}
+    });
+  } catch (_) {}
+};
+
 export const saveLeadDealData = (leadId: string, data: LeadDealData): void => {
   try {
-    localStorage.setItem(`crm_lead_deal_${leadId}`, JSON.stringify(data));
-  } catch (e) {
-    console.error('Failed to save deal data to localStorage:', e);
+    const sanitized = stripLargeDataUrls(data);
+    localStorage.setItem(`crm_lead_deal_${leadId}`, JSON.stringify(sanitized));
+  } catch (e: any) {
+    try {
+      cleanupLocalStorageQuota();
+      const sanitized = stripLargeDataUrls(data);
+      localStorage.setItem(`crm_lead_deal_${leadId}`, JSON.stringify(sanitized));
+    } catch (_) {
+      // Gracefully fall back to in-memory state if localStorage is permanently restricted
+    }
   }
 };
 
@@ -473,6 +517,19 @@ type ActiveNegTabType =
   | 'REVISED_QUOTATION'
   | 'WON'
   | 'LOST';
+
+const NEGOTIATION_STATUS_OPTIONS: Array<{
+  value: NegotiationStatus;
+  label: string;
+  color: string;
+}> = [
+  { value: 'Draft', label: 'Draft', color: 'gray' },
+  { value: 'In Progress', label: 'In Progress', color: 'blue' },
+  { value: 'Awaiting Client', label: 'Awaiting Client', color: 'yellow' },
+  { value: 'Revised Quotation', label: 'Revised Quotation', color: 'indigo' },
+  { value: 'Won', label: 'Won', color: 'teal' },
+  { value: 'Lost', label: 'Lost', color: 'red' },
+];
 
 export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
   lead,
@@ -515,6 +572,9 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
   const [deleteTarget, setDeleteTarget] = useState<Negotiation | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
+  const [revisionQuoteModalOpen, setRevisionQuoteModalOpen] = useState<boolean>(false);
+  const [revisionBaseQuote, setRevisionBaseQuote] = useState<Quotation | null>(null);
+  const [activeNegotiationForRevision, setActiveNegotiationForRevision] = useState<Negotiation | null>(null);
 
   // Form State
   const [formNegotiationId, setFormNegotiationId] = useState<string>('');
@@ -641,10 +701,64 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
     billingService
       .getQuotations()
       .then((quotes) => {
-        if (quotes && Array.isArray(quotes)) setQuotations(quotes);
+        if (quotes && Array.isArray(quotes)) {
+          const flattened: Quotation[] = [];
+          quotes.forEach((q) => {
+            if (q.allRevisions && q.allRevisions.length > 0) {
+              flattened.push(...q.allRevisions);
+            } else {
+              flattened.push(q);
+            }
+          });
+          setQuotations(flattened);
+        }
       })
       .catch(() => {});
   }, [loadData]);
+
+  const handleCreateRevisionFromNegotiation = (neg: Negotiation) => {
+    let quote = quotations.find((q) => q.id === neg.quotationId || q.quotationNumber === neg.quotationNumber);
+    if (!quote && quotations.length > 0) {
+      quote = quotations.find((q) => q.leadId === lead?.id) || quotations[0];
+    }
+    if (quote) {
+      setActiveNegotiationForRevision(neg);
+      setRevisionBaseQuote(quote);
+      setRevisionQuoteModalOpen(true);
+    } else {
+      notifications.show({
+        color: 'blue',
+        title: 'No Linked Quotation',
+        message: 'No quotation found to revise. Navigating to Quotation section.',
+      });
+      if (onNavigateSection) onNavigateSection('quotations');
+    }
+  };
+
+  const handleRevisionQuoteSaved = async (savedQuote?: Quotation) => {
+    setRevisionQuoteModalOpen(false);
+    if (savedQuote && activeNegotiationForRevision) {
+      try {
+        await leadService.updateNegotiation(activeNegotiationForRevision.id, {
+          quotationId: savedQuote.id,
+          quotationNumber: savedQuote.quotationNumber,
+          expectedFinalAmount: savedQuote.grandTotal,
+          status: 'Revised Quotation',
+          notes: `Updated with revision ${savedQuote.revisionName || savedQuote.quotationNumber}. Total: ₹${Number(savedQuote.grandTotal).toLocaleString('en-IN')}`,
+        });
+        notifications.show({
+          color: 'teal',
+          title: 'Negotiation Updated',
+          message: `Linked negotiation updated with revised quotation ${savedQuote.revisionName || savedQuote.quotationNumber}.`,
+        });
+        loadData();
+      } catch (err: any) {
+        console.warn('Update negotiation error:', err);
+      }
+    }
+    setActiveNegotiationForRevision(null);
+    setRevisionBaseQuote(null);
+  };
 
   // Tab counts
   const totalCount = negotiations.length;
@@ -1135,22 +1249,25 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
     }
   };
 
-  // Quick Mark Won
-  const handleQuickMarkWon = async (neg: Negotiation) => {
+  // Quick Update Status
+  const handleQuickStatusChange = async (neg: Negotiation, newStatus: NegotiationStatus) => {
     try {
       await leadService.updateNegotiation(neg.id, {
-        status: 'Won',
-        notes: `Quick-marked as Won from Negotiation list view.`,
+        status: newStatus,
+        notes: `Status updated to ${newStatus} from Negotiation list view.`,
       });
       notifications.show({
-        title: 'Negotiation Won! 🎉',
-        message: `${neg.negotiationId} commercial terms accepted. Ready for Contract.`,
-        color: 'teal',
+        title: newStatus === 'Won' ? 'Negotiation Won! 🎉' : 'Status Updated',
+        message:
+          newStatus === 'Won'
+            ? `${neg.negotiationId} commercial terms accepted. Ready for Contract.`
+            : `${neg.negotiationId} status changed to ${newStatus}.`,
+        color: newStatus === 'Won' ? 'teal' : newStatus === 'Lost' ? 'red' : 'blue',
       });
       if (onUpdateNegotiation && legacyNegotiation) {
         onUpdateNegotiation({
           ...legacyNegotiation,
-          status: 'Terms Agreed',
+          status: newStatus === 'Won' ? 'Terms Agreed' : (newStatus as any),
         });
       }
       await loadData();
@@ -1579,6 +1696,18 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
                             </ActionIcon>
                           </Tooltip>
 
+                          <Tooltip label="Create Revised Quotation" withArrow>
+                            <ActionIcon
+                              variant="light"
+                              color="indigo"
+                              size="md"
+                              radius="md"
+                              onClick={() => handleCreateRevisionFromNegotiation(item)}
+                            >
+                              <IconPlus size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+
                           <Tooltip label="Download Terms" withArrow>
                             <ActionIcon
                               variant="subtle"
@@ -1591,19 +1720,60 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
                             </ActionIcon>
                           </Tooltip>
 
-                          {item.status !== 'Won' && (
-                            <Tooltip label="Mark Accepted" withArrow>
-                              <ActionIcon
-                                variant="subtle"
-                                color="teal"
-                                size="md"
-                                radius="md"
-                                onClick={() => handleQuickMarkWon(item)}
-                              >
-                                <IconCheck size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
+                          <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                            <Menu.Target>
+                              <Tooltip label="Update Status" withArrow>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="teal"
+                                  size="md"
+                                  radius="md"
+                                >
+                                  <IconRefresh size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Label>Update Status</Menu.Label>
+                              {NEGOTIATION_STATUS_OPTIONS.map((opt) => {
+                                const isSelected = item.status === opt.value;
+                                return (
+                                  <Menu.Item
+                                    key={opt.value}
+                                    onClick={() => handleQuickStatusChange(item, opt.value)}
+                                    leftSection={
+                                      <Box
+                                        style={{
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          backgroundColor:
+                                            opt.color === 'teal'
+                                              ? '#10B981'
+                                              : opt.color === 'blue'
+                                              ? '#3B82F6'
+                                              : opt.color === 'yellow'
+                                              ? '#F59E0B'
+                                              : opt.color === 'indigo'
+                                              ? '#6366F1'
+                                              : opt.color === 'red'
+                                              ? '#EF4444'
+                                              : '#94A3B8',
+                                        }}
+                                      />
+                                    }
+                                    rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                    style={{
+                                      fontWeight: isSelected ? 600 : 400,
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    {opt.label}
+                                  </Menu.Item>
+                                );
+                              })}
+                            </Menu.Dropdown>
+                          </Menu>
 
                           {canEdit && (
                             <Tooltip label="Edit Negotiation" withArrow>
@@ -1718,9 +1888,56 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
                 <Divider my="xs" />
 
                 <Group justify="flex-end" gap={6}>
-                  <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => setDetailsNegotiation(item)}>
+                  <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => setDetailsNegotiation(item)} title="View Details">
                     <IconEye size={15} />
                   </ActionIcon>
+                  <Menu shadow="md" width={180} position="bottom-end" withinPortal radius="md">
+                    <Menu.Target>
+                      <ActionIcon variant="subtle" color="teal" size="sm" title="Update Status">
+                        <IconRefresh size={15} />
+                      </ActionIcon>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Label>Update Status</Menu.Label>
+                      {NEGOTIATION_STATUS_OPTIONS.map((opt) => {
+                        const isSelected = item.status === opt.value;
+                        return (
+                          <Menu.Item
+                            key={opt.value}
+                            onClick={() => handleQuickStatusChange(item, opt.value)}
+                            leftSection={
+                              <Box
+                                style={{
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: '50%',
+                                  backgroundColor:
+                                    opt.color === 'teal'
+                                      ? '#10B981'
+                                      : opt.color === 'blue'
+                                      ? '#3B82F6'
+                                      : opt.color === 'yellow'
+                                      ? '#F59E0B'
+                                      : opt.color === 'indigo'
+                                      ? '#6366F1'
+                                      : opt.color === 'red'
+                                      ? '#EF4444'
+                                      : '#94A3B8',
+                                }}
+                              />
+                            }
+                            rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                            style={{
+                              fontWeight: isSelected ? 600 : 400,
+                              fontSize: 12,
+                            }}
+                          >
+                            {opt.label}
+                          </Menu.Item>
+                        );
+                      })}
+                    </Menu.Dropdown>
+                  </Menu>
                   {canEdit && (
                     <ActionIcon variant="subtle" color="blue" size="sm" onClick={() => handleOpenEditModal(item)}>
                       <IconEdit size={15} />
@@ -2547,6 +2764,20 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
           </Group>
         </Stack>
       </Modal>
+      {/* 7. REVISION QUOTATION MODAL */}
+      <QuotationModal
+        opened={revisionQuoteModalOpen}
+        onClose={() => {
+          setRevisionQuoteModalOpen(false);
+          setRevisionBaseQuote(null);
+          setActiveNegotiationForRevision(null);
+        }}
+        isRevision={true}
+        baseQuotation={revisionBaseQuote}
+        onSuccess={handleRevisionQuoteSaved}
+        initialLead={lead}
+        onNavigateSection={onNavigateSection}
+      />
     </Box>
   );
 };

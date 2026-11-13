@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../../meetings/components/MeetingDatePicker';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
@@ -1451,15 +1452,15 @@ export const CalendarRemindersTab: React.FC = () => {
             />
 
             <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-              <TextInput
+              <MeetingDatePicker
                 label="Scheduled Date"
-                type="date"
+                placeholder="DD-MM-YYYY"
                 required
                 value={formData.date}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(val: string) => {
                   setFormData((prev) => ({ ...prev, date: val }));
                 }}
+                zIndex={3000}
               />
               <Select
                 label="Scheduled Time"

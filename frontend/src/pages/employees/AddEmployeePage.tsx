@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../meetings/components/MeetingDatePicker';
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Box,
@@ -810,14 +811,11 @@ export const AddEmployeePage: React.FC<AddEmployeePageProps> = ({
                     />
 
                     {/* 6. Date of Birth */}
-                    <TextInput
+                    <MeetingDatePicker
                       label="Date of Birth (Optional)"
-                      placeholder=""
-                      type="date"
-                      autoComplete="off"
-                      leftSection={<IconCalendar size={16} color="#64748B" />}
+                      placeholder="DD-MM-YYYY"
                       value={formData.dob}
-                      onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
+                      onChange={(val: string) => setFormData({ ...formData, dob: val })}
                       styles={normalInputStyles}
                     />
 
@@ -1070,13 +1068,11 @@ export const AddEmployeePage: React.FC<AddEmployeePageProps> = ({
                     />
 
                     {/* 5. Date of Joining */}
-                    <TextInput
+                    <MeetingDatePicker
                       label="Date of Joining"
-                      placeholder=""
-                      type="date"
-                      leftSection={<IconCalendar size={16} color="#64748B" />}
+                      placeholder="DD-MM-YYYY"
                       value={formData.joiningDate}
-                      onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
+                      onChange={(val: string) => setFormData({ ...formData, joiningDate: val })}
                       styles={normalInputStyles}
                     />
 

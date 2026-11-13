@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Text,
@@ -17,11 +17,13 @@ import {
   TextInput,
   Textarea,
   Select,
+  Menu,
 } from '@mantine/core';
 import {
   IconFileDescription,
   IconPlus,
   IconCheck,
+  IconRefresh,
   IconSend,
   IconDownload,
   IconArrowRight,
@@ -47,6 +49,18 @@ import { Lead, LeadProposal } from '../../../types/lead';
 import { ProposalModal } from './ProposalModal';
 import { leadService } from '../../../services/leadService';
 
+const PROPOSAL_STATUS_OPTIONS: Array<{
+  value: LeadProposal['status'];
+  label: string;
+  color: string;
+}> = [
+  { value: 'Draft', label: 'Draft', color: 'gray' },
+  { value: 'Sent', label: 'Sent', color: 'blue' },
+  { value: 'Under Review', label: 'Under Review', color: 'yellow' },
+  { value: 'Accepted', label: 'Accepted', color: 'teal' },
+  { value: 'Rejected', label: 'Rejected', color: 'red' },
+];
+
 interface LeadProposalSectionProps {
   lead: Lead;
   isDark: boolean;
@@ -67,6 +81,9 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
   const [selectedProposal, setSelectedProposal] = useState<LeadProposal | null>(null);
   const [selectedEditProposal, setSelectedEditProposal] = useState<LeadProposal | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [rejectionModalOpened, setRejectionModalOpened] = useState(false);
+  const [rejectionTargetId, setRejectionTargetId] = useState<string | null>(null);
+  const [rejectionReasonText, setRejectionReasonText] = useState('');
   const [previewFile, setPreviewFile] = useState<{ name: string; url: string; size?: string } | null>(null);
 
   const getSafeBlobUrl = (dataUrlOrUrl: string): string => {
@@ -115,21 +132,25 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
     );
   };
 
-  // Load proposals from database if available
+  const onUpdateProposalsRef = useRef(onUpdateProposals);
   useEffect(() => {
-    if (lead?.id) {
-      leadService
-        .getProposals({ leadId: lead.id })
-        .then((dbProposals) => {
-          if (dbProposals && dbProposals.length > 0) {
-            const existingIds = new Set(dbProposals.map((p) => p.id));
-            const merged = [...dbProposals, ...proposals.filter((p) => !p.id?.startsWith('prop-') && !existingIds.has(p.id))];
-            onUpdateProposals(merged);
-          }
-        })
-        .catch(() => {});
-    }
+    onUpdateProposalsRef.current = onUpdateProposals;
+  }, [onUpdateProposals]);
+
+  // Load proposals from database if available
+  const fetchProposalsFromDb = useCallback(async () => {
+    if (!lead?.id) return;
+    try {
+      const dbProposals = await leadService.getProposals({ leadId: lead.id });
+      if (dbProposals && Array.isArray(dbProposals)) {
+        onUpdateProposalsRef.current(dbProposals);
+      }
+    } catch (_) {}
   }, [lead?.id]);
+
+  useEffect(() => {
+    fetchProposalsFromDb();
+  }, [fetchProposalsFromDb]);
 
   const handleOpenCreate = () => {
     setSelectedEditProposal(null);
@@ -162,22 +183,47 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
     }
     setModalOpened(false);
     setSelectedEditProposal(null);
+
+    // Promptly sync state with backend database
+    setTimeout(() => {
+      fetchProposalsFromDb();
+    }, 150);
   };
 
-  const handleStatusChange = (propId: string, status: LeadProposal['status']) => {
-    const updated = proposals.map((p) => (p.id === propId ? { ...p, status } : p));
+  const handleStatusChange = (propId: string, status: LeadProposal['status'], reason?: string) => {
+    const targetProp = proposals.find((p) => p.id === propId);
+    const finalReason = status === 'Rejected' ? (reason || targetProp?.rejectionReason || '') : targetProp?.rejectionReason;
+    const updated = proposals.map((p) =>
+      p.id === propId ? { ...p, status, rejectionReason: finalReason } : p
+    );
     onUpdateProposals(updated);
     if (selectedProposal && selectedProposal.id === propId) {
-      setSelectedProposal({ ...selectedProposal, status });
+      setSelectedProposal({ ...selectedProposal, status, rejectionReason: finalReason });
     }
-    if (!propId.startsWith('prop-')) {
-      leadService.updateProposal(propId, { status }).catch(() => {});
+    const idToUpdate = !propId.startsWith('prop-') ? propId : (targetProp?.proposalNumber || propId);
+    if (idToUpdate) {
+      const payload: any = { status };
+      if (status === 'Rejected' && finalReason) {
+        payload.rejectionReason = finalReason;
+      }
+      leadService.updateProposal(idToUpdate, payload).catch(() => {});
     }
     notifications.show({
       title: 'Proposal Status Updated',
       message: `Proposal marked as ${status}.`,
-      color: status === 'Accepted' ? 'green' : 'blue',
+      color: status === 'Accepted' ? 'teal' : status === 'Rejected' ? 'red' : 'blue',
     });
+  };
+
+  const handleSelectStatus = (propId: string, status: LeadProposal['status']) => {
+    if (status === 'Rejected') {
+      const target = proposals.find((p) => p.id === propId);
+      setRejectionTargetId(propId);
+      setRejectionReasonText(target?.rejectionReason || '');
+      setRejectionModalOpened(true);
+      return;
+    }
+    handleStatusChange(propId, status);
   };
 
   const handleDeleteProposal = (propId: string) => {
@@ -459,7 +505,36 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
 
                       {/* 4. STATUS */}
                       <Table.Td>
-                        {renderStatusBadge(prop.status)}
+                        <Stack gap={4} align="flex-start">
+                          <Stack gap={2} align="flex-end">
+                    {renderStatusBadge(prop.status)}
+                    {(prop.status || '').toLowerCase() === 'rejected' && (
+                      <Text
+                        size="10px"
+                        fw={500}
+                        style={{ color: isDark ? '#FCA5A5' : '#DC2626', maxWidth: 140, textAlign: 'right' }}
+                        title={prop.rejectionReason || 'No reason specified'}
+                      >
+                        {prop.rejectionReason || '(No reason specified)'}
+                      </Text>
+                    )}
+                  </Stack>
+                          {(prop.status || '').toLowerCase() === 'rejected' && (
+                            <Text
+                              size="11px"
+                              fw={500}
+                              style={{
+                                color: isDark ? '#FCA5A5' : '#DC2626',
+                                maxWidth: 180,
+                                wordBreak: 'break-word',
+                                lineHeight: 1.3,
+                              }}
+                              title={prop.rejectionReason || 'No reason specified'}
+                            >
+                              {prop.rejectionReason ? prop.rejectionReason : '(No reason specified)'}
+                            </Text>
+                          )}
+                        </Stack>
                       </Table.Td>
 
                       {/* 5. ACTIONS */}
@@ -489,19 +564,58 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
                             </ActionIcon>
                           </Tooltip>
 
-                          {prop.status !== 'Accepted' && (
-                            <Tooltip label="Mark Accepted" withArrow>
-                              <ActionIcon
-                                variant="subtle"
-                                color="teal"
-                                size="md"
-                                radius="md"
-                                onClick={() => handleStatusChange(prop.id, 'Accepted')}
-                              >
-                                <IconCheck size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                          )}
+                          <Menu shadow="md" width={170} position="bottom-end" withinPortal radius="md">
+                            <Menu.Target>
+                              <Tooltip label="Update Status" withArrow>
+                                <ActionIcon
+                                  variant="subtle"
+                                  color="teal"
+                                  size="md"
+                                  radius="md"
+                                >
+                                  <IconRefresh size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                            </Menu.Target>
+                            <Menu.Dropdown>
+                              <Menu.Label>Update Status</Menu.Label>
+                              {PROPOSAL_STATUS_OPTIONS.map((opt) => {
+                                const isSelected = prop.status === opt.value;
+                                return (
+                                  <Menu.Item
+                                    key={opt.value}
+                                    onClick={() => handleSelectStatus(prop.id, opt.value)}
+                                    leftSection={
+                                      <Box
+                                        style={{
+                                          width: 8,
+                                          height: 8,
+                                          borderRadius: '50%',
+                                          backgroundColor:
+                                            opt.color === 'teal'
+                                              ? '#10B981'
+                                              : opt.color === 'blue'
+                                              ? '#3B82F6'
+                                              : opt.color === 'yellow'
+                                              ? '#F59E0B'
+                                              : opt.color === 'red'
+                                              ? '#EF4444'
+                                              : '#94A3B8',
+                                        }}
+                                      />
+                                    }
+                                    rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                                    style={{
+                                      fontWeight: isSelected ? 600 : 400,
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    {opt.label}
+                                  </Menu.Item>
+                                );
+                              })}
+                            </Menu.Dropdown>
+                          </Menu>
 
                           <Tooltip label="Edit Proposal" withArrow>
                             <ActionIcon
@@ -554,7 +668,19 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
                       {prop.title || 'Solution Proposal'}
                     </Text>
                   </div>
-                  {renderStatusBadge(prop.status)}
+                  <Stack gap={2} align="flex-end">
+                    {renderStatusBadge(prop.status)}
+                    {(prop.status || '').toLowerCase() === 'rejected' && (
+                      <Text
+                        size="10px"
+                        fw={500}
+                        style={{ color: isDark ? '#FCA5A5' : '#DC2626', maxWidth: 140, textAlign: 'right' }}
+                        title={prop.rejectionReason || 'No reason specified'}
+                      >
+                        {prop.rejectionReason || '(No reason specified)'}
+                      </Text>
+                    )}
+                  </Stack>
                 </Group>
 
                 <SimpleGrid cols={2} spacing="xs" my="xs">
@@ -711,7 +837,7 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
                 </Group>
                 <Select
                   value={selectedProposal.status}
-                  onChange={(val) => val && handleStatusChange(selectedProposal.id, val as any)}
+                  onChange={(val) => val && handleSelectStatus(selectedProposal.id, val as any)}
                   data={[
                     { value: 'Draft', label: 'Draft' },
                     { value: 'Sent', label: 'Sent to Client' },
@@ -934,6 +1060,30 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
               </Group>
             </Paper>
 
+            {/* REJECTION REASON CARD */}
+            {selectedProposal.status === 'Rejected' && (
+              <Paper
+                p="md"
+                radius="md"
+                style={{
+                  backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+                  border: isDark ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid #FECACA',
+                }}
+              >
+                <Group gap={6} mb={4}>
+                  <ThemeIcon color="red" size="sm" variant="light" radius="xl">
+                    <IconX size={12} />
+                  </ThemeIcon>
+                  <Text size="xs" fw={700} c="red">
+                    Rejection Reason
+                  </Text>
+                </Group>
+                <Text size="xs" style={{ color: isDark ? '#FCA5A5' : '#991B1B' }}>
+                  {selectedProposal.rejectionReason || 'No specific reason provided.'}
+                </Text>
+              </Paper>
+            )}
+
             {/* FOOTER ACTIONS */}
             <Group justify="space-between" mt="md">
               <Button
@@ -959,16 +1109,56 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
                 >
                   Edit Proposal
                 </Button>
-                {selectedProposal.status !== 'Accepted' && (
-                  <Button
-                    color="teal"
-                    radius="md"
-                    leftSection={<IconCheck size={14} />}
-                    onClick={() => handleStatusChange(selectedProposal.id, 'Accepted')}
-                  >
-                    Mark Accepted
-                  </Button>
-                )}
+                <Menu shadow="md" width={170} position="top-end" withinPortal radius="md">
+                  <Menu.Target>
+                    <Button
+                      color="teal"
+                      variant="light"
+                      radius="md"
+                      leftSection={<IconRefresh size={14} />}
+                    >
+                      Update Status
+                    </Button>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>Update Status</Menu.Label>
+                    {PROPOSAL_STATUS_OPTIONS.map((opt) => {
+                      const isSelected = selectedProposal.status === opt.value;
+                      return (
+                        <Menu.Item
+                          key={opt.value}
+                          onClick={() => handleSelectStatus(selectedProposal.id, opt.value)}
+                          leftSection={
+                            <Box
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                backgroundColor:
+                                  opt.color === 'teal'
+                                    ? '#10B981'
+                                    : opt.color === 'blue'
+                                    ? '#3B82F6'
+                                    : opt.color === 'yellow'
+                                    ? '#F59E0B'
+                                    : opt.color === 'red'
+                                    ? '#EF4444'
+                                    : '#94A3B8',
+                              }}
+                            />
+                          }
+                          rightSection={isSelected ? <IconCheck size={14} color="#10B981" /> : undefined}
+                          style={{
+                            fontWeight: isSelected ? 600 : 400,
+                            fontSize: 12,
+                          }}
+                        >
+                          {opt.label}
+                        </Menu.Item>
+                      );
+                    })}
+                  </Menu.Dropdown>
+                </Menu>
                 {selectedProposal.status === 'Draft' && (
                   <Button
                     color="blue"
@@ -1147,6 +1337,75 @@ export const LeadProposalSection: React.FC<LeadProposalSectionProps> = ({
             </Paper>
           )
         ) : null}
+      </Modal>
+
+      {/* SPECIFY REJECTION REASON MODAL */}
+      <Modal
+        opened={rejectionModalOpened}
+        onClose={() => {
+          setRejectionModalOpened(false);
+          setRejectionTargetId(null);
+          setRejectionReasonText('');
+        }}
+        title={
+          <Group gap={8}>
+            <ThemeIcon color="red" variant="light" size="md" radius="md">
+              <IconX size={16} />
+            </ThemeIcon>
+            <Text fw={700} size="sm">
+              Specify Rejection Reason
+            </Text>
+          </Group>
+        }
+        centered
+        radius="md"
+      >
+        <Stack gap="md">
+          <Text size="xs" c="dimmed">
+            Please provide the reason why this proposal was rejected by the client.
+          </Text>
+          <Textarea
+            label="Rejection Reason"
+            placeholder="e.g. Budget constraints, selected another vendor, project cancelled..."
+            withAsterisk
+            minRows={3}
+            radius="md"
+            value={rejectionReasonText}
+            onChange={(e) => setRejectionReasonText(e.currentTarget.value)}
+            required
+            autoFocus
+          />
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              size="xs"
+              radius="md"
+              onClick={() => {
+                setRejectionModalOpened(false);
+                setRejectionTargetId(null);
+                setRejectionReasonText('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              size="xs"
+              radius="md"
+              disabled={!rejectionReasonText.trim()}
+              onClick={() => {
+                if (rejectionTargetId && rejectionReasonText.trim()) {
+                  handleStatusChange(rejectionTargetId, 'Rejected', rejectionReasonText.trim());
+                  setRejectionModalOpened(false);
+                  setRejectionTargetId(null);
+                  setRejectionReasonText('');
+                }
+              }}
+            >
+              Confirm Rejection
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* CREATE / EDIT PROPOSAL MODAL */}

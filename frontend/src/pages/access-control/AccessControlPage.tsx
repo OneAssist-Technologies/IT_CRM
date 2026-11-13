@@ -14,6 +14,7 @@ import {
   Avatar,
   Collapse,
   Switch,
+  SegmentedControl,
   UnstyledButton,
   ScrollArea,
   ActionIcon,
@@ -387,8 +388,12 @@ export const AccessControlPage: React.FC = () => {
   useEffect(() => {
     if (selectedRole && selectedRole.permissions) {
       const map: Record<string, RolePermission> = {};
+      const isSuperOrAdmin = selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin';
       selectedRole.permissions.forEach((p) => {
-        map[p.moduleId] = { ...p };
+        map[p.moduleId] = {
+          ...p,
+          dataScope: p.dataScope || (isSuperOrAdmin ? 'All' : 'Own'),
+        };
       });
       // Ensure all system modules exist in map
       systemModules.forEach((m) => {
@@ -397,13 +402,16 @@ export const AccessControlPage: React.FC = () => {
             moduleId: m.id,
             moduleName: m.name,
             category: m.category,
-            canView: selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin',
-            canCreate: selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin',
-            canEdit: selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin',
-            canDelete: selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin',
-            canExport: selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin',
-            canApprove: selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin',
+            dataScope: isSuperOrAdmin ? 'All' : 'Own',
+            canView: isSuperOrAdmin,
+            canCreate: isSuperOrAdmin,
+            canEdit: isSuperOrAdmin,
+            canDelete: isSuperOrAdmin,
+            canExport: isSuperOrAdmin,
+            canApprove: isSuperOrAdmin,
           };
+        } else if (!map[m.id].dataScope) {
+          map[m.id].dataScope = isSuperOrAdmin ? 'All' : 'Own';
         }
       });
       setLocalPermissions(map);
@@ -424,14 +432,18 @@ export const AccessControlPage: React.FC = () => {
       'call_logs',
       'customers',
       'projects',
+      'activity_timeline',
       'access_control',
+      'settings',
     ];
 
-    systemModules.forEach((mod) => {
-      const cat = mod.category || 'Main Navigation';
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(mod);
-    });
+    systemModules
+      .filter((mod) => mod.id !== 'negotiations' && mod.id !== 'invoices')
+      .forEach((mod) => {
+        const cat = mod.category || 'Main Navigation';
+        if (!map.has(cat)) map.set(cat, []);
+        map.get(cat)!.push(mod);
+      });
 
     const categoryOrder = ['Main Navigation', 'Administration & Security', 'Custom Modules'];
 
@@ -472,10 +484,12 @@ export const AccessControlPage: React.FC = () => {
   const handleToggleModule = (moduleId: string) => {
     if (!selectedRole) return;
 
+    const isSuperOrAdmin = selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin';
     const current = localPermissions[moduleId] || {
       moduleId,
       moduleName: moduleId,
       category: 'Main Navigation',
+      dataScope: isSuperOrAdmin ? 'All' : 'Own',
       canView: false,
       canCreate: false,
       canEdit: false,
@@ -488,6 +502,7 @@ export const AccessControlPage: React.FC = () => {
 
     const updatedPerm: RolePermission = {
       ...current,
+      dataScope: current.dataScope || (isSuperOrAdmin ? 'All' : 'Own'),
       canView: nextState,
       canCreate: nextState,
       canEdit: nextState,
@@ -523,19 +538,52 @@ export const AccessControlPage: React.FC = () => {
     setHasUnsavedChanges(true);
   };
 
+  // Change data scope ('Own' | 'All') for scoped modules (e.g. Contacts, Leads)
+  const handleDataScopeChange = (moduleId: string, scope: 'Own' | 'All') => {
+    if (!selectedRole) return;
+
+    const current = localPermissions[moduleId] || {
+      moduleId,
+      moduleName: moduleId,
+      category: 'Main Navigation',
+      canView: true,
+      canCreate: true,
+      canEdit: true,
+      canDelete: false,
+      canExport: true,
+      canApprove: false,
+    };
+
+    const updatedPerm: RolePermission = {
+      ...current,
+      dataScope: scope,
+    };
+
+    const updatedMap = {
+      ...localPermissions,
+      [moduleId]: updatedPerm,
+    };
+
+    setLocalPermissions(updatedMap);
+    setHasUnsavedChanges(true);
+  };
+
   // Quick Action: Enable All Modules
   const handleSelectAllModules = () => {
     if (!selectedRole) return;
     const updatedMap: Record<string, RolePermission> = { ...localPermissions };
     const isSuper = selectedRole.slug === 'super_admin';
     systemModules.forEach((mod) => {
+      const isSuperOrAdmin = isSuper || selectedRole.slug === 'admin';
       const current = updatedMap[mod.id] || {
         moduleId: mod.id,
         moduleName: mod.name,
         category: mod.category || 'Main Navigation',
+        dataScope: isSuperOrAdmin ? 'All' : 'Own',
       };
       updatedMap[mod.id] = {
         ...current,
+        dataScope: current.dataScope || (isSuperOrAdmin ? 'All' : 'Own'),
         canView: true,
         canCreate: true,
         canEdit: true,
@@ -912,6 +960,8 @@ export const AccessControlPage: React.FC = () => {
       case 'projects':
       case 'projects_management':
         return <IconFolders size={18} color="#4F46E5" />;
+      case 'activity_timeline':
+        return <IconClock size={18} color="#4F46E5" />;
       case 'employees':
       case 'employee_management':
         return <IconUsers size={18} color="#4F46E5" />;
@@ -1024,10 +1074,10 @@ export const AccessControlPage: React.FC = () => {
             leftSection={<IconPlus size={16} />}
             onClick={() => setAddRoleModalOpen(true)}
             style={{
-              background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+              background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
               color: '#FFFFFF',
               fontWeight: 600,
-              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.35)',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
               padding: '0 22px',
               height: 40,
             }}
@@ -1515,6 +1565,8 @@ export const AccessControlPage: React.FC = () => {
                           {modules.map((mod) => {
                             const isEnabled = Boolean(localPermissions[mod.id]?.canView);
                             const isLocked = mod.id === 'access_control' && !['admin', 'super_admin'].includes(selectedRole.slug);
+                            const isScopedModule = mod.id === 'contacts' || mod.id === 'leads';
+                            const currentScope = localPermissions[mod.id]?.dataScope || (['admin', 'super_admin'].includes(selectedRole.slug) ? 'All' : 'Own');
 
                             return (
                               <Paper
@@ -1525,34 +1577,75 @@ export const AccessControlPage: React.FC = () => {
                                   background: isDark ? '#1E293B' : '#F8FAFC',
                                   border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9',
                                   display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: '10px',
+                                  flexDirection: 'column',
+                                  gap: '8px',
                                 }}
                               >
-                                <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                                  {getModuleIcon(mod.id)}
-                                  <Text
-                                    fw={600}
-                                    size="13px"
-                                    style={{ color: headingColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                                    title={mod.name}
-                                  >
-                                    {mod.name}
-                                  </Text>
-                                  {isLocked && <IconLock size={14} color="#F59E0B" />}
+                                <Group justify="space-between" align="center" wrap="nowrap" style={{ width: '100%' }}>
+                                  <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                                    {getModuleIcon(mod.id)}
+                                    <Text
+                                      fw={600}
+                                      size="13px"
+                                      style={{ color: headingColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                                      title={mod.name}
+                                    >
+                                      {mod.name}
+                                    </Text>
+                                    {isLocked && <IconLock size={14} color="#F59E0B" />}
+                                  </Group>
+
+                                  <Switch
+                                    checked={isEnabled}
+                                    disabled={['admin', 'super_admin'].includes(selectedRole.slug) && mod.id === 'access_control'}
+                                    color="indigo"
+                                    size="md"
+                                    onChange={() => handleToggleModule(mod.id)}
+                                    styles={{
+                                      track: { cursor: 'pointer' },
+                                    }}
+                                  />
                                 </Group>
 
-                                <Switch
-                                  checked={isEnabled}
-                                  disabled={['admin', 'super_admin'].includes(selectedRole.slug) && mod.id === 'access_control'}
-                                  color="indigo"
-                                  size="md"
-                                  onChange={() => handleToggleModule(mod.id)}
-                                  styles={{
-                                    track: { cursor: 'pointer' },
-                                  }}
-                                />
+                                {/* Data Scope Option for Contacts and Leads */}
+                                {isScopedModule && isEnabled && (
+                                  <Group
+                                    justify="space-between"
+                                    align="center"
+                                    pt={6}
+                                    style={{
+                                      borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                                      width: '100%',
+                                    }}
+                                  >
+                                    <Text size="11px" fw={600} c="dimmed">
+                                      Data Scope
+                                    </Text>
+                                    <SegmentedControl
+                                      size="xs"
+                                      value={currentScope}
+                                      disabled={selectedRole.slug === 'super_admin'}
+                                      onChange={(val) => handleDataScopeChange(mod.id, val as 'Own' | 'All')}
+                                      data={[
+                                        { label: 'Own Data', value: 'Own' },
+                                        { label: 'All Data', value: 'All' },
+                                      ]}
+                                      styles={{
+                                        root: {
+                                          padding: 2,
+                                          height: 24,
+                                          background: isDark ? '#0F172A' : '#E2E8F0',
+                                        },
+                                        label: {
+                                          fontSize: '10px',
+                                          fontWeight: 700,
+                                          padding: '2px 8px',
+                                          lineHeight: '18px',
+                                        },
+                                      }}
+                                    />
+                                  </Group>
+                                )}
                               </Paper>
                             );
                           })}
@@ -1957,7 +2050,7 @@ export const AccessControlPage: React.FC = () => {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2009,7 +2102,7 @@ export const AccessControlPage: React.FC = () => {
               onClick={handleCreateRoleSubmit}
               disabled={!newRoleName.trim()}
               style={{
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 color: '#FFFFFF',
               }}
             >
@@ -2082,7 +2175,7 @@ export const AccessControlPage: React.FC = () => {
               onClick={handleCreateModuleSubmit}
               disabled={!newModuleName.trim()}
               style={{
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 color: '#FFFFFF',
               }}
             >
@@ -2141,7 +2234,7 @@ export const AccessControlPage: React.FC = () => {
                 loading={updatingHierarchy}
                 onClick={() => handleUpdateRoleParent(hierarchyModalRole.id, targetParentId || null)}
                 style={{
-                  background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                  background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                   color: '#FFFFFF',
                 }}
               >
@@ -2270,7 +2363,7 @@ export const AccessControlPage: React.FC = () => {
                 width: 32,
                 height: 32,
                 borderRadius: 8,
-                background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2385,7 +2478,7 @@ export const AccessControlPage: React.FC = () => {
                 radius="100px"
                 size="xs"
                 style={{
-                  background: 'linear-gradient(135deg, #6366F1 0%, #7C3AED 100%)',
+                  background: 'var(--crm-primary-gradient, linear-gradient(135deg, #1D4ED8 0%, #2563EB 55%, #3B82F6 100%))',
                   color: '#FFFFFF',
                 }}
                 leftSection={<IconShieldLock size={14} />}

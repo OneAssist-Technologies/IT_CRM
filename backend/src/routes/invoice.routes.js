@@ -13,6 +13,9 @@ import {
   updateQuotation,
   deleteQuotation,
   convertQuotationToOrder,
+  createQuotationRevision,
+  updateQuotationStatus,
+  getQuotationRevisions,
   getSalesOrders,
   getSalesOrderById,
   createSalesOrder,
@@ -53,12 +56,15 @@ router.put('/products-services/:id', requireAuth, authorizePermission('billing',
 router.delete('/products-services/:id', requireAuth, authorizePermission('billing', 'delete'), deleteProductServiceItem);
 
 // =============================================================================
-// 3. QUOTATIONS
+// 3. QUOTATIONS & REVISIONS
 // =============================================================================
 router.get('/quotations', requireAuth, authorizePermission('billing', 'view'), getQuotations);
 router.get('/quotations/:id', requireAuth, authorizePermission('billing', 'view'), getQuotationById);
+router.get('/quotations/:id/revisions', requireAuth, authorizePermission('billing', 'view'), getQuotationRevisions);
 router.post('/quotations', requireAuth, authorizePermission('billing', 'create'), createQuotation);
 router.put('/quotations/:id', requireAuth, authorizePermission('billing', 'edit'), updateQuotation);
+router.patch('/quotations/:id/status', requireAuth, authorizePermission('billing', 'edit'), updateQuotationStatus);
+router.post('/quotations/:id/revise', requireAuth, authorizePermission('billing', 'create'), createQuotationRevision);
 router.delete('/quotations/:id', requireAuth, authorizePermission('billing', 'delete'), deleteQuotation);
 router.post('/quotations/:id/convert', requireAuth, authorizePermission('billing', 'create'), convertQuotationToOrder);
 

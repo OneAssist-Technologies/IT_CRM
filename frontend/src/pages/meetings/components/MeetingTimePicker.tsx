@@ -1,21 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Popover,
   TextInput,
-  ActionIcon,
   Group,
   Text,
   Badge,
   Divider,
-  SimpleGrid,
   Button,
-  Select,
+  UnstyledButton,
+  SegmentedControl,
   useComputedColorScheme,
 } from '@mantine/core';
 import { IconClock } from '@tabler/icons-react';
 
-interface MeetingTimePickerProps {
+export interface MeetingTimePickerProps {
   value: string;
   onChange: (value: string) => void;
   label?: string;
@@ -26,19 +25,12 @@ interface MeetingTimePickerProps {
   leftSection?: React.ReactNode;
   rightSection?: React.ReactNode;
   error?: React.ReactNode;
+  hideQuickSelect?: boolean;
 }
 
-const STANDARD_TIME_SLOTS = [
-  '08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM',
-  '11:00 AM', '11:30 AM', '12:00 PM', '12:30 PM', '01:00 PM', '01:30 PM',
-  '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM', '04:30 PM',
-  '05:00 PM', '05:30 PM', '06:00 PM', '06:30 PM', '07:00 PM', '07:30 PM',
-  '08:00 PM',
-];
-
-const QUICK_TIME_PRESETS = [
-  '10:00 AM', '11:30 AM', '02:30 PM', '04:00 PM', '05:30 PM',
-];
+const HOURS = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+const STANDARD_MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+const QUICK_PRESETS = ['09:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '04:00 PM'];
 
 interface ParsedTimeResult {
   hours: string; // "01" - "12"
@@ -47,7 +39,7 @@ interface ParsedTimeResult {
   formatted: string; // "HH:MM AM"
 }
 
-const parseFlexibleTime = (str: string, currentPeriod = 'AM'): ParsedTimeResult | null => {
+const parseFlexibleTime = (str: string, currentPeriod = (new Date().getHours() >= 12 ? 'PM' : 'AM')): ParsedTimeResult | null => {
   if (!str) return null;
   const trimmed = str.trim().toLowerCase();
 
@@ -68,7 +60,6 @@ const parseFlexibleTime = (str: string, currentPeriod = 'AM'): ParsedTimeResult 
       const mStr = String(m).padStart(2, '0');
       return { hours: hStr, minutes: mStr, period: meridiem, formatted: `${hStr}:${mStr} ${meridiem}` };
     } else {
-      // 24-hour vs 12-hour
       if (h >= 13 && h <= 23) {
         const h12 = h - 12;
         const hStr = String(h12).padStart(2, '0');
@@ -78,13 +69,8 @@ const parseFlexibleTime = (str: string, currentPeriod = 'AM'): ParsedTimeResult 
         const hStr = '12';
         const mStr = String(m).padStart(2, '0');
         return { hours: hStr, minutes: mStr, period: 'AM', formatted: `${hStr}:${mStr} AM` };
-      } else if (h === 12) {
-        const hStr = '12';
-        const mStr = String(m).padStart(2, '0');
-        const p = (currentPeriod === 'PM' ? 'PM' : 'AM') as 'AM' | 'PM';
-        return { hours: hStr, minutes: mStr, period: p, formatted: `${hStr}:${mStr} ${p}` };
-      } else if (h >= 1 && h <= 11) {
-        const hStr = String(h).padStart(2, '0');
+      } else {
+        const hStr = String(h > 12 ? h - 12 : h).padStart(2, '0');
         const mStr = String(m).padStart(2, '0');
         const p = (currentPeriod === 'PM' ? 'PM' : 'AM') as 'AM' | 'PM';
         return { hours: hStr, minutes: mStr, period: p, formatted: `${hStr}:${mStr} ${p}` };
@@ -95,7 +81,7 @@ const parseFlexibleTime = (str: string, currentPeriod = 'AM'): ParsedTimeResult 
   // 2. Hour with AM/PM (e.g. '2pm', '11am', '2 pm')
   const hourAmPmMatch = trimmed.match(/^(\d{1,2})\s*(am|pm)$/i);
   if (hourAmPmMatch) {
-    let h = parseInt(hourAmPmMatch[1], 10);
+    const h = parseInt(hourAmPmMatch[1], 10);
     const meridiem = hourAmPmMatch[2].toUpperCase() as 'AM' | 'PM';
     if (h >= 1 && h <= 12) {
       const hStr = String(h).padStart(2, '0');
@@ -125,24 +111,27 @@ const parseFlexibleTime = (str: string, currentPeriod = 'AM'): ParsedTimeResult 
 export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
   value,
   onChange,
-  label = 'Meeting Time',
-  placeholder = 'hh:mm',
-  required = true,
+  label = 'Time',
+  placeholder = 'hh:mm a',
+  required = false,
   zIndex = 3000,
   styles,
   leftSection,
   rightSection,
   error,
+  hideQuickSelect = false,
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
 
   const [opened, setOpened] = useState(false);
   const [inputText, setInputText] = useState<string>(value || '');
-  const [hours, setHours] = useState('11');
+  const [hours, setHours] = useState('10');
   const [minutes, setMinutes] = useState('00');
-  const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
-  const [exactMinInput, setExactMinInput] = useState('0');
+  const [period, setPeriod] = useState<'AM' | 'PM'>(() => (new Date().getHours() >= 12 ? 'PM' : 'AM'));
+
+  const hourListRef = useRef<HTMLDivElement>(null);
+  const minuteListRef = useRef<HTMLDivElement>(null);
 
   // Sync internal state when external value changes
   useEffect(() => {
@@ -155,7 +144,6 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
       setHours(parsed.hours);
       setMinutes(parsed.minutes);
       setPeriod(parsed.period);
-      setExactMinInput(parseInt(parsed.minutes, 10).toString());
       const currentParsed = parseFlexibleTime(inputText, period);
       if (!currentParsed || currentParsed.formatted !== parsed.formatted) {
         setInputText(value);
@@ -163,8 +151,33 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
     }
   }, [value]);
 
+  // Scroll active item into view when popover opens
+  useEffect(() => {
+    if (opened) {
+      const timer = setTimeout(() => {
+        const activeHourEl = hourListRef.current?.querySelector('[data-active="true"]');
+        if (activeHourEl) {
+          activeHourEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+        const activeMinEl = minuteListRef.current?.querySelector('[data-active="true"]');
+        if (activeMinEl) {
+          activeMinEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [opened]);
+
+  // If current minute is non-standard (e.g. 07, 23), insert it into the list
+  const minuteList = useMemo(() => {
+    if (minutes && !STANDARD_MINUTES.includes(minutes)) {
+      return [...STANDARD_MINUTES, minutes].sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+    }
+    return STANDARD_MINUTES;
+  }, [minutes]);
+
   const updateFromParts = (h: string, m: string, p: 'AM' | 'PM') => {
-    const formattedH = h ? (h.length === 1 ? `0${h}` : h) : '11';
+    const formattedH = h ? (h.length === 1 ? `0${h}` : h) : '10';
     const formattedM = m ? (m.length === 1 ? `0${m}` : m) : '00';
     setHours(formattedH);
     setMinutes(formattedM);
@@ -186,39 +199,35 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
 
   const handleMinuteSelect = (m: string) => {
     setMinutes(m);
-    setExactMinInput(parseInt(m, 10).toString());
     updateFromParts(hours, m, period);
   };
 
-  const handleExactMinChange = (val: string) => {
-    const clean = val.replace(/\D/g, '').slice(0, 2);
-    setExactMinInput(clean);
-    if (clean !== '') {
-      const num = parseInt(clean, 10);
-      if (num <= 59) {
-        const padded = clean.length === 1 ? `0${clean}` : clean;
-        setMinutes(padded);
-        updateFromParts(hours, padded, period);
-      }
-    }
+  const handleSetNow = () => {
+    const now = new Date();
+    let h = now.getHours();
+    const m = now.getMinutes();
+    const p: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    const hStr = String(h).padStart(2, '0');
+    const mStr = String(m).padStart(2, '0');
+    updateFromParts(hStr, mStr, p);
   };
 
   const handleClearTime = () => {
-    setHours('12');
+    setHours('10');
     setMinutes('00');
     setPeriod('AM');
-    setExactMinInput('0');
     setInputText('');
     onChange('');
   };
 
-  const handleSelectSlot = (slot: string) => {
-    const parsed = parseFlexibleTime(slot);
+  const handleSelectPreset = (preset: string) => {
+    const parsed = parseFlexibleTime(preset);
     if (parsed) {
       setHours(parsed.hours);
       setMinutes(parsed.minutes);
       setPeriod(parsed.period);
-      setExactMinInput(parseInt(parsed.minutes, 10).toString());
       setInputText(parsed.formatted);
       onChange(parsed.formatted);
     }
@@ -233,7 +242,6 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
       setHours(parsed.hours);
       setMinutes(parsed.minutes);
       setPeriod(parsed.period);
-      setExactMinInput(parseInt(parsed.minutes, 10).toString());
       onChange(parsed.formatted);
     }
   };
@@ -266,6 +274,8 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
     }
   };
 
+  const formattedDisplay = `${hours}:${minutes} ${period}`;
+
   return (
     <Box>
       <Popover
@@ -273,8 +283,8 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
         onChange={setOpened}
         position="bottom-start"
         shadow="xl"
-        radius="md"
-        width={310}
+        radius="lg"
+        width={270}
         withArrow
         withinPortal
         zIndex={zIndex}
@@ -290,230 +300,297 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             onClick={() => setOpened(true)}
-            styles={styles || {
-              label: { fontWeight: 600, fontSize: 13, color: isDark ? '#E2E8F0' : '#374151', marginBottom: 6 },
-              input: {
-                height: 44,
-                borderRadius: 10,
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-                borderColor: isDark ? '#334155' : '#E2E8F0',
-                fontSize: 14,
-                color: isDark ? '#F8FAFC' : '#1E293B',
-              },
-            }}
+            styles={
+              styles || {
+                label: {
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: isDark ? '#E2E8F0' : '#374151',
+                  marginBottom: 6,
+                },
+                input: {
+                  height: 44,
+                  borderRadius: 10,
+                  backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                  fontSize: 14,
+                  color: isDark ? '#F8FAFC' : '#1E293B',
+                },
+              }
+            }
             radius="md"
-            leftSection={leftSection !== undefined ? leftSection : <IconClock size={16} />}
+            leftSection={leftSection !== undefined ? leftSection : <IconClock size={16} stroke={1.8} />}
             error={error}
             rightSection={rightSection}
           />
         </Popover.Target>
 
-        <Popover.Dropdown p="sm">
-          {/* Header */}
-          <Group justify="space-between" align="center" mb={8}>
-            <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: '0.05em' }}>
-              TIME (HH:MM A)
-            </Text>
-            <Badge
-              size="md"
-              radius="sm"
-              variant="outline"
+        <Popover.Dropdown
+          p="sm"
+          style={{
+            backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+            borderRadius: 14,
+          }}
+        >
+          {/* Top Bar: Live Time Badge + AM/PM Segmented Pill */}
+          <Group
+            justify="space-between"
+            align="center"
+            mb="xs"
+            pb={8}
+            style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'}` }}
+          >
+            <Group gap={6} align="center">
+              <IconClock size={15} stroke={2} color="#2563EB" />
+              <Badge
+                size="md"
+                radius="md"
+                variant="light"
+                color="blue"
+                styles={{
+                  root: {
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    letterSpacing: '0.02em',
+                    padding: '4px 10px',
+                    height: 24,
+                  },
+                }}
+              >
+                {formattedDisplay}
+              </Badge>
+            </Group>
+
+            {/* AM / PM Segmented Control */}
+            <SegmentedControl
+              size="xs"
+              radius="xl"
+              value={period}
+              onChange={(val) => handlePeriodSelect(val as 'AM' | 'PM')}
+              data={[
+                { label: 'AM', value: 'AM' },
+                { label: 'PM', value: 'PM' },
+              ]}
               styles={{
                 root: {
-                  borderColor: isDark ? '#475569' : '#D1D5DB',
-                  color: isDark ? '#F1F5F9' : '#1F2937',
+                  backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#EFF6FF',
+                  padding: 2,
+                },
+                indicator: {
+                  backgroundColor: '#2563EB',
+                },
+                label: {
                   fontWeight: 700,
-                  backgroundColor: isDark ? '#1E293B' : '#F3F4F6',
+                  fontSize: 11.5,
+                  padding: '2px 8px',
                 },
               }}
-            >
-              {value || inputText || '11:00 AM'}
-            </Badge>
+            />
           </Group>
 
-          {/* Quick Select Buttons */}
-          <Text size="xs" fw={700} c="dimmed" mb={4} style={{ letterSpacing: '0.03em' }}>
-            QUICK SELECT
-          </Text>
-          <SimpleGrid cols={3} spacing={6} mb={8}>
-            {QUICK_TIME_PRESETS.map((slot) => (
-              <Button
-                key={slot}
-                size="xs"
-                radius="md"
-                variant={inputText === slot ? 'filled' : 'light'}
-                color={inputText === slot ? 'orange' : 'gray'}
-                onClick={() => handleSelectSlot(slot)}
-                style={{
-                  fontWeight: 600,
-                  height: 28,
-                  fontSize: 11,
-                }}
-              >
-                {slot}
-              </Button>
-            ))}
-          </SimpleGrid>
+          {/* Quick Presets (Optional) */}
+          {!hideQuickSelect && (
+            <Box mb="xs" pb={6} style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9'}` }}>
+              <Group gap={4} wrap="wrap">
+                {QUICK_PRESETS.map((slot) => {
+                  const isSlotActive = inputText === slot;
+                  return (
+                    <UnstyledButton
+                      key={slot}
+                      onClick={() => handleSelectPreset(slot)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: isSlotActive ? 700 : 500,
+                        backgroundColor: isSlotActive
+                          ? '#2563EB'
+                          : isDark
+                          ? 'rgba(255, 255, 255, 0.05)'
+                          : '#F8FAFC',
+                        color: isSlotActive ? '#FFFFFF' : isDark ? '#CBD5E1' : '#475569',
+                        border: isSlotActive ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      {slot}
+                    </UnstyledButton>
+                  );
+                })}
+              </Group>
+            </Box>
+          )}
 
-          {/* Standard Interval Select Dropdown */}
-          <Select
-            size="xs"
-            placeholder="Select standard time slot..."
-            data={STANDARD_TIME_SLOTS}
-            value={STANDARD_TIME_SLOTS.includes(inputText) ? inputText : null}
-            onChange={(val) => {
-              if (val) handleSelectSlot(val);
-            }}
-            searchable
-            clearable
-            radius="md"
-            mb={8}
-            styles={{
-              input: {
-                fontSize: 12,
-                fontWeight: 600,
-              },
-            }}
-          />
-          <Divider mb={8} />
-
-          {/* Period (AM / PM) */}
-          <Text size="xs" fw={700} c="dimmed" mb={4} style={{ letterSpacing: '0.03em' }}>
-            PERIOD (AM / PM)
-          </Text>
-          <SimpleGrid cols={2} spacing={6} mb={10}>
-            {(['AM', 'PM'] as const).map((p) => (
-              <Button
-                key={p}
-                size="xs"
-                radius="md"
-                onClick={() => handlePeriodSelect(p)}
-                style={{
-                  backgroundColor: period === p ? '#4B5563' : isDark ? '#1E293B' : '#F3F4F6',
-                  color: period === p ? '#FFFFFF' : isDark ? '#94A3B8' : '#4B5563',
-                  fontWeight: 700,
-                  height: 30,
-                  border: period === p ? 'none' : isDark ? '1px solid #334155' : '1px solid #E5E7EB',
-                  transition: 'all 150ms ease',
-                }}
-              >
-                {p}
-              </Button>
-            ))}
-          </SimpleGrid>
-
-          {/* Hour (01 - 12) */}
-          <Text size="xs" fw={700} c="dimmed" mb={4} style={{ letterSpacing: '0.03em' }}>
-            HOUR (01 – 12)
-          </Text>
-          <SimpleGrid cols={6} spacing={4} mb={10}>
-            {['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map((hr) => (
-              <Button
-                key={hr}
-                size="xs"
-                radius="sm"
-                p={0}
-                onClick={() => handleHourSelect(hr)}
-                style={{
-                  backgroundColor: hours === hr ? '#4B5563' : isDark ? '#1E293B' : '#FFFFFF',
-                  color: hours === hr ? '#FFFFFF' : isDark ? '#F1F5F9' : '#1F2937',
-                  height: 28,
-                  fontSize: 12,
-                  fontWeight: hours === hr ? 700 : 500,
-                  border: hours === hr ? 'none' : isDark ? '1px solid #334155' : '1px solid #E5E7EB',
-                  transition: 'all 150ms ease',
-                }}
-              >
-                {hr}
-              </Button>
-            ))}
-          </SimpleGrid>
-
-          {/* Minute */}
-          <Group justify="space-between" align="center" mb={4}>
-            <Text size="xs" fw={700} c="dimmed" style={{ letterSpacing: '0.03em' }}>
-              MINUTE
+          {/* Column Headers */}
+          <Group justify="space-between" px={10} pb={4}>
+            <Text size="10.5px" fw={700} c="dimmed" style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Hour
             </Text>
-            <Text size="xs" c="dimmed" fw={600}>
-              :{minutes}
+            <Text size="10.5px" fw={700} c="dimmed" style={{ letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              Minute
             </Text>
           </Group>
-          <SimpleGrid cols={6} spacing={4} mb={10}>
-            {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map((min) => (
-              <Button
-                key={min}
-                size="xs"
-                radius="sm"
-                p={0}
-                onClick={() => handleMinuteSelect(min)}
-                style={{
-                  backgroundColor: minutes === min ? '#4B5563' : isDark ? '#1E293B' : '#FFFFFF',
-                  color: minutes === min ? '#FFFFFF' : isDark ? '#F1F5F9' : '#1F2937',
-                  height: 28,
-                  fontSize: 12,
-                  fontWeight: minutes === min ? 700 : 500,
-                  border: minutes === min ? 'none' : isDark ? '1px solid #334155' : '1px solid #E5E7EB',
-                  transition: 'all 150ms ease',
-                }}
-              >
-                {min}
-              </Button>
-            ))}
-          </SimpleGrid>
 
-          <Divider my={8} />
-
-          {/* Footer */}
-          <Group justify="space-between" align="center">
-            <Button
-              variant="subtle"
-              size="xs"
-              p={0}
-              onClick={handleClearTime}
+          {/* Two Sleek Scrollable Columns: Hour & Minute */}
+          <Box
+            style={{
+              display: 'flex',
+              gap: 8,
+              height: 170,
+              position: 'relative',
+            }}
+          >
+            {/* Hours Column */}
+            <Box
+              ref={hourListRef}
               style={{
-                color: '#0078D4',
-                fontWeight: 600,
-                fontSize: 13,
+                flex: 1,
+                overflowY: 'auto',
+                scrollbarWidth: 'thin',
+                paddingRight: 2,
               }}
             >
-              Clear Time
-            </Button>
+              {HOURS.map((hr) => {
+                const isSelected = hours === hr;
+                return (
+                  <UnstyledButton
+                    key={hr}
+                    data-active={isSelected ? 'true' : undefined}
+                    onClick={() => handleHourSelect(hr)}
+                    style={{
+                      width: '100%',
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      marginBottom: 2,
+                      fontSize: 13,
+                      fontWeight: isSelected ? 700 : 500,
+                      backgroundColor: isSelected ? '#2563EB' : 'transparent',
+                      color: isSelected ? '#FFFFFF' : isDark ? '#E2E8F0' : '#334155',
+                      boxShadow: isSelected ? '0 2px 6px rgba(37, 99, 235, 0.3)' : 'none',
+                      transition: 'background-color 0.12s ease, color 0.12s ease',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    {hr}
+                  </UnstyledButton>
+                );
+              })}
+            </Box>
 
-            <Group gap={4} align="center">
-              <Text size="xs" c="dimmed" fw={500}>
-                Exact Min:
-              </Text>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={2}
-                value={exactMinInput}
-                onChange={(e) => handleExactMinChange(e.target.value)}
-                placeholder="0"
-                style={{
-                  width: 38,
-                  height: 26,
-                  borderRadius: 4,
-                  border: isDark ? '1px solid #374151' : '1px solid #D1D5DB',
-                  background: isDark ? '#1E293B' : '#FFFFFF',
-                  color: isDark ? '#FFFFFF' : '#1F2937',
-                  textAlign: 'center',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  outline: 'none',
-                }}
-              />
+            {/* Vertical Separator Hairline */}
+            <Box
+              style={{
+                width: 1,
+                backgroundColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
+                margin: '2px 0',
+              }}
+            />
+
+            {/* Minutes Column */}
+            <Box
+              ref={minuteListRef}
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                scrollbarWidth: 'thin',
+                paddingRight: 2,
+              }}
+            >
+              {minuteList.map((min) => {
+                const isSelected = minutes === min;
+                return (
+                  <UnstyledButton
+                    key={min}
+                    data-active={isSelected ? 'true' : undefined}
+                    onClick={() => handleMinuteSelect(min)}
+                    style={{
+                      width: '100%',
+                      height: 32,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
+                      marginBottom: 2,
+                      fontSize: 13,
+                      fontWeight: isSelected ? 700 : 500,
+                      backgroundColor: isSelected ? '#2563EB' : 'transparent',
+                      color: isSelected ? '#FFFFFF' : isDark ? '#E2E8F0' : '#334155',
+                      boxShadow: isSelected ? '0 2px 6px rgba(37, 99, 235, 0.3)' : 'none',
+                      transition: 'background-color 0.12s ease, color 0.12s ease',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }
+                    }}
+                  >
+                    :{min}
+                  </UnstyledButton>
+                );
+              })}
+            </Box>
+          </Box>
+
+          <Divider my={8} style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }} />
+
+          {/* Footer: Now, Clear, Done */}
+          <Group justify="space-between" align="center">
+            <Group gap={6}>
+              <Button
+                variant="subtle"
+                size="xs"
+                color="blue"
+                p="xs"
+                h={28}
+                onClick={handleSetNow}
+                style={{ fontSize: 11.5, fontWeight: 600 }}
+              >
+                Now
+              </Button>
+              <Button
+                variant="subtle"
+                size="xs"
+                color="gray"
+                p="xs"
+                h={28}
+                onClick={handleClearTime}
+                style={{ fontSize: 11.5, fontWeight: 500 }}
+              >
+                Clear
+              </Button>
             </Group>
 
             <Button
               size="xs"
-              radius="sm"
+              radius="md"
+              h={28}
               onClick={() => setOpened(false)}
               style={{
-                backgroundColor: '#374151',
+                backgroundColor: '#2563EB',
                 color: '#FFFFFF',
-                fontWeight: 700,
-                height: 26,
+                fontWeight: 600,
+                fontSize: 12,
                 padding: '0 14px',
               }}
             >

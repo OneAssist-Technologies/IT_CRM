@@ -361,10 +361,18 @@ export const ContactDrawer: React.FC<ContactDrawerProps> = ({
                 </Text>
                 <Select
                   placeholder="Assign owner"
-                  data={[
-                    { value: 'none', label: '— Unassigned —' },
-                    ...(metadata?.employees?.map((emp) => ({ value: emp.id, label: `${emp.name} (${emp.empCode})` })) || []),
-                  ]}
+                  data={(() => {
+                    const list = [
+                      { value: 'none', label: '— Unassigned —' },
+                      ...(metadata?.employees?.map((emp) => ({ value: emp.id, label: `${emp.name} (${emp.empCode})` })) || []),
+                    ];
+                    const seen = new Set<string>();
+                    return list.filter((opt) => {
+                      if (!opt.value || seen.has(opt.value)) return false;
+                      seen.add(opt.value);
+                      return true;
+                    });
+                  })()}
                   value={contact.assignedTo || 'none'}
                   onChange={async (val) => {
                     await assignContact(contact.id, val === 'none' ? null : val);

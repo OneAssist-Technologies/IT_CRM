@@ -1,3 +1,4 @@
+import { MeetingDatePicker } from '../../meetings/components/MeetingDatePicker';
 import React, { useState, useEffect } from 'react';
 import {
   Paper,
@@ -86,19 +87,17 @@ export const BillingReportsView: React.FC = () => {
       <Paper p="md" withBorder radius="md">
         <Group justify="space-between" wrap="wrap" gap="sm">
           <Group gap="sm" wrap="wrap">
-            <TextInput
+            <MeetingDatePicker
               label="From Date"
-              type="date"
-              size="xs"
+              placeholder="DD-MM-YYYY"
               value={startDate}
-              onChange={(e) => setStartDate(e.currentTarget.value)}
+              onChange={(val: string) => setStartDate(val)}
             />
-            <TextInput
+            <MeetingDatePicker
               label="To Date"
-              type="date"
-              size="xs"
+              placeholder="DD-MM-YYYY"
               value={endDate}
-              onChange={(e) => setEndDate(e.currentTarget.value)}
+              onChange={(val: string) => setEndDate(val)}
             />
             <Button
               variant="light"

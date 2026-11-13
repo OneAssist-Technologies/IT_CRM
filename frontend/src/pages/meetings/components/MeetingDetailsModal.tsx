@@ -42,6 +42,104 @@ import { updateMeetingApi } from '../../../services/meetingService';
 import { MeetingDatePicker } from './MeetingDatePicker';
 import { MeetingTimePicker } from './MeetingTimePicker';
 
+const parseTimeToMinutes = (timeStr: string): { minutes: number; isAM: boolean; isPM: boolean; rawHours: number } | null => {
+  if (!timeStr) return null;
+  const trimmed = timeStr.trim();
+
+  // Match 12-hour: e.g. "10:05 AM", "10:05:00 AM", "10:05am", "2:30 pm"
+  const match12 = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (match12) {
+    const rawHours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const meridiem = match12[4].toUpperCase();
+
+    let h = rawHours;
+    if (h === 12) {
+      h = meridiem === 'PM' ? 12 : 0;
+    } else if (meridiem === 'PM') {
+      h += 12;
+    }
+
+    return {
+      minutes: h * 60 + minutes,
+      isAM: meridiem === 'AM',
+      isPM: meridiem === 'PM',
+      rawHours,
+    };
+  }
+
+  // Match 24-hour: e.g. "10:05", "14:30"
+  const match24 = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = parseInt(match24[2], 10);
+
+    return {
+      minutes: hours * 60 + minutes,
+      isAM: hours < 12,
+      isPM: hours >= 12,
+      rawHours: hours,
+    };
+  }
+
+  return null;
+};
+
+const calculateMeetingDurationStr = (from: string, to: string): string => {
+  const fromParsed = parseTimeToMinutes(from);
+  const toParsed = parseTimeToMinutes(to);
+  if (!fromParsed || !toParsed) return '';
+
+  let fromMin = fromParsed.minutes;
+  let toMin = toParsed.minutes;
+  if (toParsed.rawHours === 12 && toParsed.isAM && fromParsed.isAM && fromMin >= 360) {
+    toMin = 720;
+  }
+  let diffMinutes = toMin - fromMin;
+  if (diffMinutes < 0) diffMinutes += 24 * 60;
+  if (diffMinutes === 0) return '0 Minutes';
+
+  const h = Math.floor(diffMinutes / 60);
+  const m = Math.floor(diffMinutes % 60);
+  if (h > 0 && m > 0) return `${h} Hour ${m} Minutes`;
+  if (h > 0 && m === 0) return `${h} ${h === 1 ? 'Hour' : 'Hours'}`;
+  return `${m} Minutes`;
+};
+
+const calculateEndTime = (startTimeStr: string, durationStr: string): string => {
+  try {
+    const trimmed = (startTimeStr || '10:00 AM').trim();
+    const parts = trimmed.split(' ');
+    const timePart = parts[0] || '10:00';
+    const meridiem = (parts[1] || 'AM').toUpperCase();
+    const [h, m] = timePart.split(':').map(Number);
+    let durMin = 30;
+    if (durationStr.includes('15')) durMin = 15;
+    else if (durationStr.includes('45')) durMin = 45;
+    else if (durationStr.includes('1.5')) durMin = 90;
+    else if (durationStr.includes('2')) durMin = 120;
+    else if (durationStr.includes('1 Hour') || durationStr.includes('60')) durMin = 60;
+    else durMin = 30;
+
+    const baseH = (h % 12) + (meridiem === 'PM' ? 12 : 0);
+    const totalMin = baseH * 60 + (isNaN(m) ? 0 : m) + durMin;
+    const endH = Math.floor(totalMin / 60) % 24;
+    const endM = totalMin % 60;
+    const endMeridiem = endH >= 12 ? 'PM' : 'AM';
+    const displayEndH = (endH % 12) || 12;
+    return `${displayEndH}:${endM.toString().padStart(2, '0')} ${endMeridiem}`;
+  } catch (_) {
+    return '10:30 AM';
+  }
+};
+
+const shouldShowEndTime = (statusVal?: string): boolean => {
+  if (!statusVal) return false;
+  const s = statusVal.toLowerCase().trim();
+  const excluded = ['not interested', 'not-interested', 'cancelled', 'rescheduled', 'scheduled', 'schedule', 'pending'];
+  return !excluded.includes(s);
+};
+
 interface MeetingDetailsModalProps {
   opened: boolean;
   onClose: () => void;
@@ -68,6 +166,7 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
   const [initialStartTime, setInitialStartTime] = useState<string>('');
   const [meetingDate, setMeetingDate] = useState<string>('');
   const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
   const [newMeetingDate, setNewMeetingDate] = useState<string>('');
   const [newMeetingTime, setNewMeetingTime] = useState<string>('');
   const [duration, setDuration] = useState<string>('30 Minutes');
@@ -179,11 +278,23 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
       const cName = meeting.companyName && !lName.includes(meeting.companyName) ? ` (${meeting.companyName})` : '';
       setClientName(lName ? `${lName}${cName}` : 'Lead Contact');
       setHostName(meeting.employeeName || meeting.hostName || meeting.assignedTo || 'Kavin');
+      const initEndTime = meeting.endTime || '';
       setMeetingDate(initDate);
       setStartTime(initTime);
+      setEndTime(initEndTime);
       setNewMeetingDate('');
       setNewMeetingTime('');
-      setDuration(meeting.duration || '30 Minutes');
+      let currentDur = meeting.duration || '30 Minutes';
+      if (shouldShowEndTime(meeting.status || meeting.meetingStatus)) {
+        if (initEndTime && initTime) {
+          const calc = calculateMeetingDurationStr(initTime, initEndTime);
+          if (calc) currentDur = calc;
+        } else if (initTime && !initEndTime) {
+          const computed = calculateEndTime(initTime, currentDur);
+          setEndTime(computed);
+        }
+      }
+      setDuration(currentDur);
       setMeetingType(meeting.meetingType?.toLowerCase().includes('in-person') ? 'In-person' : 'Virtual');
       setLocation(meeting.location || meeting.meetingLocation || meeting.meetingLink || '');
       setStatus(meeting.status || meeting.meetingStatus || 'Scheduled');
@@ -197,6 +308,22 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
   }, [meeting]);
 
   if (!meeting) return null;
+
+  const handleStartTimeChange = (val: string) => {
+    setStartTime(val);
+    if (shouldShowEndTime(status) && val && endTime) {
+      const calcDur = calculateMeetingDurationStr(val, endTime);
+      if (calcDur) setDuration(calcDur);
+    }
+  };
+
+  const handleEndTimeChange = (val: string) => {
+    setEndTime(val);
+    if (startTime && val) {
+      const calcDur = calculateMeetingDurationStr(startTime, val);
+      if (calcDur) setDuration(calcDur);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -298,6 +425,7 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
         startTime: effectiveTime,
         time: effectiveTime,
         meetingTime: effectiveTime,
+        endTime: shouldShowEndTime(status) && endTime ? endTime.trim() : (meeting.endTime || undefined),
         duration: duration.trim(),
         meetingType: meetingType,
         location: location.trim(),
@@ -351,6 +479,9 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm:meeting-updated', { detail: updated }));
+        window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
         if (status === 'Rescheduled') {
           window.dispatchEvent(
             new CustomEvent('crm:notification', {
@@ -458,29 +589,63 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
         </SimpleGrid>
 
         {status !== 'Rescheduled' ? (
-          <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-            <MeetingDatePicker
-              label="Meeting Date"
-              value={meetingDate}
-              onChange={(val) => setMeetingDate(val)}
-              placeholder="dd-mm-yyyy"
-              zIndex={3000}
-            />
-            <MeetingTimePicker
-              label="Meeting Time"
-              value={startTime}
-              onChange={(val) => setStartTime(val)}
-              placeholder="hh:mm A"
-              zIndex={3000}
-            />
-            <Select
-              label="Duration"
-              value={duration}
-              onChange={(val) => setDuration(val || '30 Minutes')}
-              data={['15 Minutes', '30 Minutes', '45 Minutes', '1 Hour', '1.5 Hours', '2 Hours']}
-              radius="md"
-            />
-          </SimpleGrid>
+          shouldShowEndTime(status) ? (
+            <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="sm">
+              <MeetingDatePicker
+                label="Meeting Date"
+                value={meetingDate}
+                onChange={(val) => setMeetingDate(val)}
+                placeholder="dd-mm-yyyy"
+                zIndex={3000}
+              />
+              <MeetingTimePicker
+                label="Meeting Time"
+                value={startTime}
+                onChange={handleStartTimeChange}
+                placeholder="hh:mm A"
+                zIndex={3000}
+              />
+              <MeetingTimePicker
+                label="Meeting End Time"
+                value={endTime}
+                onChange={handleEndTimeChange}
+                placeholder="hh:mm A"
+                zIndex={3000}
+              />
+              <TextInput
+                label="Duration"
+                value={duration}
+                onChange={(e) => setDuration(e.currentTarget.value)}
+                placeholder="Auto-calculated (e.g. 45 Minutes)"
+                radius="md"
+                leftSection={<IconClock size={16} />}
+              />
+            </SimpleGrid>
+          ) : (
+            <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
+              <MeetingDatePicker
+                label="Meeting Date"
+                value={meetingDate}
+                onChange={(val) => setMeetingDate(val)}
+                placeholder="dd-mm-yyyy"
+                zIndex={3000}
+              />
+              <MeetingTimePicker
+                label="Meeting Time"
+                value={startTime}
+                onChange={handleStartTimeChange}
+                placeholder="hh:mm A"
+                zIndex={3000}
+              />
+              <Select
+                label="Duration"
+                value={duration}
+                onChange={(val) => setDuration(val || '30 Minutes')}
+                data={['15 Minutes', '30 Minutes', '45 Minutes', '1 Hour', '1.5 Hours', '2 Hours']}
+                radius="md"
+              />
+            </SimpleGrid>
+          )
         ) : (
           <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
             <Select
@@ -497,7 +662,6 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               data={[
                 { value: 'Virtual', label: 'Virtual (Google Meet / Zoom)' },
                 { value: 'In-person', label: 'In-person' },
-                { value: 'Phone Call', label: 'Phone Call' },
               ]}
               radius="md"
             />
@@ -513,7 +677,6 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               data={[
                 { value: 'Virtual', label: 'Virtual (Google Meet / Zoom)' },
                 { value: 'In-person', label: 'In-person' },
-                { value: 'Phone Call', label: 'Phone Call' },
               ]}
               radius="md"
             />
@@ -603,6 +766,17 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               if (next === 'Rescheduled') {
                 setNewMeetingDate('');
                 setNewMeetingTime('');
+              }
+              if (shouldShowEndTime(next)) {
+                if (!endTime && startTime) {
+                  const computedEnd = calculateEndTime(startTime, duration || '30 Minutes');
+                  setEndTime(computedEnd);
+                  const calc = calculateMeetingDurationStr(startTime, computedEnd);
+                  if (calc) setDuration(calc);
+                } else if (endTime && startTime) {
+                  const calc = calculateMeetingDurationStr(startTime, endTime);
+                  if (calc) setDuration(calc);
+                }
               }
             }}
             allowDeselect={false}
