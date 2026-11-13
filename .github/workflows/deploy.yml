@@ -166,7 +166,7 @@ jobs:
               echo "===== DEPLOYMENT COMPLETED ====="
               pm2 status it-crm-backend
               pm2 status it-crm-frontend
-REMOTE
+          REMOTE
 
       - name: Verify public production endpoints
         run: |
