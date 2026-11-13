@@ -35,10 +35,10 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('oneassist.net.in')) {
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(null, true);
+      return callback(new Error('Origin not allowed by Express CORS'));
     },
     credentials: true, // Enables HttpOnly cookies across origins
   })

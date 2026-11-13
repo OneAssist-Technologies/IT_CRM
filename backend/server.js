@@ -31,10 +31,10 @@ const allowedOrigins = [
 export const io = new SocketIOServer(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('oneassist.net.in')) {
+      if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      return callback(null, true);
+      return callback(new Error('Origin not allowed by Socket.IO CORS'));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -51,7 +51,7 @@ io.on('connection', (socket) => {
 // 5. Start Server Listener
 const PORT = env.PORT || 5000;
 
-server.listen(PORT, async () => {
+server.listen(PORT, '127.0.0.1', async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`⚡ Redis: Active | 🗄️ PostgreSQL: Connected | 🔌 Socket.IO: Ready`);
   await autoSyncDatabase();
