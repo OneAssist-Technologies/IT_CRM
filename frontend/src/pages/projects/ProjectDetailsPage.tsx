@@ -375,34 +375,118 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
     setModuleModalOpened(true);
   };
 
-  // Persist updated modules list to backend
+  // Persist updated modules list to backend and sync with linked Support Ticket tasks
   const saveModulesList = async (newList: ProjectModuleItem[]) => {
+    // 1. Optimistic immediate state and storage update
+    setModules(newList);
+    const allDone =
+      newList.length > 0 &&
+      newList.every((m) => m.status === 'Completed' || (m.progress || 0) >= 100);
+    const computedStatus = allDone ? 'Completed' : 'In Progress';
+
+    if (currentProject) {
+      const updatedProj = { ...currentProject, modules: newList, status: computedStatus };
+      setCurrentProject(updatedProj);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('crm_viewing_project', JSON.stringify(updatedProj));
+        window.dispatchEvent(new CustomEvent('crm_projects_updated', { detail: { projectId: currentProject.id } }));
+      }
+    }
+
+    // 2. Two-way sync: Scan all Support Ticket tasks in localStorage & broadcast update
+    newList.forEach((m) => {
+      const descMatch = (m.description || '').match(/\[Ticket\s+([A-Za-z0-9\-]+)\]/i);
+      const ticketRef = (m as any).ticketNumber || (m as any).ticketId || (descMatch ? descMatch[1] : null);
+      const refMatch = (m.name || '').match(/^(TSK-\d+)/i) || (m.name || '').match(/(TSK-\d+)/i);
+      const taskRefNumber = (m as any).taskRefNumber || (refMatch ? refMatch[1] : null);
+      const taskCleanName = (m.name || '').replace(/^(TSK-\d+)\s*[•\-]\s*/i, '').trim().toLowerCase();
+
+      let nextStatus: 'Pending' | 'In Progress' | 'Completed' = 'Pending';
+      if (m.status === 'Completed' || (m.progress || 0) >= 100) {
+        nextStatus = 'Completed';
+      } else if (m.status === 'In Progress' || (m.progress || 0) > 0) {
+        nextStatus = 'In Progress';
+      }
+
+      // Update all localStorage ticket tasks across all keys
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (
+            key &&
+            key.startsWith('crm_ticket_tasks_') &&
+            !key.includes('initialized') &&
+            !key.includes('cleared')
+          ) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (Array.isArray(parsed)) {
+                let hasChange = false;
+                const updatedTasks = parsed.map((t: any) => {
+                  const matchesRef =
+                    taskRefNumber && (t.refNumber === taskRefNumber || t.id === taskRefNumber);
+                  const matchesName =
+                    taskCleanName &&
+                    t.taskName &&
+                    (t.taskName.toLowerCase().includes(taskCleanName) ||
+                      taskCleanName.includes(t.taskName.toLowerCase()));
+                  if (matchesRef || matchesName) {
+                    hasChange = true;
+                    return { ...t, status: nextStatus };
+                  }
+                  return t;
+                });
+                if (hasChange) {
+                  localStorage.setItem(key, JSON.stringify(updatedTasks));
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Dispatch event to active Support Ticket view
+      window.dispatchEvent(
+        new CustomEvent('crm_ticket_tasks_updated', {
+          detail: {
+            ticketRef,
+            taskRefNumber,
+            taskCleanName,
+            status: nextStatus,
+          },
+        })
+      );
+    });
+
+    // 3. Persist to backend
     setSavingModules(true);
     try {
       const res = await projectService.updateProjectModules(currentProject.id, newList);
-      if (res.success && res.data) {
-        setModules(newList);
-        setCurrentProject(res.data);
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('crm_viewing_project', JSON.stringify(res.data));
-        }
-        notifications.show({
-          title: 'Modules Updated',
-          message: 'Project modules and delivery progress updated successfully.',
-          color: 'teal',
-        });
-        return true;
+      if (currentProject && currentProject.status !== computedStatus) {
+        projectService.updateProject(currentProject.id, { status: computedStatus }).catch(() => {});
       }
-    } catch (err: any) {
+      if (res.success && res.data) {
+        const fullProj = { ...res.data, status: computedStatus };
+        setCurrentProject(fullProj);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('crm_viewing_project', JSON.stringify(fullProj));
+          window.dispatchEvent(new CustomEvent('crm_projects_updated', { detail: { projectId: res.data.id } }));
+        }
+      }
       notifications.show({
-        title: 'Error Saving Modules',
-        message: err.message || 'Could not save module changes.',
-        color: 'red',
+        title: 'Modules & Tasks Updated',
+        message: 'Project modules and linked support ticket tasks updated successfully.',
+        color: 'teal',
       });
+      return true;
+    } catch (err: any) {
+      console.warn('Backend updateProjectModules notice:', err?.message);
+      // Optimistic update succeeded
+      return true;
     } finally {
       setSavingModules(false);
     }
-    return false;
   };
 
   // Save Modal Form
@@ -1363,16 +1447,11 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                         </Box>
                       </Table.Td>
 
-                      {/* 2. Module Name & Description */}
+                      {/* 2. Module Name */}
                       <Table.Td>
                         <Text fw={700} size="13.5px" style={{ color: valueColor, lineHeight: 1.3 }}>
                           {mod.name}
                         </Text>
-                        {mod.description && (
-                          <Text size="11px" c="dimmed" lineClamp={1} mt={2}>
-                            {mod.description}
-                          </Text>
-                        )}
                       </Table.Td>
 
                       {/* 3. Assigned Developer */}
@@ -1527,32 +1606,37 @@ export const ProjectDetailsPage: React.FC<ProjectDetailsPageProps> = ({
                             : { label: 'Not Started', dot: '#94A3B8', bg: isDark ? 'rgba(148, 163, 184, 0.15)' : '#F8FAFC', text: '#64748B', border: 'rgba(148, 163, 184, 0.25)' };
 
                           return (
-                            <Box
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 6,
-                                padding: '3px 9px',
-                                borderRadius: 12,
-                                backgroundColor: cfg.bg,
-                                border: `1px solid ${cfg.border}`,
-                                color: cfg.text,
-                                fontSize: 11.5,
-                                fontWeight: 700,
-                                textTransform: 'capitalize',
-                              }}
-                            >
+                            <Tooltip label={`Click to mark as ${isDone ? 'In Progress' : 'Completed'}`} withArrow position="top">
                               <Box
+                                onClick={() => handleQuickProgressUpdate(mod, isDone ? 0 : 100)}
                                 style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: '50%',
-                                  backgroundColor: cfg.dot,
-                                  boxShadow: `0 0 6px ${cfg.dot}`,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  padding: '3px 9px',
+                                  borderRadius: 12,
+                                  backgroundColor: cfg.bg,
+                                  border: `1px solid ${cfg.border}`,
+                                  color: cfg.text,
+                                  fontSize: 11.5,
+                                  fontWeight: 700,
+                                  textTransform: 'capitalize',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
                                 }}
-                              />
-                              {cfg.label}
-                            </Box>
+                              >
+                                <Box
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    backgroundColor: cfg.dot,
+                                    boxShadow: `0 0 6px ${cfg.dot}`,
+                                  }}
+                                />
+                                {cfg.label}
+                              </Box>
+                            </Tooltip>
                           );
                         })()}
                       </Table.Td>

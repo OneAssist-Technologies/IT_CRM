@@ -46,12 +46,7 @@ export class LeadModel {
   }
 
   static async getDynamicStatuses() {
-    const dbStatuses = await prisma.lead.findMany({
-      select: { status: true },
-      distinct: ['status'],
-    });
-    const fallbackStatuses = ['New', 'In Progress', 'Qualified', 'Proposal Sent', 'In Negotiation', 'Complete', 'Lost'];
-    return Array.from(new Set([...dbStatuses.map(s => s.status === 'Contacted' ? 'In Progress' : ((s.status === 'Won' || s.status === 'Completed') ? 'Complete' : s.status)).filter(Boolean), ...fallbackStatuses]));
+    return ['New', 'In Progress', 'Completed', 'Lost'];
   }
 
   static async getDynamicMetadata() {
@@ -166,7 +161,7 @@ export class LeadModel {
     };
 
     const sources = Array.from(new Set([...dbSources.map(s => s.source).filter(Boolean), ...fallbackSources]));
-    const statuses = Array.from(new Set([...dbStatuses.map(s => (s.status === 'Contacted' || s.status === 'Active') ? 'In Progress' : ((s.status === 'Won' || s.status === 'Completed') ? 'Complete' : s.status)).filter(Boolean), ...fallbackStatuses]));
+    const statuses = ['New', 'In Progress', 'Completed', 'Lost'];
     const stages = Array.from(new Set([...fallbackStages, ...dbStages.map(s => normalizeStage(s.stage)).filter(Boolean)]));
     const categories = Array.from(new Set([...dbCategories.map(c => c.category).filter(Boolean), ...fallbackCategories]));
     const contactTypes = Array.from(new Set([...dbContactTypes.map(c => c.contactType).filter(Boolean), ...fallbackContactTypes]));

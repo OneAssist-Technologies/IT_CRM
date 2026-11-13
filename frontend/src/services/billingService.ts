@@ -11,7 +11,9 @@ import {
   BillingAuditLog,
 } from '../types/billing';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000/api') + '/billing';
+import { API_BASE_URL } from '../config/env';
+
+const API_BASE = `${API_BASE_URL}/billing`;
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;

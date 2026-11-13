@@ -1575,7 +1575,6 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
                 data={[
                   { value: 'Virtual', label: 'Virtual (Google Meet / Zoom)' },
                   { value: 'In-person', label: 'In-person (Office / Client Site)' },
-                  { value: 'Phone Call', label: 'Phone Call' },
                 ]}
                 value={meetingType}
                 onChange={(val) => setMeetingType(val || 'Virtual')}

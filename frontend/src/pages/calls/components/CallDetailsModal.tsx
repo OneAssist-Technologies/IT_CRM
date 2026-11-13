@@ -23,6 +23,8 @@ import {
   IconEdit,
   IconTrash,
   IconNotes,
+  IconBrandWhatsapp,
+  IconMail,
 } from '@tabler/icons-react';
 import { CallLog } from '../../../types/callLog';
 import { useEmployee } from '../../../context/EmployeeContext';
@@ -48,6 +50,9 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({
 
   if (!call) return null;
 
+  const channel = (call as any).channel || 'Calls';
+  const isWhatsapp = String(channel).toLowerCase() === 'whatsapp';
+  const isEmail = String(channel).toLowerCase() === 'email';
   const isIncoming = call.callType?.toLowerCase() === 'incoming';
 
   const getEmployeeDisplayName = (empName?: string, empId?: string | null) => {
@@ -167,15 +172,27 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: isIncoming
+                backgroundColor: isWhatsapp
+                  ? isDark ? 'rgba(34, 197, 94, 0.15)' : '#DCFCE7'
+                  : isEmail
+                  ? isDark ? 'rgba(59, 130, 246, 0.15)' : '#DBEAFE'
+                  : isIncoming
                   ? isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7'
                   : isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
-                color: isIncoming
+                color: isWhatsapp
+                  ? isDark ? '#4ADE80' : '#16A34A'
+                  : isEmail
+                  ? isDark ? '#60A5FA' : '#2563EB'
+                  : isIncoming
                   ? isDark ? '#4ADE80' : '#16A34A'
                   : isDark ? '#60A5FA' : '#2563EB',
               }}
             >
-              {isIncoming ? (
+              {isWhatsapp ? (
+                <IconBrandWhatsapp size={24} stroke={2} />
+              ) : isEmail ? (
+                <IconMail size={24} stroke={2} />
+              ) : isIncoming ? (
                 <IconPhoneIncoming size={24} stroke={2} />
               ) : (
                 <IconPhoneOutgoing size={24} stroke={2} />
@@ -189,7 +206,7 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({
                 {renderStatusBadge(call.status)}
               </Group>
               <Text size="xs" style={{ color: isDark ? '#94A3B8' : '#64748B', marginTop: 2 }}>
-                Channel: <strong>Calls</strong> • Type: <strong>{call.callType}</strong>
+                Channel: <strong>{channel}</strong> • Type: <strong>{call.callType || 'Outgoing'}</strong>
               </Text>
             </div>
           </Group>
@@ -332,7 +349,7 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({
               <IconPhoneCall size={18} color={isDark ? '#94A3B8' : '#64748B'} style={{ marginTop: 2 }} />
               <div>
                 <Text size="11px" fw={600} style={{ color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase' }}>
-                  Call Type
+                  {channel !== 'Calls' ? `${channel} Type` : 'Call Type'}
                 </Text>
                 <Text size="sm" fw={600} style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>
                   {call.callType || 'Outgoing'}
@@ -343,30 +360,28 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({
         </Box>
 
         {/* Description / Discussion Summary / Notes */}
-        {call.description && (
-          <Box>
-            <Group gap="xs" mb={6}>
-              <IconNotes size={16} color={isDark ? '#94A3B8' : '#64748B'} />
-              <Text size="xs" fw={700} style={{ color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase' }}>
-                Call Notes & Discussion Summary
-              </Text>
-            </Group>
-            <Box
-              p="md"
-              style={{
-                borderRadius: 10,
-                backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
-                color: isDark ? '#E2E8F0' : '#1E293B',
-                fontSize: 13,
-                lineHeight: 1.6,
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {call.description}
-            </Box>
+        <Box>
+          <Group gap="xs" mb={6}>
+            <IconNotes size={16} color={isDark ? '#94A3B8' : '#64748B'} />
+            <Text size="xs" fw={700} style={{ color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase' }}>
+              {channel !== 'Calls' ? `${channel} Notes & Discussion Summary` : 'Call Notes & Discussion Summary'}
+            </Text>
+          </Group>
+          <Box
+            p="md"
+            style={{
+              borderRadius: 10,
+              backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+              border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+              color: isDark ? '#E2E8F0' : '#1E293B',
+              fontSize: 13,
+              lineHeight: 1.6,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {call.description || 'Discussion points and activity notes recorded in CRM log.'}
           </Box>
-        )}
+        </Box>
 
         {/* Modal Footer */}
         <Group justify="flex-end" pt="xs" gap="sm">
@@ -380,7 +395,7 @@ export const CallDetailsModal: React.FC<CallDetailsModalProps> = ({
               onEdit(call);
             }}
           >
-            Edit Call
+            {channel !== 'Calls' ? `Edit ${channel}` : 'Edit Call'}
           </Button>
           <Button variant="default" size="sm" radius="md" onClick={onClose}>
             Close

@@ -29,6 +29,7 @@ import {
   IconChevronDown,
   IconChevronsRight,
   IconLock,
+  IconTicket,
 } from '@tabler/icons-react';
 import { useCRM } from '../../context/CRMContext';
 import { usePermissions } from '../../context/AccessControlContext';
@@ -426,6 +427,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 'Contacts',
                 <IconAddressBook size={18} stroke={2} />,
                 activeNav === 'contacts' ||
+                  activeNav === 'contact' ||
                   activeNav === 'add-contact' ||
                   activeNav === 'contact-details' ||
                   activeNav === 'contact-qualification' ||
@@ -476,6 +478,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                 'Projects Management',
                 <IconFolders size={18} stroke={2} />,
                 activeNav.startsWith('projects') || activeNav === 'project' || activeNav === 'add-project'
+              )}
+
+            {(can('support_tickets', 'view') || can('tickets', 'view') || isSuperAdmin) &&
+              renderNavItem(
+                'support-tickets',
+                'Support Tickets',
+                <IconTicket size={18} stroke={2} />,
+                activeNav.startsWith('support-tickets') || activeNav === 'tickets' || activeNav === 'ticket-details'
               )}
 
             {(can('activity_timeline', 'view') || can('activities', 'view') || isSuperAdmin || can('leads', 'view')) &&

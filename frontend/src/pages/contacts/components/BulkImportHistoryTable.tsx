@@ -81,7 +81,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
     if (!employees || employees.length === 0) {
       fetchEmployees();
     }
-  }, [employees, fetchEmployees]);
+  }, []);
 
   const handleAssignOwner = async (batch: ImportBatch, targetId: string | null) => {
     try {

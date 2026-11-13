@@ -61,6 +61,12 @@ export const SYSTEM_MODULES = [
     description: 'Client project delivery, sprints, milestones, and task SLAs.',
   },
   {
+    id: 'support_tickets',
+    name: 'Support Tickets',
+    category: 'Main Navigation',
+    description: 'Customer support tickets, SLA tracking, investigation, and multi-channel resolution.',
+  },
+  {
     id: 'activity_timeline',
     name: 'Activity Timeline',
     category: 'Main Navigation',

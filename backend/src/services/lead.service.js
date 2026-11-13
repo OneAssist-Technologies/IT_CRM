@@ -25,32 +25,70 @@ import {
  * Computes accurate effective timestamp for an activity item based on its business date and time
  */
 export function getActivityEffectiveTime(item) {
-  if (item && item.date) {
+  if (!item) return 0;
+  const createdMs = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+  const updatedMs = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+  // If the record was updated after creation (e.g. status was updated, notes edited)
+  const isUpdatedLater = updatedMs > (createdMs + 5000);
+  const effectiveBaseMs = isUpdatedLater ? updatedMs : createdMs;
+
+  if (item.date) {
     try {
-      const datePart = String(item.date).trim().slice(0, 10);
-      let timePart = '12:00:00';
-      if (item.time) {
-        const tStr = String(item.time).trim();
-        const match12 = tStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
-        if (match12) {
-          let h = parseInt(match12[1], 10);
-          const m = match12[2];
-          const s = match12[3] || '00';
-          const meridiem = (match12[4] || '').toUpperCase();
-          if (meridiem === 'PM' && h < 12) h += 12;
-          if (meridiem === 'AM' && h === 12) h = 0;
-          timePart = `${String(h).padStart(2, '0')}:${m}:${s}`;
-        } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(tStr)) {
-          timePart = tStr;
-        }
+      let datePart = String(item.date).trim();
+      // Normalize DD-MM-YYYY or DD/MM/YYYY to YYYY-MM-DD
+      if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(datePart)) {
+        const parts = datePart.split(/[-/]/);
+        datePart = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else {
+        datePart = datePart.slice(0, 10);
       }
-      const combined = new Date(`${datePart}T${timePart}`);
-      if (!isNaN(combined.getTime())) {
-        return combined.getTime();
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const effectiveDateStr = effectiveBaseMs ? new Date(effectiveBaseMs).toISOString().slice(0, 10) : '';
+
+        // If updated today or created today, the latest action timestamp gives the true sequence
+        if (effectiveDateStr === todayStr || datePart === todayStr) {
+          return effectiveBaseMs || new Date(`${datePart}T12:00:00Z`).getTime();
+        }
+
+        // If date is in the future, it is a scheduled future activity (e.g. meeting next week)
+        // For "Last Activity", the event of scheduling it was completed at createdAt/updatedAt
+        if (datePart > todayStr) {
+          return effectiveBaseMs || Date.now();
+        }
+
+        // If record was modified on a later date than its scheduled/past date, use the update timestamp
+        if (isUpdatedLater && effectiveDateStr > datePart) {
+          return effectiveBaseMs;
+        }
+
+        // If it's an explicitly backdated past day:
+        let timePart = '12:00:00';
+        if (item.time) {
+          const tStr = String(item.time).trim();
+          const match12 = tStr.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+          if (match12) {
+            let h = parseInt(match12[1], 10);
+            const m = match12[2];
+            const s = match12[3] || '00';
+            const meridiem = (match12[4] || '').toUpperCase();
+            if (meridiem === 'PM' && h < 12) h += 12;
+            if (meridiem === 'AM' && h === 12) h = 0;
+            timePart = `${String(h).padStart(2, '0')}:${m}:${s}`;
+          } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(tStr)) {
+            timePart = tStr;
+          }
+        }
+        const combined = new Date(`${datePart}T${timePart}`);
+        if (!isNaN(combined.getTime())) {
+          return combined.getTime();
+        }
       }
     } catch (_) {}
   }
-  return item && item.createdAt ? new Date(item.createdAt).getTime() : 0;
+
+  return effectiveBaseMs;
 }
 
 /**
@@ -113,6 +151,7 @@ export async function attachLastActivityToLeads(leads = []) {
           OR: [
             { leadId: { in: allIdentifiers } },
             { leadCode: { in: leadCodes } },
+            { entityId: { in: allIdentifiers } },
             ...(allContactIds.length > 0 ? [{ contactId: { in: allContactIds } }] : []),
           ],
         },
@@ -177,7 +216,10 @@ export async function attachLastActivityToLeads(leads = []) {
       .filter((a) => {
         if (a.leadId && lIds.has(a.leadId)) return true;
         if (a.leadCode && lIds.has(a.leadCode)) return true;
+        if (a.entityId && lIds.has(a.entityId)) return true;
+        if (a.customerId && lIds.has(a.customerId)) return true;
         if (a.contactId && (lIds.has(a.contactId) || matchedContactIds.has(a.contactId))) return true;
+        if (cleanLeadPhone && a.metadata && typeof a.metadata === 'object' && a.metadata.phoneNumber && String(a.metadata.phoneNumber).replace(/\D/g, '') === cleanLeadPhone) return true;
         return false;
       })
       .forEach((a) => {
@@ -185,16 +227,20 @@ export async function attachLastActivityToLeads(leads = []) {
         const direction = meta.emailType || meta.messageType || meta.callType || (a.type === 'call' ? 'Outgoing' : 'Outgoing');
         const followUpDate = meta.nextFollowDate || meta.followUpDate || null;
 
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const isUpdatedToday = a.updatedAt && new Date(a.updatedAt).toISOString().slice(0, 10) === todayStr && new Date(a.updatedAt).getTime() > (new Date(a.createdAt || 0).getTime() + 5000);
+
         candidateItems.push({
           type: a.type || 'activity',
           title: a.title || 'Activity Logged',
           status: a.status || null,
           direction: direction || 'Outgoing',
           followUpDate: followUpDate || null,
-          date: a.activityDate || null,
+          date: isUpdatedToday ? todayStr : (a.activityDate || null),
           time: a.activityTime || null,
           performedBy: a.performedBy || null,
           createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
         });
       });
 
@@ -202,6 +248,11 @@ export async function attachLastActivityToLeads(leads = []) {
       .filter((m) => {
         if (m.leadId && lIds.has(m.leadId)) return true;
         if (m.contactId && (lIds.has(m.contactId) || matchedContactIds.has(m.contactId))) return true;
+        if (m.clientName) {
+          const clientLow = m.clientName.toLowerCase();
+          if (lead.name && clientLow.includes(lead.name.toLowerCase())) return true;
+          if (lead.companyName && clientLow.includes(lead.companyName.toLowerCase())) return true;
+        }
         return false;
       })
       .forEach((m) => {
@@ -211,6 +262,9 @@ export async function attachLastActivityToLeads(leads = []) {
           if (matchedContact) followUpDate = matchedContact.nextFollowDate;
         }
 
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const isUpdatedToday = m.updatedAt && new Date(m.updatedAt).toISOString().slice(0, 10) === todayStr && new Date(m.updatedAt).getTime() > (new Date(m.createdAt || 0).getTime() + 5000);
+
         candidateItems.push({
           type: 'meeting',
           title: m.title ? `Meeting: ${m.title}` : 'Scheduled Meeting',
@@ -218,10 +272,11 @@ export async function attachLastActivityToLeads(leads = []) {
           status: m.status || 'Scheduled',
           direction: null,
           followUpDate: followUpDate || null,
-          date: m.meetingDate || null,
+          date: isUpdatedToday ? todayStr : (m.meetingDate || null),
           time: m.startTime || null,
           performedBy: m.employeeName || null,
           createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
         });
       });
 
@@ -249,6 +304,7 @@ export async function attachLastActivityToLeads(leads = []) {
           time: c.callTime || null,
           performedBy: c.employeeName || null,
           createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
         });
       });
 
@@ -422,9 +478,9 @@ export async function getLeadStatsService(currentUser = null) {
   const [total, newCount, inProgress, won, lost] = await Promise.all([
     prisma.lead.count({ where: baseWhere }),
     prisma.lead.count({ where: { ...baseWhere, status: 'New' } }),
-    prisma.lead.count({ where: { ...baseWhere, status: { in: ['In Progress', 'Contacted', 'Qualified', 'Active'] } } }),
+    prisma.lead.count({ where: { ...baseWhere, status: { in: ['In Progress', 'Contacted', 'Qualified', 'Active', 'Follow-up', 'Interested', 'Proposal Sent'] } } }),
     prisma.lead.count({ where: { ...baseWhere, status: { in: ['Won', 'Closed Won', 'Completed', 'Complete'] } } }),
-    prisma.lead.count({ where: { ...baseWhere, status: { in: ['Lost', 'Disqualified'] } } }),
+    prisma.lead.count({ where: { ...baseWhere, status: { in: ['Lost', 'Disqualified', 'Unqualified', 'Cancelled'] } } }),
   ]);
 
   return {
@@ -702,11 +758,43 @@ export async function updateLeadService(id, body, currentUser = null) {
         performedBy: currentUser?.name || updated.assignedToName || 'Staff',
         activityDate: new Date().toISOString().slice(0, 10),
       }).catch(() => {});
+    } else if (notes !== undefined && notes !== existing.notes && String(notes).trim().length > 0) {
+      await recordActivity({
+        type: 'note',
+        title: 'Lead Note Added',
+        description: String(notes).slice(0, 150),
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: updated.status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
     } else if (stage !== undefined && stage !== existing.stage) {
       await recordActivity({
         type: 'stage_change',
         title: `Stage: ${stage}`,
         description: `Lead stage updated to ${stage}.`,
+        leadId: updated.id,
+        leadCode: updated.leadId,
+        leadName: updated.name,
+        customerName: updated.companyName || updated.name,
+        entityId: updated.id,
+        entityType: 'Lead',
+        entityNumber: updated.leadId,
+        status: updated.status,
+        performedBy: currentUser?.name || updated.assignedToName || 'Staff',
+        activityDate: new Date().toISOString().slice(0, 10),
+      }).catch(() => {});
+    } else if (notes !== undefined && notes !== existing.notes && String(notes).trim().length > 0) {
+      await recordActivity({
+        type: 'note',
+        title: 'Lead Note Added',
+        description: String(notes).slice(0, 150),
         leadId: updated.id,
         leadCode: updated.leadId,
         leadName: updated.name,

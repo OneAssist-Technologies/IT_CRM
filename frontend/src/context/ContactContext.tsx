@@ -58,7 +58,18 @@ const defaultPagination: ContactPagination = {
   hasNext: false,
 };
 
+const getInitialSavedTab = (): string => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('crm_contacts_tab');
+    if (saved === 'ASSIGNED' || saved === 'BULK_IMPORT' || saved === 'NEW') {
+      return saved;
+    }
+  }
+  return 'NEW';
+};
+
 const defaultFilters: ContactFilter = {
+  tab: getInitialSavedTab(),
   search: '',
   companyName: 'All',
   contactType: 'All',

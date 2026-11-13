@@ -139,6 +139,25 @@ export async function syncExistingContactLeadMeetings() {
         AND (c."status" = 'Qualified' OR c."qualificationStatus" = 'Qualified')
         AND (l."status" = 'Qualified' OR l."stage" = 'Qualification');
     `).catch(() => {});
+
+    // 8. Standardize all lead statuses to the 4 official statuses: New, In Progress, Completed, Lost
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead"
+      SET "status" = 'Completed', "updatedAt" = NOW()
+      WHERE "status" IN ('Won', 'Closed Won', 'Complete');
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead"
+      SET "status" = 'Lost', "updatedAt" = NOW()
+      WHERE "status" IN ('Disqualified', 'Unqualified', 'Cancelled');
+    `).catch(() => {});
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Lead"
+      SET "status" = 'In Progress', "updatedAt" = NOW()
+      WHERE "status" IN ('Contacted', 'Active', 'Follow-up', 'Interested', 'Proposal Sent', 'In Negotiation');
+    `).catch(() => {});
   } catch (err) {
     console.warn('[syncExistingContactLeadMeetings Notice]:', err.message || err);
   }
@@ -150,20 +169,14 @@ export async function syncExistingContactLeadMeetings() {
  */
 export async function autoSyncDatabase() {
   try {
-    console.log('🔄 [Auto-Sync] Checking and creating PostgreSQL SQL tables...');
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
-      cwd: backendDir,
-      stdio: 'pipe',
-      timeout: 30000,
-    });
-    console.log('✅ [Auto-Sync] All PostgreSQL SQL tables verified and synced!');
+    console.log('🔄 [Auto-Sync] Verifying database synchronization...');
     await ensureSystemRolesService();
     console.log('🛡️ [Auto-Sync] Default system roles verified and active!');
     await syncExistingContactLeadMeetings();
     console.log('🤝 [Auto-Sync] Contact, Lead, and Meeting synchronization verified!');
   } catch (error) {
     console.warn('⚠️ [Auto-Sync Notice]:', error.message || error);
-    // Still run meetings sync in case db push was skipped
+    // Still run meetings sync in case
     await syncExistingContactLeadMeetings();
   }
 }

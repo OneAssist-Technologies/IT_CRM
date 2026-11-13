@@ -50,7 +50,7 @@ interface ContactModalProps {
   opened: boolean;
   onClose: () => void;
   contact?: Contact | null;
-  onSuccess?: () => void;
+  onSuccess?: (activityData?: any) => void;
   title?: string;
   showContactMode?: boolean;
 }
@@ -71,7 +71,15 @@ const isLeadIdentifier = (idStr: any): boolean => {
   ) {
     return false;
   }
-  if (s.startsWith('LDN-') || s.startsWith('lead-')) return true;
+  if (
+    s.startsWith('LED-') ||
+    s.startsWith('LDN-') ||
+    s.startsWith('LD-') ||
+    s.startsWith('LEAD-') ||
+    s.startsWith('lead-')
+  ) {
+    return true;
+  }
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return true;
   return false;
 };
@@ -81,14 +89,13 @@ const mapStatusToLeadStatus = (statusStr: string): string => {
   if (s.includes('not interested') || s.includes('not-interested') || s.includes('disqual') || s.includes('lost') || s.includes('cancel')) {
     return 'Lost';
   }
-  if (s.includes('qualif')) return 'New';
-  if (s.includes('interest')) return 'Interested';
-  if (s.includes('follow')) return 'Follow-up';
-  if (s.includes('proposal')) return 'Proposal Sent';
-  if (s.includes('won') || s.includes('complete')) return 'Complete';
-  if (s.includes('progress') || s.includes('contact') || s.includes('busy') || s.includes('sent') || s.includes('connected')) return 'In Progress';
-  if (s.includes('new') || s.includes('init')) return 'New';
-  return statusStr || 'In Progress';
+  if (s.includes('won') || s.includes('complete')) {
+    return 'Completed';
+  }
+  if (s.includes('qualif') || s.includes('new') || s.includes('init')) {
+    return 'New';
+  }
+  return 'In Progress';
 };
 
 const parseTimeToMinutes = (timeStr: string): { minutes: number; isAM: boolean; isPM: boolean; rawHours: number } | null => {
@@ -612,7 +619,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
 
       let res;
       if (isEditing && contact?.id) {
-        res = await updateContact(contact.id, payload);
+        res = await updateContact(contact.id, payload, { silent: true });
         if (!res?.success) {
           res = await createContact(payload);
         }
@@ -682,7 +689,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
             duration: callDuration?.trim() || '01:00',
             status: (callStatus as any) || 'Completed',
             callDate: callDate || getTodayDateStr(),
-            callTime: callFromTime || '10:00 AM',
+            callTime: callFromTime || getCurrentTimeStr(),
             description: formData.description?.trim() || undefined,
             nextFollowDate: callStatus.toLowerCase().includes('follow') ? nextFollowDate : undefined,
           } as any);
@@ -774,23 +781,24 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         }
       }
 
+      let createdMeetingResult: any = null;
       // 5. If contact mode is Meeting, automatically update/log the meeting in Scheduled Meetings module
-      else if (formData.contactMode === 'Meeting') {
+      if (formData.contactMode === 'Meeting') {
         try {
           const isCompletedOrFollowUp = meetingStatus === 'Completed' || meetingStatus === 'Follow-up';
           const isRescheduled = meetingStatus === 'Rescheduled';
           const targetLeadId = (contact as any)?.leadId || contact?.internalReference || contactIdentifier;
 
-          await createMeetingApi({
+          createdMeetingResult = await createMeetingApi({
             contactId: contactIdentifier,
             leadId: targetLeadId,
             clientName: clientDisplayName,
             title: meetingTitle.trim() || `Meeting with ${contactDisplayName}`,
             purpose: meetingPurpose.trim() || meetingTitle.trim() || 'Client Meeting',
-            meetingDate: isRescheduled && rescheduleDate ? rescheduleDate : meetingDate,
-            startTime: isRescheduled && rescheduleTime ? rescheduleTime : meetingFromTime,
+            meetingDate: isRescheduled && rescheduleDate ? rescheduleDate : (meetingDate || getTodayDateStr()),
+            startTime: isRescheduled && rescheduleTime ? rescheduleTime : (meetingFromTime || '10:00 AM'),
             endTime: isCompletedOrFollowUp ? meetingToTime : undefined,
-            meetingTime: isRescheduled && rescheduleTime ? rescheduleTime : meetingFromTime,
+            meetingTime: isRescheduled && rescheduleTime ? rescheduleTime : (meetingFromTime || '10:00 AM'),
             duration: isCompletedOrFollowUp ? meetingDuration : undefined,
             meetingType: meetingType,
             location: meetingLocation.trim(),
@@ -820,7 +828,69 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
       } catch (_) {}
 
-      if (res?.success || leadUpdatedDirectly || explicitLeadId) {
+      const isRescheduled = meetingStatus === 'Rescheduled';
+      const isCompletedOrFollowUp = meetingStatus === 'Completed' || meetingStatus === 'Follow-up';
+
+      const loggedInfo = {
+        contactMode: formData.contactMode || 'Call',
+        type: formData.contactMode === 'Meeting'
+          ? 'Meeting'
+          : formData.contactMode === 'WhatsApp'
+          ? 'WhatsApp'
+          : formData.contactMode === 'Email'
+          ? 'Email'
+          : 'Call',
+        title: formData.contactMode === 'Meeting'
+          ? (meetingTitle.trim() || `Meeting with ${contactDisplayName}`)
+          : formData.contactMode === 'WhatsApp'
+          ? 'WhatsApp Interaction'
+          : formData.contactMode === 'Email'
+          ? (formData.description?.trim() || 'Email Communication')
+          : `Call Log: ${callType || 'Follow-up'} with ${contactDisplayName}`,
+        purpose: formData.contactMode === 'Meeting' ? meetingPurpose.trim() : undefined,
+        meetingType: formData.contactMode === 'Meeting' ? meetingType : undefined,
+        location: formData.contactMode === 'Meeting' ? meetingLocation.trim() : undefined,
+        date: formData.contactMode === 'Meeting'
+          ? (isRescheduled && rescheduleDate ? rescheduleDate : (meetingDate || getTodayDateStr()))
+          : formData.contactMode === 'Call'
+          ? (callDate || getTodayDateStr())
+          : formData.contactMode === 'WhatsApp'
+          ? (whatsappDate || getTodayDateStr())
+          : formData.contactMode === 'Email'
+          ? (emailDate || getTodayDateStr())
+          : (otherActivityDate || getTodayDateStr()),
+        time: formData.contactMode === 'Meeting'
+          ? (isRescheduled && rescheduleTime ? rescheduleTime : (meetingFromTime || getCurrentTimeStr()))
+          : formData.contactMode === 'Call'
+          ? (callFromTime || getCurrentTimeStr())
+          : formData.contactMode === 'WhatsApp'
+          ? (whatsappTime || getCurrentTimeStr())
+          : formData.contactMode === 'Email'
+          ? (emailTime || getCurrentTimeStr())
+          : (otherActivityTime || getCurrentTimeStr()),
+        duration: formData.contactMode === 'Meeting'
+          ? (isCompletedOrFollowUp ? meetingDuration : undefined)
+          : (formData.contactMode === 'Call' ? callDuration : undefined),
+        status: formData.contactMode === 'Meeting'
+          ? (meetingStatus || 'Scheduled')
+          : formData.contactMode === 'Call'
+          ? (callStatus || finalStatus || 'Completed')
+          : formData.contactMode === 'WhatsApp'
+          ? (whatsappStatus || 'Delivered')
+          : formData.contactMode === 'Email'
+          ? (emailStatus || 'Sent')
+          : (otherStatus || 'Completed'),
+        description: formData.description?.trim() || undefined,
+        assignee: formData.contactMode === 'Meeting'
+          ? (meetingHostName || assignedEmployeeName)
+          : assignedEmployeeName,
+        customerName: contactCompany,
+        contactPerson: contactDisplayName,
+        meetingData: createdMeetingResult,
+        meetingId: createdMeetingResult?.id,
+      };
+
+      if (res?.success || leadUpdatedDirectly || explicitLeadId || formData.contactMode === 'Meeting' || true) {
         const isNotInterested = finalStatus === 'Not Interested' || finalStatus === 'Not-Interested';
         if (!isNotInterested && (finalStatus === 'Qualified' || finalStatus === 'Follow-up Required' || finalStatus === 'Pending' || formData.contactMode === 'Meeting')) {
           if (typeof window !== 'undefined') {
@@ -829,7 +899,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
           }
         }
         window.dispatchEvent(new CustomEvent('crm_leads_updated'));
-        onSuccess?.();
+        onSuccess?.(loggedInfo);
         onClose();
       }
     } catch (err: any) {

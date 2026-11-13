@@ -82,6 +82,34 @@ export async function getProjectsService(queryParams = {}, currentUser = null) {
   const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
   const finalSortOrder = sortOrder.toLowerCase() === 'asc' ? 'asc' : 'desc';
 
+  // Synchronize status for projects with modules: Incomplete modules -> 'In Progress', All complete -> 'Completed'
+  try {
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Project"
+      SET "status" = 'In Progress'
+      WHERE "status" = 'Completed'
+        AND "modules" IS NOT NULL
+        AND jsonb_array_length("modules") > 0
+        AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements("modules") elem
+          WHERE (elem->>'status' IS DISTINCT FROM 'Completed')
+            AND (elem->>'progress' IS NULL OR (elem->>'progress')::int < 100)
+        );
+    `);
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Project"
+      SET "status" = 'Completed', "progress" = 100
+      WHERE "status" = 'In Progress'
+        AND "modules" IS NOT NULL
+        AND jsonb_array_length("modules") > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM jsonb_array_elements("modules") elem
+          WHERE (elem->>'status' IS DISTINCT FROM 'Completed')
+            AND (elem->>'progress' IS NULL OR (elem->>'progress')::int < 100)
+        );
+    `);
+  } catch (_) {}
+
   const [total, projects] = await Promise.all([
     prisma.project.count({ where }),
     prisma.project.findMany({
@@ -252,6 +280,34 @@ export async function getProjectStatsService(currentUser = null) {
   } catch (_) {}
 
   const whereClause = scopeFilter ? scopeFilter : {};
+
+  // Auto-sync status so stats group counts reflect module completion accurately
+  try {
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Project"
+      SET "status" = 'In Progress'
+      WHERE "status" = 'Completed'
+        AND "modules" IS NOT NULL
+        AND jsonb_array_length("modules") > 0
+        AND EXISTS (
+          SELECT 1 FROM jsonb_array_elements("modules") elem
+          WHERE (elem->>'status' IS DISTINCT FROM 'Completed')
+            AND (elem->>'progress' IS NULL OR (elem->>'progress')::int < 100)
+        );
+    `);
+    await prisma.$executeRawUnsafe(`
+      UPDATE "Project"
+      SET "status" = 'Completed', "progress" = 100
+      WHERE "status" = 'In Progress'
+        AND "modules" IS NOT NULL
+        AND jsonb_array_length("modules") > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM jsonb_array_elements("modules") elem
+          WHERE (elem->>'status' IS DISTINCT FROM 'Completed')
+            AND (elem->>'progress' IS NULL OR (elem->>'progress')::int < 100)
+        );
+    `);
+  } catch (_) {}
 
   const [statusGroups, budgetAggregate] = await Promise.all([
     prisma.project.groupBy({
@@ -552,6 +608,26 @@ export async function updateProjectService(id, body, user) {
     }
   }
 
+  const modulesToCheck = body.modules !== undefined ? body.modules : existing.modules;
+  const cleanModulesForUpdate = Array.isArray(modulesToCheck) ? modulesToCheck : [];
+  let calculatedStatus = body.status !== undefined ? body.status : existing.status;
+  let calculatedProgress = body.progress !== undefined ? body.progress : existing.progress;
+
+  if (cleanModulesForUpdate.length > 0) {
+    const allModulesCompleted = cleanModulesForUpdate.every((m) => {
+      const isStatusDone = m.status === 'Completed';
+      const isProgDone = parseInt(m.progress, 10) === 100;
+      return isStatusDone || isProgDone;
+    });
+
+    if (allModulesCompleted) {
+      calculatedStatus = 'Completed';
+      calculatedProgress = 100;
+    } else {
+      calculatedStatus = 'In Progress';
+    }
+  }
+
   const updated = await prisma.project.update({
     where: { id: existing.id },
     data: {
@@ -570,11 +646,9 @@ export async function updateProjectService(id, body, user) {
       ...(body.teamMembers !== undefined && {
         teamMembers: Array.isArray(body.teamMembers) ? body.teamMembers : [],
       }),
-      ...(body.status !== undefined && { status: body.status }),
+      status: calculatedStatus,
       ...(body.priority !== undefined && { priority: body.priority }),
-      ...(body.progress !== undefined && {
-        progress: Math.min(100, Math.max(0, parseInt(body.progress, 10) || 0)),
-      }),
+      progress: Math.min(100, Math.max(0, parseInt(calculatedProgress, 10) || 0)),
       ...(body.estimatedBudget !== undefined && {
         estimatedBudget: body.estimatedBudget ? parseFloat(body.estimatedBudget) : null,
       }),
@@ -684,10 +758,20 @@ export async function updateProjectModulesService(id, modules, user) {
   }
 
   let projectStatus = existing.status;
-  if (overallProgress === 100 && cleanModules.length > 0) {
-    projectStatus = 'Completed';
-  } else if (overallProgress > 0 && projectStatus === 'Planning') {
-    projectStatus = 'In Progress';
+  if (cleanModules.length > 0) {
+    const allModulesCompleted = cleanModules.every((m) => {
+      const isStatusDone = m.status === 'Completed';
+      const isProgDone = parseInt(m.progress, 10) === 100;
+      return isStatusDone || isProgDone;
+    });
+
+    if (allModulesCompleted) {
+      projectStatus = 'Completed';
+      overallProgress = 100;
+    } else {
+      // Until all tasks/modules are complete, status MUST be 'In Progress'
+      projectStatus = 'In Progress';
+    }
   }
 
   await prisma.$executeRawUnsafe(
@@ -697,6 +781,37 @@ export async function updateProjectModulesService(id, modules, user) {
     projectStatus,
     existing.id
   );
+
+  // Synchronize any support ticket tasks linked to these modules back to support_ticket_tasks table
+  try {
+    for (const m of cleanModules) {
+      const descMatch = (m.description || '').match(/\[Ticket\s+([A-Za-z0-9\-]+)\]/i);
+      const ticketRef = m.ticketNumber || m.ticketId || (descMatch ? descMatch[1] : null);
+      const refMatch = (m.name || '').match(/^(TSK-\d+)/i) || (m.name || '').match(/(TSK-\d+)/i);
+      const taskRefNumber = m.taskRefNumber || (refMatch ? refMatch[1] : null);
+
+      if (ticketRef && taskRefNumber) {
+        let taskStatus = 'Pending';
+        if (m.status === 'Completed' || parseInt(m.progress, 10) >= 100) {
+          taskStatus = 'Completed';
+        } else if (m.status === 'In Progress' || parseInt(m.progress, 10) > 0) {
+          taskStatus = 'In Progress';
+        }
+
+        await prisma.$executeRawUnsafe(
+          `UPDATE support_ticket_tasks
+           SET status = $1, updated_at = NOW()
+           WHERE (ticket_id IN (SELECT id FROM support_tickets WHERE ticket_number = $2 OR id::text = $2))
+             AND (ref_number = $3 OR id::text = $3)`,
+          taskStatus,
+          ticketRef,
+          taskRefNumber
+        );
+      }
+    }
+  } catch (syncErr) {
+    console.warn('[updateProjectModulesService] Error syncing to support_ticket_tasks:', syncErr);
+  }
 
   const updatedProject = await getProjectByIdService(existing.id);
 

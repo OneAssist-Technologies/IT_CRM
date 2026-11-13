@@ -52,6 +52,7 @@ import {
 } from '../../services/meetingService';
 import { leadService } from '../../services/leadService';
 import { contactService } from '../../services/contactService';
+import { customerService } from '../../services/customerService';
 import { Contact } from '../../types/contact';
 import { useEmployee } from '../../context/EmployeeContext';
 import { useCRM } from '../../context/CRMContext';
@@ -74,6 +75,7 @@ export const ScheduledMeetingsPage: React.FC = () => {
   const { leads, setSelectedLead, fetchLeads } = useLead();
   const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [allCustomers, setAllCustomers] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<ScheduledMeeting[]>([]);
 
   const baseLeads = allLeads.length > 0 ? allLeads : leads;
@@ -122,7 +124,41 @@ export const ScheduledMeetingsPage: React.FC = () => {
       }
     });
 
-    // 2. Synthesize virtual leads for any meeting not matched yet
+    // 2. Incorporate Customers (e.g. from Support Tickets and converted accounts)
+    allCustomers.forEach((cust) => {
+      const custId = String(cust.id);
+      const custCode = cust.customerId ? String(cust.customerId) : '';
+      const custName = (cust.contactPerson || cust.name || cust.companyName || '').trim();
+      const custCo = cust.companyName || cust.name || '';
+      const custNameLower = custName.toLowerCase();
+
+      const exists =
+        seenIds.has(custId) ||
+        (custCode && seenIds.has(custCode)) ||
+        (custName && seenNames.has(custNameLower));
+
+      if (!exists && (custName || custCo)) {
+        seenIds.add(custId);
+        if (custCode) seenIds.add(custCode);
+        if (custName) seenNames.add(custNameLower);
+
+        list.push({
+          id: custId,
+          leadId: custCode || custId,
+          name: custName || custCo,
+          companyName: custCo,
+          email: cust.email || '',
+          phone: cust.phone || '',
+          profession: cust.designation || 'Customer',
+          status: 'Customer',
+          stage: 'Customer',
+          assignedTo: cust.accountManager || '',
+          createdAt: cust.createdAt || new Date().toISOString(),
+        } as Lead);
+      }
+    });
+
+    // 3. Synthesize virtual leads for any meeting not matched yet
     meetings.forEach((m) => {
       const matched = findLeadForMeeting(m, list);
       if (!matched) {
@@ -153,7 +189,7 @@ export const ScheduledMeetingsPage: React.FC = () => {
     });
 
     return list;
-  }, [baseLeads, allContacts, meetings]);
+  }, [baseLeads, allContacts, allCustomers, meetings]);
   const [stats, setStats] = useState<MeetingStats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -255,11 +291,12 @@ const inferDuration = (start?: string, end?: string): string => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [meetingsRes, statsRes, leadsRes, contactsRes] = await Promise.all([
+      const [meetingsRes, statsRes, leadsRes, contactsRes, customersRes] = await Promise.all([
         fetchMeetingsApi(),
         fetchMeetingStatsApi().catch(() => null),
         leadService.getLeads({}, { page: 1, limit: 1000 }).catch(() => null),
         contactService.getContacts({ limit: 1000 }).catch(() => null),
+        customerService.getCustomers({ limit: 1000 }).catch(() => null),
       ]);
       setMeetings(meetingsRes.meetings || []);
       if (statsRes) setStats(statsRes);
@@ -268,6 +305,9 @@ const inferDuration = (start?: string, end?: string): string => {
       }
       if (contactsRes && contactsRes.data) {
         setAllContacts(contactsRes.data);
+      }
+      if (customersRes && (customersRes.data || (customersRes as any).customers)) {
+        setAllCustomers(customersRes.data || (customersRes as any).customers || []);
       }
       if (fetchLeads) fetchLeads();
     } catch (err: any) {
@@ -286,14 +326,26 @@ const inferDuration = (start?: string, end?: string): string => {
   }, []);
 
   useEffect(() => {
+    if (activeNav === 'scheduled-meetings' || activeNav === 'meetings') {
+      loadData();
+    }
+  }, [activeNav]);
+
+  useEffect(() => {
     const handleUpdated = () => {
       loadData();
     };
     window.addEventListener('crm_meetings_updated', handleUpdated);
     window.addEventListener('crm_contacts_updated', handleUpdated);
+    window.addEventListener('crm_customers_updated', handleUpdated);
+    window.addEventListener('crm_leads_updated', handleUpdated);
+    window.addEventListener('crm_activities_updated', handleUpdated);
     return () => {
       window.removeEventListener('crm_meetings_updated', handleUpdated);
       window.removeEventListener('crm_contacts_updated', handleUpdated);
+      window.removeEventListener('crm_customers_updated', handleUpdated);
+      window.removeEventListener('crm_leads_updated', handleUpdated);
+      window.removeEventListener('crm_activities_updated', handleUpdated);
     };
   }, []);
 
@@ -655,6 +707,8 @@ const inferDuration = (start?: string, end?: string): string => {
       setModalOpen(false);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
       }
       await loadData();
     } catch (err: any) {
@@ -682,6 +736,8 @@ const inferDuration = (start?: string, end?: string): string => {
       setDeleteTarget(null);
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
       }
       await loadData();
     } catch (err: any) {

@@ -8,7 +8,7 @@ import {
   ImportBatch,
 } from '../types/contact';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE_URL } from '../config/env';
 
 async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
@@ -49,6 +49,7 @@ export const contactService = {
     params: ContactFilter = {}
   ): Promise<{ success: boolean; data: Contact[]; pagination: ContactPagination }> => {
     const query = new URLSearchParams();
+    if (params.tab) query.append('tab', params.tab);
     if (params.search) query.append('search', params.search);
     if (params.companyName && params.companyName !== 'All') query.append('companyName', params.companyName);
     if (params.contactType && params.contactType !== 'All') query.append('contactType', params.contactType);

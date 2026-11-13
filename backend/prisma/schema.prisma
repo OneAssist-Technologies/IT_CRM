@@ -948,3 +948,135 @@ model Activity {
   @@map("activities")
 }
 
+model SupportTicket {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketNumber          String    @unique @map("ticket_number") @db.VarChar(64)
+  subject               String    @db.VarChar(255)
+  description           String    @db.Text
+  source                String    @default("Customer") @db.VarChar(50)
+  customerId            String?   @map("customer_id") @db.VarChar(64)
+  contactId             String?   @map("contact_id") @db.VarChar(64)
+  contactName           String?   @map("contact_name") @db.VarChar(128)
+  projectId             String?   @map("project_id") @db.VarChar(64)
+  handoverId            String?   @map("handover_id") @db.VarChar(128)
+  contractId            String?   @map("contract_id") @db.VarChar(64)
+  affectedModule        String?   @map("affected_module") @db.VarChar(128)
+  issueType             String    @default("Bug") @map("issue_type") @db.VarChar(64)
+  priority              String    @default("Medium") @db.VarChar(32)
+  status                String    @default("New") @db.VarChar(32)
+  assignedTeam          String?   @map("assigned_team") @db.VarChar(128)
+  assignedTo            String?   @map("assigned_to") @db.VarChar(64)
+  teamLeadId            String?   @map("team_lead_id") @db.VarChar(64)
+  qaAssignedTo          String?   @map("qa_assigned_to") @db.VarChar(64)
+  reportedBy            String    @map("reported_by") @db.VarChar(128)
+  reportedById          String?   @map("reported_by_id") @db.VarChar(64)
+  reportedAt            DateTime  @default(now()) @map("reported_at") @db.Timestamptz
+  firstResponseAt       DateTime? @map("first_response_at") @db.Timestamptz
+  firstResponseDueAt    DateTime? @map("first_response_due_at") @db.Timestamptz
+  resolutionDueAt       DateTime? @map("resolution_due_at") @db.Timestamptz
+  resolvedAt            DateTime? @map("resolved_at") @db.Timestamptz
+  closedAt              DateTime? @map("closed_at") @db.Timestamptz
+  reopenedCount         Int       @default(0) @map("reopened_count")
+  stepsToReproduce      String?   @map("steps_to_reproduce") @db.Text
+  expectedResult        String?   @map("expected_result") @db.Text
+  actualResult          String?   @map("actual_result") @db.Text
+  environment           String?   @default("Production") @db.VarChar(64)
+  browserDevice         String?   @map("browser_device") @db.VarChar(128)
+  errorMessage          String?   @map("error_message") @db.Text
+  rootCause             String?   @map("root_cause") @db.Text
+  workaround            String?   @map("workaround") @db.Text
+  resolutionDescription String?   @map("resolution_description") @db.Text
+  createdBy             String?   @map("created_by") @db.VarChar(64)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status], map: "idx_support_tickets_status")
+  @@index([priority], map: "idx_support_tickets_priority")
+  @@index([customerId], map: "idx_support_tickets_customer")
+  @@index([projectId], map: "idx_support_tickets_project")
+  @@index([assignedTo], map: "idx_support_tickets_assigned_to")
+  @@map("support_tickets")
+}
+
+model SupportTicketAttachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId   String   @map("ticket_id") @db.Uuid
+  fileName   String   @map("file_name") @db.VarChar(255)
+  filePath   String   @map("file_path") @db.VarChar(512)
+  mimeType   String?  @map("mime_type") @db.VarChar(128)
+  fileSize   BigInt?  @map("file_size")
+  uploadedBy String?  @map("uploaded_by") @db.VarChar(128)
+  uploadedById String? @map("uploaded_by_id") @db.VarChar(64)
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_ticket_attachments_ticket_id")
+  @@map("support_ticket_attachments")
+}
+
+model SupportTicketHistory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId    String   @map("ticket_id") @db.Uuid
+  action      String   @db.VarChar(64)
+  fieldName   String?  @map("field_name") @db.VarChar(64)
+  oldValue    String?  @map("old_value") @db.Text
+  newValue    String?  @map("new_value") @db.Text
+  reason      String?  @db.Text
+  performedBy String   @map("performed_by") @db.VarChar(128)
+  performedById String? @map("performed_by_id") @db.VarChar(64)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_ticket_history_ticket_id")
+  @@map("support_ticket_history")
+}
+
+model SupportTicketAssignment {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId         String    @map("ticket_id") @db.Uuid
+  team             String?   @db.VarChar(128)
+  assignedTo       String?   @map("assigned_to") @db.VarChar(64)
+  assignedToName   String?   @map("assigned_to_name") @db.VarChar(128)
+  assignedBy       String?   @map("assigned_by") @db.VarChar(64)
+  assignedByName   String?   @map("assigned_by_name") @db.VarChar(128)
+  assignedAt       DateTime  @default(now()) @map("assigned_at") @db.Timestamptz
+  unassignedAt     DateTime? @map("unassigned_at") @db.Timestamptz
+  assignmentReason String?   @map("assignment_reason") @db.Text
+
+  @@index([ticketId], map: "idx_ticket_assignments_ticket_id")
+  @@map("support_ticket_assignments")
+}
+
+model SupportTicketComment {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId    String   @map("ticket_id") @db.Uuid
+  type        String   @default("public_reply") @db.VarChar(32)
+  message     String   @db.Text
+  authorId    String?  @map("author_id") @db.VarChar(64)
+  authorName  String   @map("author_name") @db.VarChar(128)
+  authorRole  String?  @map("author_role") @db.VarChar(64)
+  attachments Json?    @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_ticket_comments_ticket_id")
+  @@map("support_ticket_comments")
+}
+
+model SupportTicketTask {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketId     String    @map("ticket_id") @db.Uuid
+  refNumber    String    @default("TSK-01") @map("ref_number") @db.VarChar(32)
+  taskName     String    @map("task_name") @db.VarChar(255)
+  assignedTo   String?   @map("assigned_to") @db.VarChar(128)
+  assignedToId String?   @map("assigned_to_id") @db.VarChar(64)
+  targetDate   String?   @map("target_date") @db.VarChar(32)
+  priority     String    @default("Medium") @db.VarChar(32)
+  status       String    @default("Pending") @db.VarChar(32)
+  notes        String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([ticketId], map: "idx_support_ticket_tasks_ticket_id")
+  @@map("support_ticket_tasks")
+}
+
+

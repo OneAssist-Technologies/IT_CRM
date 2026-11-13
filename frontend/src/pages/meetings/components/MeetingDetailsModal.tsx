@@ -479,6 +479,9 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('crm:meeting-updated', { detail: updated }));
+        window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+        window.dispatchEvent(new CustomEvent('crm_leads_updated'));
+        window.dispatchEvent(new CustomEvent('crm_activities_updated'));
         if (status === 'Rescheduled') {
           window.dispatchEvent(
             new CustomEvent('crm:notification', {
@@ -659,7 +662,6 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               data={[
                 { value: 'Virtual', label: 'Virtual (Google Meet / Zoom)' },
                 { value: 'In-person', label: 'In-person' },
-                { value: 'Phone Call', label: 'Phone Call' },
               ]}
               radius="md"
             />
@@ -675,7 +677,6 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               data={[
                 { value: 'Virtual', label: 'Virtual (Google Meet / Zoom)' },
                 { value: 'In-person', label: 'In-person' },
-                { value: 'Phone Call', label: 'Phone Call' },
               ]}
               radius="md"
             />
