@@ -13,8 +13,8 @@ const API_BASE = `${API_BASE_URL}/access-control`;
 const getAuthHeaders = (): Record<string, string> => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (token && token.trim() && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token.trim()}`;
   }
   return headers;
 };

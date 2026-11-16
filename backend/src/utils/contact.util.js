@@ -33,7 +33,7 @@ export function buildContactFilterQuery(queryParams = {}) {
 
   const activeTabUpper = String(tab || section || '').toUpperCase().trim();
   if (activeTabUpper === 'NEW') {
-    // 1. Exclude Bulk Import contacts
+    // 1. Exclude Bulk Import contacts (Bulk Import has its own section; New maintains all direct contacts)
     andConditions.push({
       NOT: [
         { source: { in: ['Bulk Import', 'Import', 'bulk import', 'import'] } },
@@ -46,35 +46,51 @@ export function buildContactFilterQuery(queryParams = {}) {
         { NOT: { internalReference: { startsWith: 'BLK-' } } },
       ],
     });
-    // 2. Exclude Qualified contacts (they belong in Qualification tab)
-    andConditions.push({
-      NOT: [
-        { status: { in: ['Qualified', 'qualified'] } },
-        { qualificationStatus: { in: ['Qualified', 'qualified'] } },
-      ],
-    });
-    // 3. Exclude Not Interested contacts
-    andConditions.push({
-      NOT: [
-        { status: { in: ['Not Interested', 'not interested'] } },
-        { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
-      ],
-    });
+    // 2. Exclude Not Interested contacts (unless specifically filtered)
+    if (!status || status.toLowerCase() !== 'not interested') {
+      andConditions.push({
+        NOT: [
+          { status: { in: ['Not Interested', 'not interested'] } },
+          { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
+        ],
+      });
+    }
   } else if (activeTabUpper === 'ASSIGNED' || activeTabUpper === 'QUALIFICATION') {
-    // 1. Must be Qualified
+    // 1. Must be in Qualification stage or have qualification status or be Qualified
     andConditions.push({
       OR: [
-        { status: { in: ['Qualified', 'qualified'] } },
-        { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+        { stage: { in: ['Qualification', 'qualification'] } },
+        { status: { in: ['Qualification', 'qualification', 'Qualified', 'qualified'] } },
+        {
+          qualificationStatus: {
+            in: [
+              'Qualification', 'qualification',
+              'Qualified', 'qualified',
+              'Follow-up Required', 'follow-up required',
+              'Pending', 'pending',
+              'In Progress', 'in progress',
+              'Unqualified', 'unqualified',
+              'Disqualified', 'disqualified',
+            ],
+          },
+        },
+        {
+          AND: [
+            { qualificationStatus: { not: null } },
+            { qualificationStatus: { notIn: ['', 'New', 'new', 'not connected', 'Not Connected'] } },
+          ],
+        },
       ],
     });
-    // 2. Exclude Not Interested
-    andConditions.push({
-      NOT: [
-        { status: { in: ['Not Interested', 'not interested'] } },
-        { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
-      ],
-    });
+    // 2. Exclude Not Interested (unless specifically filtered)
+    if (!status || status.toLowerCase() !== 'not interested') {
+      andConditions.push({
+        NOT: [
+          { status: { in: ['Not Interested', 'not interested'] } },
+          { qualificationStatus: { in: ['Not Interested', 'not interested'] } },
+        ],
+      });
+    }
   } else if (activeTabUpper === 'BULK_IMPORT') {
     andConditions.push({
       OR: [
@@ -109,18 +125,51 @@ export function buildContactFilterQuery(queryParams = {}) {
   }
   if (status && status !== 'All' && status.trim() !== '') {
     const s = status.trim();
-    andConditions.push({
-      OR: [
-        { status: { equals: s, mode: 'insensitive' } },
-        { qualificationStatus: { equals: s, mode: 'insensitive' } },
-        ...(s.toLowerCase() === 'disqualified' || s.toLowerCase() === 'unqualified'
-          ? [
-              { qualificationStatus: { equals: 'Disqualified', mode: 'insensitive' } },
-              { qualificationStatus: { equals: 'Unqualified', mode: 'insensitive' } },
-            ]
-          : []),
-      ],
-    });
+    const sLow = s.toLowerCase();
+    if (sLow === 'disqualified' || sLow === 'unqualified') {
+      andConditions.push({
+        OR: [
+          { status: { in: ['Unqualified', 'Disqualified', 'unqualified', 'disqualified'] } },
+          { qualificationStatus: { in: ['Unqualified', 'Disqualified', 'unqualified', 'disqualified'] } },
+        ],
+      });
+    } else if (sLow === 'qualification') {
+      andConditions.push({
+        OR: [
+          { status: { in: ['Qualification', 'qualification'] } },
+          { stage: { in: ['Qualification', 'qualification'] } },
+          { qualificationStatus: { in: ['Qualification', 'qualification'] } },
+        ],
+      });
+    } else if (sLow === 'qualified') {
+      andConditions.push({
+        OR: [
+          { status: { in: ['Qualified', 'qualified'] } },
+          { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+        ],
+      });
+    } else if (sLow === 'follow-up required' || sLow === 'follow-up' || sLow === 'followup') {
+      andConditions.push({
+        OR: [
+          { status: { in: ['Follow-up Required', 'follow-up required', 'Follow-up', 'follow-up', 'Followup', 'followup'] } },
+          { qualificationStatus: { in: ['Follow-up Required', 'follow-up required', 'Follow-up', 'follow-up', 'Followup', 'followup'] } },
+        ],
+      });
+    } else if (sLow === 'pending') {
+      andConditions.push({
+        OR: [
+          { status: { in: ['Pending', 'pending'] } },
+          { qualificationStatus: { in: ['Pending', 'pending'] } },
+        ],
+      });
+    } else {
+      andConditions.push({
+        OR: [
+          { status: { equals: s, mode: 'insensitive' } },
+          { qualificationStatus: { equals: s, mode: 'insensitive' } },
+        ],
+      });
+    }
   }
   if (stage && stage !== 'All' && stage.trim() !== '') {
     andConditions.push({ stage: { equals: stage.trim(), mode: 'insensitive' } });
@@ -202,10 +251,13 @@ export function buildContactFilterQuery(queryParams = {}) {
     andConditions.push({
       OR: [
         { name: { contains: q, mode: 'insensitive' } },
+        { contactPerson: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
         { companyName: { contains: q, mode: 'insensitive' } },
         { contactId: { contains: q, mode: 'insensitive' } },
+        { assignedToName: { contains: q, mode: 'insensitive' } },
+        { designation: { contains: q, mode: 'insensitive' } },
         { gstNumber: { contains: q, mode: 'insensitive' } },
         { cinNumber: { contains: q, mode: 'insensitive' } },
         { city: { contains: q, mode: 'insensitive' } },

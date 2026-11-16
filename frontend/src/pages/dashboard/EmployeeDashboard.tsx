@@ -58,7 +58,7 @@ interface EmployeeDashboardProps {
 }
 
 export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate }) => {
-  const { currentUser } = useCRM();
+  const { currentUser, isAuthenticated } = useCRM();
   const { leads } = useLead();
   const { customers } = useCustomer();
   const { projects } = useProject();
@@ -107,6 +107,8 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     // Dynamic invoices from billing service
     billingService
       .getInvoices({ limit: 100 })

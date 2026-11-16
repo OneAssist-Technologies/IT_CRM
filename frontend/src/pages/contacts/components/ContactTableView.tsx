@@ -519,6 +519,9 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
     if (qLow === 'pending' || sLow === 'pending') {
       return 'Pending';
     }
+    if (sLow === 'qualification' || ((c as any).stage === 'Qualification' && (!q || q === 'New' || q === 'new'))) {
+      return 'Qualification';
+    }
     if (s && s !== 'Not Connected' && s !== 'New' && s !== 'new') {
       return s;
     }

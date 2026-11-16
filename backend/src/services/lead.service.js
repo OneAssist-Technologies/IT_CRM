@@ -19,6 +19,124 @@ import {
 } from '../middlewares/permission.middleware.js';
 
 /**
+ * Helper to determine if a user is an Admin / Super Admin or an Employee for lead access.
+ * Returns { isEmployee: false, filter: null, allowedLeadIds: null } for Admins,
+ * and { isEmployee: true, employee: emp, ids: [...], names: [...], filter: { OR: [...] }, allowedLeadIds: [...] } for Employees.
+ */
+export async function resolveLeadEmployeeFilter(currentUser) {
+  if (!currentUser) {
+    return {
+      isEmployee: true,
+      ids: [],
+      names: [],
+      filter: { id: '__none__' },
+      allowedLeadIds: [],
+    };
+  }
+
+  const roleUpper = String(currentUser.role || '').toUpperCase().trim();
+  const emailLower = String(currentUser.email || '').toLowerCase().trim();
+
+  // 1. Super Admin / Admin check
+  if (
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'ADMINISTRATOR' ||
+    roleUpper === 'MANAGEMENT' ||
+    emailLower === 'sandy@gmail.com' ||
+    emailLower === 'sandyy@gmail.com'
+  ) {
+    return { isEmployee: false, filter: null, allowedLeadIds: null };
+  }
+
+  // 2. Check role slug in Role table if roleId exists
+  if (currentUser.roleId) {
+    try {
+      const roleRecord = await prisma.role.findUnique({
+        where: { id: currentUser.roleId },
+        select: { slug: true, appType: true },
+      });
+      if (roleRecord?.slug === 'super_admin' || roleRecord?.slug === 'admin') {
+        return { isEmployee: false, filter: null, allowedLeadIds: null };
+      }
+    } catch (_) {}
+  }
+
+  // 3. User is an Employee -> Find matching employee record
+  const emp = await prisma.employee.findFirst({
+    where: {
+      OR: [
+        ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+        ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+        ...(currentUser.id ? [{ id: currentUser.id }] : []),
+      ],
+    },
+  });
+
+  const ids = new Set();
+  const names = new Set();
+
+  if (currentUser.id) ids.add(currentUser.id);
+  if (currentUser.name) names.add(currentUser.name.trim());
+
+  if (emp) {
+    if (emp.id) ids.add(emp.id);
+    if (emp.empCode) ids.add(emp.empCode);
+    if (emp.name) names.add(emp.name.trim());
+  }
+
+  const idList = Array.from(ids);
+  const nameList = Array.from(names);
+
+  // Filter leads strictly using assigned employee / assigned owner field
+  const or = [];
+  idList.forEach((id) => or.push({ assignedTo: id }));
+  nameList.forEach((name) => {
+    or.push({ assignedToName: { equals: name, mode: 'insensitive' } });
+    or.push({ assignedTo: { equals: name, mode: 'insensitive' } });
+  });
+
+  const filter = or.length > 0 ? { OR: or } : { id: '__none__' };
+
+  // Fetch the lead IDs assigned to this employee for fast sub-record access checks
+  const assignedLeads = await prisma.lead.findMany({
+    where: filter,
+    select: { id: true, leadId: true },
+  });
+
+  const leadIdSet = new Set();
+  assignedLeads.forEach((l) => {
+    if (l.id) leadIdSet.add(l.id);
+    if (l.leadId) leadIdSet.add(l.leadId);
+  });
+  const allowedLeadIds = Array.from(leadIdSet);
+
+  return {
+    isEmployee: true,
+    employee: emp,
+    ids: idList,
+    names: nameList,
+    filter,
+    allowedLeadIds,
+  };
+}
+
+export function canEmployeeAccessLead(lead, empScope) {
+  if (!empScope || !empScope.isEmployee) return true;
+  if (!lead) return false;
+  if (empScope.allowedLeadIds && (empScope.allowedLeadIds.includes(lead.id) || empScope.allowedLeadIds.includes(lead.leadId))) {
+    return true;
+  }
+  const assigned = lead.assignedTo || '';
+  const assignedName = (lead.assignedToName || '').toLowerCase().trim();
+  if (assigned && empScope.ids.includes(assigned)) return true;
+  if (assigned && empScope.names.some((n) => n.toLowerCase() === assigned.toLowerCase())) return true;
+  if (assignedName && empScope.names.some((n) => n.toLowerCase() === assignedName)) return true;
+  return false;
+}
+
+/**
  * 1. List leads with search, filters, pagination, and sorting
  */
 /**
@@ -372,13 +490,12 @@ export async function getLeadsService(queryParams = {}, currentUser = null) {
 
   const where = buildLeadFilterQuery(queryParams);
 
-  // Enforce role-based Data Scope (Own / All)
+  // Enforce Employee lead assignment filtering
   if (currentUser) {
-    const userScope = await resolveUserScope(currentUser, 'leads');
-    const scopeFilter = buildLeadScopeFilter(userScope);
-    if (scopeFilter) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
       where.AND = where.AND || [];
-      where.AND.push(scopeFilter);
+      where.AND.push(empScope.filter);
     }
   }
 
@@ -449,8 +566,8 @@ export async function getLeadByIdService(id, currentUser = null) {
   }
 
   if (currentUser) {
-    const userScope = await resolveUserScope(currentUser, 'leads');
-    if (!isRecordAccessible(lead, userScope)) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee && !canEmployeeAccessLead(lead, empScope)) {
       const error = new Error('Access denied: You do not have permission to access this lead.');
       error.status = 403;
       throw error;
@@ -468,10 +585,9 @@ export async function getLeadStatsService(currentUser = null) {
   let baseWhere = {};
 
   if (currentUser) {
-    const userScope = await resolveUserScope(currentUser, 'leads');
-    const scopeFilter = buildLeadScopeFilter(userScope);
-    if (scopeFilter) {
-      baseWhere = scopeFilter;
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      baseWhere = empScope.filter;
     }
   }
 
@@ -634,8 +750,8 @@ export async function updateLeadService(id, body, currentUser = null) {
   }
 
   if (currentUser) {
-    const userScope = await resolveUserScope(currentUser, 'leads');
-    if (!isRecordAccessible(existing, userScope)) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee && !canEmployeeAccessLead(existing, empScope)) {
       const error = new Error('Access denied: You do not have permission to edit this lead.');
       error.status = 403;
       throw error;
@@ -871,8 +987,8 @@ export async function deleteLeadService(id, currentUser = null) {
   }
 
   if (currentUser) {
-    const userScope = await resolveUserScope(currentUser, 'leads');
-    if (!isRecordAccessible(existing, userScope)) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee && !canEmployeeAccessLead(existing, empScope)) {
       const error = new Error('Access denied: You do not have permission to delete this lead.');
       error.status = 403;
       throw error;
@@ -906,11 +1022,26 @@ export async function deleteLeadService(id, currentUser = null) {
 /**
  * 8. GET ALL PROPOSALS (Inside Lead Module)
  */
-export async function getLeadProposalsService(query = {}) {
+export async function getLeadProposalsService(query = {}, currentUser = null) {
   const { leadId, search, status } = query;
   const where = {};
 
-  if (leadId && leadId !== 'All') {
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(leadId);
+        if (!hasAccess) {
+          return [];
+        }
+        where.leadId = leadId;
+      } else {
+        where.leadId = { in: empScope.allowedLeadIds };
+      }
+    } else if (leadId && leadId !== 'All') {
+      where.leadId = leadId;
+    }
+  } else if (leadId && leadId !== 'All') {
     where.leadId = leadId;
   }
 
@@ -941,7 +1072,7 @@ export const getProposalsService = getLeadProposalsService;
 /**
  * 9. GET SINGLE PROPOSAL BY ID
  */
-export async function getLeadProposalByIdService(id) {
+export async function getLeadProposalByIdService(id, currentUser = null) {
   const proposal = await prisma.proposal.findFirst({
     where: {
       OR: [{ id }, { proposalNumber: id }],
@@ -953,6 +1084,17 @@ export async function getLeadProposalByIdService(id) {
     const err = new Error('Proposal not found.');
     err.status = 404;
     throw err;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (proposal.leadId && !empScope.allowedLeadIds.includes(proposal.leadId)) {
+        const err = new Error('Access denied: You do not have permission to access this proposal.');
+        err.status = 403;
+        throw err;
+      }
+    }
   }
 
   return proposal;
@@ -1126,7 +1268,7 @@ export const updateProposalService = updateLeadProposalService;
 /**
  * 12. DELETE PROPOSAL
  */
-export async function deleteLeadProposalService(id) {
+export async function deleteLeadProposalService(id, currentUser = null) {
   const existing = await prisma.proposal.findFirst({
     where: {
       OR: [{ id }, { proposalNumber: id }],
@@ -1137,6 +1279,17 @@ export async function deleteLeadProposalService(id) {
     const err = new Error('Proposal not found.');
     err.status = 404;
     throw err;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (existing.leadId && !empScope.allowedLeadIds.includes(existing.leadId)) {
+        const err = new Error('Access denied: You do not have permission to delete this proposal.');
+        err.status = 403;
+        throw err;
+      }
+    }
   }
 
   await prisma.proposal.delete({
@@ -1154,7 +1307,7 @@ export const deleteProposalService = deleteLeadProposalService;
 /**
  * 13. GET ALL NEGOTIATIONS
  */
-export async function getLeadNegotiationsService(queryParams = {}) {
+export async function getLeadNegotiationsService(queryParams = {}, currentUser = null) {
   const {
     search,
     status,
@@ -1172,13 +1325,36 @@ export async function getLeadNegotiationsService(queryParams = {}) {
 
   const where = {};
 
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'ALL' && leadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(leadId);
+        if (!hasAccess) {
+          return { data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+        }
+        where.leadId = leadId;
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0 ? [{ leadId: { in: empScope.allowedLeadIds } }] : []),
+          ...empScope.ids.map((id) => ({ assignedTo: id })),
+          ...empScope.names.map((name) => ({ assignedToName: { equals: name, mode: 'insensitive' } })),
+          ...empScope.names.map((name) => ({ assignedTo: { equals: name, mode: 'insensitive' } })),
+        ];
+        where.AND = where.AND || [];
+        where.AND.push({ OR: empConditions });
+      }
+    } else if (leadId && leadId !== 'ALL' && leadId !== 'All') {
+      where.leadId = leadId;
+    }
+  } else if (leadId && leadId !== 'ALL' && leadId !== 'All') {
+    where.leadId = leadId;
+  }
+
   if (status && status !== 'ALL' && status !== 'All') {
     where.status = { equals: status, mode: 'insensitive' };
   }
 
-  if (leadId && leadId !== 'ALL' && leadId !== 'All') {
-    where.leadId = leadId;
-  }
   if (contactId && contactId !== 'ALL' && contactId !== 'All') {
     where.contactId = contactId;
   }
@@ -1264,16 +1440,36 @@ export const getNegotiationsService = getLeadNegotiationsService;
 /**
  * 14. GET NEGOTIATION STATS
  */
-export async function getLeadNegotiationStatsService() {
+export async function getLeadNegotiationStatsService(queryParams = {}, currentUser = null) {
+  let baseWhere = {};
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const qLeadId = queryParams?.leadId;
+      if (qLeadId && qLeadId !== 'ALL' && qLeadId !== 'All') {
+        baseWhere.leadId = qLeadId;
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0 ? [{ leadId: { in: empScope.allowedLeadIds } }] : []),
+          ...empScope.ids.map((id) => ({ assignedTo: id })),
+          ...empScope.names.map((name) => ({ assignedToName: { equals: name, mode: 'insensitive' } })),
+          ...empScope.names.map((name) => ({ assignedTo: { equals: name, mode: 'insensitive' } })),
+        ];
+        baseWhere = { OR: empConditions };
+      }
+    }
+  }
+
   const [all, inProgress, awaitingClient, revisedQuotation, won, lost] = await Promise.all([
     prisma.negotiation.findMany({
+      where: baseWhere,
       select: { quotedAmount: true, expectedFinalAmount: true, status: true },
     }),
-    prisma.negotiation.count({ where: { status: { equals: 'In Progress', mode: 'insensitive' } } }),
-    prisma.negotiation.count({ where: { status: { equals: 'Awaiting Client', mode: 'insensitive' } } }),
-    prisma.negotiation.count({ where: { status: { equals: 'Revised Quotation', mode: 'insensitive' } } }),
-    prisma.negotiation.count({ where: { status: { equals: 'Won', mode: 'insensitive' } } }),
-    prisma.negotiation.count({ where: { status: { equals: 'Lost', mode: 'insensitive' } } }),
+    prisma.negotiation.count({ where: { ...baseWhere, status: { equals: 'In Progress', mode: 'insensitive' } } }),
+    prisma.negotiation.count({ where: { ...baseWhere, status: { equals: 'Awaiting Client', mode: 'insensitive' } } }),
+    prisma.negotiation.count({ where: { ...baseWhere, status: { equals: 'Revised Quotation', mode: 'insensitive' } } }),
+    prisma.negotiation.count({ where: { ...baseWhere, status: { equals: 'Won', mode: 'insensitive' } } }),
+    prisma.negotiation.count({ where: { ...baseWhere, status: { equals: 'Lost', mode: 'insensitive' } } }),
   ]);
 
   const totalQuotedValue = all.reduce((sum, item) => sum + (Number(item.quotedAmount) || 0), 0);
@@ -1295,7 +1491,7 @@ export const getNegotiationStatsService = getLeadNegotiationStatsService;
 /**
  * 15. GET NEGOTIATION BY ID
  */
-export async function getLeadNegotiationByIdService(id) {
+export async function getLeadNegotiationByIdService(id, currentUser = null) {
   const record = await prisma.negotiation.findFirst({
     where: {
       OR: [{ id }, { negotiationId: id }],
@@ -1306,6 +1502,24 @@ export async function getLeadNegotiationByIdService(id) {
     const error = new Error('Negotiation record not found');
     error.status = 404;
     throw error;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = record.leadId && empScope.allowedLeadIds.includes(record.leadId);
+      const hasAssignedAccess =
+        (record.assignedTo &&
+          (empScope.ids.includes(record.assignedTo) ||
+            empScope.names.some((n) => n.toLowerCase() === record.assignedTo.toLowerCase()))) ||
+        (record.assignedToName &&
+          empScope.names.some((n) => n.toLowerCase() === record.assignedToName.toLowerCase()));
+      if (!hasLeadAccess && !hasAssignedAccess) {
+        const error = new Error('Access denied: You do not have permission to access this negotiation.');
+        error.status = 403;
+        throw error;
+      }
+    }
   }
 
   return formatNegotiationResponse(record);
@@ -1593,7 +1807,7 @@ export const updateNegotiationService = updateLeadNegotiationService;
 /**
  * 18. DELETE NEGOTIATION
  */
-export async function deleteLeadNegotiationService(id) {
+export async function deleteLeadNegotiationService(id, currentUser = null) {
   const existing = await prisma.negotiation.findFirst({
     where: {
       OR: [{ id }, { negotiationId: id }],
@@ -1604,6 +1818,24 @@ export async function deleteLeadNegotiationService(id) {
     const error = new Error('Negotiation record not found');
     error.status = 404;
     throw error;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = existing.leadId && empScope.allowedLeadIds.includes(existing.leadId);
+      const hasAssignedAccess =
+        (existing.assignedTo &&
+          (empScope.ids.includes(existing.assignedTo) ||
+            empScope.names.some((n) => n.toLowerCase() === existing.assignedTo.toLowerCase()))) ||
+        (existing.assignedToName &&
+          empScope.names.some((n) => n.toLowerCase() === existing.assignedToName.toLowerCase()));
+      if (!hasLeadAccess && !hasAssignedAccess) {
+        const error = new Error('Access denied: You do not have permission to delete this negotiation.');
+        error.status = 403;
+        throw error;
+      }
+    }
   }
 
   await prisma.negotiation.delete({
@@ -1617,7 +1849,7 @@ export const deleteNegotiationService = deleteLeadNegotiationService;
 /**
  * 19. LIST CONTRACTS (UNDER LEAD MODULE)
  */
-export async function getLeadContractsService(queryParams = {}) {
+export async function getLeadContractsService(queryParams = {}, currentUser = null) {
   const {
     sortBy = 'createdAt',
     sortOrder = 'desc',
@@ -1630,6 +1862,28 @@ export async function getLeadContractsService(queryParams = {}) {
   const skip = (pageNum - 1) * limitNum;
 
   const where = buildContractFilterQuery(queryParams);
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const qLeadId = queryParams.leadId;
+      if (qLeadId && qLeadId !== 'ALL' && qLeadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(qLeadId);
+        if (!hasAccess) {
+          return { data: [], pagination: { total: 0, page: pageNum, limit: limitNum, totalPages: 0 } };
+        }
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0 ? [{ leadId: { in: empScope.allowedLeadIds } }] : []),
+          ...empScope.ids.map((id) => ({ assignedTo: id })),
+          ...empScope.names.map((name) => ({ assignedToName: { equals: name, mode: 'insensitive' } })),
+          ...empScope.names.map((name) => ({ assignedTo: { equals: name, mode: 'insensitive' } })),
+        ];
+        where.AND = where.AND || [];
+        where.AND.push({ OR: empConditions });
+      }
+    }
+  }
 
   const validSortFields = [
     'createdAt',
@@ -1672,8 +1926,40 @@ export const getContractsService = getLeadContractsService;
 /**
  * 20. GET CONTRACT STATS
  */
-export async function getLeadContractStatsService(leadId = null) {
-  const where = leadId && leadId !== 'ALL' && leadId !== 'All' ? { leadId } : {};
+export async function getLeadContractStatsService(leadId = null, currentUser = null) {
+  let where = leadId && leadId !== 'ALL' && leadId !== 'All' ? { leadId } : {};
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'ALL' && leadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(leadId);
+        if (!hasAccess) {
+          return {
+            total: 0,
+            draft: 0,
+            pendingApproval: 0,
+            sentForSignature: 0,
+            partiallySigned: 0,
+            active: 0,
+            completed: 0,
+            expired: 0,
+            terminated: 0,
+            totalContractValue: 0,
+          };
+        }
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0 ? [{ leadId: { in: empScope.allowedLeadIds } }] : []),
+          ...empScope.ids.map((id) => ({ assignedTo: id })),
+          ...empScope.names.map((name) => ({ assignedToName: { equals: name, mode: 'insensitive' } })),
+          ...empScope.names.map((name) => ({ assignedTo: { equals: name, mode: 'insensitive' } })),
+        ];
+        where.AND = where.AND || [];
+        where.AND.push({ OR: empConditions });
+      }
+    }
+  }
 
   const [
     total,
@@ -1722,7 +2008,7 @@ export const getContractStatsService = getLeadContractStatsService;
 /**
  * 21. GET CONTRACT BY ID
  */
-export async function getLeadContractByIdService(id) {
+export async function getLeadContractByIdService(id, currentUser = null) {
   const record = await prisma.contract.findFirst({
     where: {
       OR: [{ id }, { contractId: id }],
@@ -1733,6 +2019,24 @@ export async function getLeadContractByIdService(id) {
     const error = new Error('Contract record not found');
     error.status = 404;
     throw error;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = record.leadId && empScope.allowedLeadIds.includes(record.leadId);
+      const hasAssignedAccess =
+        (record.assignedTo &&
+          (empScope.ids.includes(record.assignedTo) ||
+            empScope.names.some((n) => n.toLowerCase() === record.assignedTo.toLowerCase()))) ||
+        (record.assignedToName &&
+          empScope.names.some((n) => n.toLowerCase() === record.assignedToName.toLowerCase()));
+      if (!hasLeadAccess && !hasAssignedAccess) {
+        const error = new Error('Access denied: You do not have permission to access this contract.');
+        error.status = 403;
+        throw error;
+      }
+    }
   }
 
   return formatContractResponse(record);
@@ -2506,7 +2810,7 @@ export const rejectContractService = rejectLeadContractService;
 /**
  * 24. DELETE CONTRACT
  */
-export async function deleteLeadContractService(id) {
+export async function deleteLeadContractService(id, currentUser = null) {
   const existing = await prisma.contract.findFirst({
     where: {
       OR: [{ id }, { contractId: id }],
@@ -2517,6 +2821,24 @@ export async function deleteLeadContractService(id) {
     const error = new Error('Contract record not found');
     error.status = 404;
     throw error;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = existing.leadId && empScope.allowedLeadIds.includes(existing.leadId);
+      const hasAssignedAccess =
+        (existing.assignedTo &&
+          (empScope.ids.includes(existing.assignedTo) ||
+            empScope.names.some((n) => n.toLowerCase() === existing.assignedTo.toLowerCase()))) ||
+        (existing.assignedToName &&
+          empScope.names.some((n) => n.toLowerCase() === existing.assignedToName.toLowerCase()));
+      if (!hasLeadAccess && !hasAssignedAccess) {
+        const error = new Error('Access denied: You do not have permission to delete this contract.');
+        error.status = 403;
+        throw error;
+      }
+    }
   }
 
   await prisma.contract.delete({

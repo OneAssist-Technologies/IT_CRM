@@ -9,6 +9,7 @@ import {
   deleteEmployeeApi,
 } from '../services/employeeService';
 import { notifications } from '@mantine/notifications';
+import { useCRM } from './CRMContext';
 import {
   IconCheck,
   IconUserCheck,
@@ -34,6 +35,7 @@ interface EmployeeContextType {
 const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);
 
 export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAuthChecking } = useCRM();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeStats, setEmployeeStats] = useState<EmployeeStats | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -56,16 +58,19 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
   const fetchEmployeeStats = useCallback(async () => {
     try {
       const stats = await fetchEmployeeStatsApi();
-      setEmployeeStats(stats);
-    } catch (err) {
-      console.error('Failed to load employee stats:', err);
+      if (stats) {
+        setEmployeeStats(stats);
+      }
+    } catch (_) {
+      // Suppress errors gracefully for non-admin users
     }
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchEmployees();
     fetchEmployeeStats();
-  }, []);
+  }, [fetchEmployees, fetchEmployeeStats, isAuthenticated, isAuthChecking]);
 
   // Onboard / Add Employee
   const addEmployee = async (empData: Partial<Employee>): Promise<boolean> => {

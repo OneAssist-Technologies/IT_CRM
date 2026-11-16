@@ -130,7 +130,7 @@ export async function deleteLead(req, res) {
  */
 export async function getLeadProposals(req, res) {
   try {
-    const proposals = await leadService.getLeadProposalsService(req.query);
+    const proposals = await leadService.getLeadProposalsService(req.query, req.user);
     return res.status(200).json({
       success: true,
       message: 'Proposals retrieved successfully.',
@@ -149,7 +149,7 @@ export const getProposals = getLeadProposals;
  */
 export async function getLeadProposalById(req, res) {
   try {
-    const proposal = await leadService.getLeadProposalByIdService(req.params.id);
+    const proposal = await leadService.getLeadProposalByIdService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       data: proposal,
@@ -205,7 +205,7 @@ export const updateProposal = updateLeadProposal;
  */
 export async function deleteLeadProposal(req, res) {
   try {
-    const result = await leadService.deleteLeadProposalService(req.params.id);
+    const result = await leadService.deleteLeadProposalService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       message: 'Proposal deleted successfully.',
@@ -228,7 +228,7 @@ export const deleteProposal = deleteLeadProposal;
  */
 export async function getLeadNegotiations(req, res) {
   try {
-    const result = await leadService.getLeadNegotiationsService(req.query);
+    const result = await leadService.getLeadNegotiationsService(req.query, req.user);
     return res.status(200).json({
       success: true,
       message: 'Negotiations retrieved successfully',
@@ -248,7 +248,7 @@ export const getNegotiations = getLeadNegotiations;
  */
 export async function getLeadNegotiationStats(req, res) {
   try {
-    const stats = await leadService.getLeadNegotiationStatsService();
+    const stats = await leadService.getLeadNegotiationStatsService(req.query, req.user);
     return res.status(200).json({
       success: true,
       data: stats,
@@ -267,7 +267,7 @@ export const getNegotiationStats = getLeadNegotiationStats;
  */
 export async function getLeadNegotiationById(req, res) {
   try {
-    const negotiation = await leadService.getLeadNegotiationByIdService(req.params.id);
+    const negotiation = await leadService.getLeadNegotiationByIdService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       data: negotiation,
@@ -323,7 +323,7 @@ export const updateNegotiation = updateLeadNegotiation;
  */
 export async function deleteLeadNegotiation(req, res) {
   try {
-    const result = await leadService.deleteLeadNegotiationService(req.params.id);
+    const result = await leadService.deleteLeadNegotiationService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       message: 'Negotiation deleted successfully',
@@ -342,7 +342,7 @@ export const deleteNegotiation = deleteLeadNegotiation;
  */
 export async function getLeadContracts(req, res) {
   try {
-    const result = await leadService.getLeadContractsService(req.query);
+    const result = await leadService.getLeadContractsService(req.query, req.user);
     return res.status(200).json({
       success: true,
       message: 'Contracts retrieved successfully',
@@ -362,7 +362,7 @@ export const getContracts = getLeadContracts;
  */
 export async function getLeadContractStats(req, res) {
   try {
-    const stats = await leadService.getLeadContractStatsService(req.query.leadId);
+    const stats = await leadService.getLeadContractStatsService(req.query.leadId, req.user);
     return res.status(200).json({
       success: true,
       message: 'Contract statistics retrieved successfully',
@@ -382,7 +382,7 @@ export const getContractStats = getLeadContractStats;
  */
 export async function getLeadContractById(req, res) {
   try {
-    const contract = await leadService.getLeadContractByIdService(req.params.id);
+    const contract = await leadService.getLeadContractByIdService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       message: 'Contract retrieved successfully',
@@ -497,7 +497,7 @@ export const rejectContract = rejectLeadContract;
  */
 export async function deleteLeadContract(req, res) {
   try {
-    const result = await leadService.deleteLeadContractService(req.params.id);
+    const result = await leadService.deleteLeadContractService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       message: 'Contract deleted successfully',

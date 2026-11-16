@@ -17,13 +17,13 @@ export const FuturisticAuthLayout: React.FC<FuturisticAuthLayoutProps> = ({
   children,
   onReturnToDashboard,
 }) => {
-  const { setActiveNav } = useCRM();
+  const { setActiveNav, isAuthenticated } = useCRM();
 
   const handleReturn = () => {
     if (onReturnToDashboard) {
       onReturnToDashboard();
     } else {
-      setActiveNav('dashboard');
+      setActiveNav(isAuthenticated ? 'dashboard' : 'signup');
     }
   };
 

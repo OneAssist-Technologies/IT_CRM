@@ -7,7 +7,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
  */
 export async function getCustomers(req, res) {
   try {
-    const result = await customerService.getCustomersService(req.query);
+    const result = await customerService.getCustomersService(req.query, req.user);
     return res.status(200).json({
       success: true,
       message: 'Customers retrieved successfully',
@@ -26,7 +26,7 @@ export async function getCustomers(req, res) {
  */
 export async function getCustomerStats(req, res) {
   try {
-    const stats = await customerService.getCustomerStatsService();
+    const stats = await customerService.getCustomerStatsService(req.user);
     return res.status(200).json({
       success: true,
       stats,
@@ -43,7 +43,7 @@ export async function getCustomerStats(req, res) {
  */
 export async function getCustomerById(req, res) {
   try {
-    const customer = await customerService.getCustomerByIdService(req.params.id);
+    const customer = await customerService.getCustomerByIdService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       data: customer,
@@ -65,7 +65,7 @@ export async function createCustomer(req, res) {
       return sendError(res, 'Company Name, Contact Person, and Phone Number are required.', 400);
     }
 
-    const newCustomer = await customerService.createCustomerService(req.body);
+    const newCustomer = await customerService.createCustomerService(req.body, req.user);
     return res.status(201).json({
       success: true,
       message: `Customer ${newCustomer.companyName} created successfully.`,
@@ -83,7 +83,7 @@ export async function createCustomer(req, res) {
  */
 export async function updateCustomer(req, res) {
   try {
-    const updated = await customerService.updateCustomerService(req.params.id, req.body);
+    const updated = await customerService.updateCustomerService(req.params.id, req.body, req.user);
     return res.status(200).json({
       success: true,
       message: `Customer ${updated.companyName} updated successfully.`,
@@ -101,7 +101,7 @@ export async function updateCustomer(req, res) {
  */
 export async function deleteCustomer(req, res) {
   try {
-    const result = await customerService.deleteCustomerService(req.params.id);
+    const result = await customerService.deleteCustomerService(req.params.id, req.user);
     return res.status(200).json({
       success: true,
       ...result,

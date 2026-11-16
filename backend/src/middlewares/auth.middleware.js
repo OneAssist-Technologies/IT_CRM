@@ -10,9 +10,12 @@ export async function requireAuth(req, res, next) {
   let token = null;
 
   if (req.headers.authorization) {
-    const parts = req.headers.authorization.split(' ');
-    if (parts.length === 2 && parts[0] === 'Bearer') {
-      token = parts[1];
+    const authHeader = req.headers.authorization.trim();
+    const parts = authHeader.split(/\s+/);
+    if (parts.length >= 2 && parts[0].toLowerCase() === 'bearer') {
+      token = parts.slice(1).join(' ').trim();
+    } else if (parts.length === 1 && !parts[0].toLowerCase().startsWith('bearer')) {
+      token = parts[0].trim();
     }
   }
 
@@ -20,24 +23,11 @@ export async function requireAuth(req, res, next) {
     token = req.cookies[COOKIE_NAME];
   }
 
-  if (!token) {
-    if (env.NODE_ENV !== 'production' && !req.headers['x-strict-auth']) {
-      try {
-        const firstUser = (await prisma.user.findFirst({
-          where: { role: 'SUPER_ADMIN' },
-          select: { id: true, email: true, name: true, role: true, department: true, avatar: true },
-        })) || (await prisma.user.findFirst({
-          select: { id: true, email: true, name: true, role: true, department: true, avatar: true },
-        }));
-        if (firstUser) {
-          req.user = firstUser;
-          return next();
-        }
-      } catch (e) {}
-    }
-
+  if (!token || token === 'undefined' || token === 'null' || token.trim() === '') {
     return res.status(401).json({ success: false, message: 'Authentication required. Please login.' });
   }
+
+  token = token.trim();
 
   try {
     req.sessionToken = token;
@@ -46,8 +36,13 @@ export async function requireAuth(req, res, next) {
     if (token.includes('.')) {
       try {
         const decoded = verifyToken(token);
-        if (decoded && decoded.id) {
-          req.user = decoded;
+        if (decoded && (decoded.id || decoded.email)) {
+          req.user = {
+            id: decoded.id,
+            email: decoded.email,
+            name: decoded.name || 'User',
+            role: decoded.role || 'STAFF',
+          };
           return next();
         }
       } catch (_) {}
@@ -55,7 +50,7 @@ export async function requireAuth(req, res, next) {
 
     // 2. Redis Session Cache lookup (<1ms response)
     const cachedSession = await getCache(`crm:session:${token}`);
-    if (cachedSession && cachedSession.id) {
+    if (cachedSession && (cachedSession.id || cachedSession.email)) {
       req.user = {
         id: cachedSession.id,
         email: cachedSession.email,
@@ -65,9 +60,14 @@ export async function requireAuth(req, res, next) {
       return next();
     }
 
-    // 3. Direct User lookup in Database
-    const dbUser = await prisma.user.findUnique({
-      where: { id: token },
+    // 3. Direct User lookup in Database (supports direct user id or email)
+    const dbUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: token },
+          { email: { equals: token, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true, email: true, name: true, role: true },
     });
 
@@ -82,39 +82,8 @@ export async function requireAuth(req, res, next) {
       return next();
     }
 
-    // 4. Dev mode fallback: auto-restore user session in dev
-    if (env.NODE_ENV !== 'production' && !req.headers['x-strict-auth']) {
-      try {
-        const devUser = (await prisma.user.findFirst({
-          where: { role: 'SUPER_ADMIN' },
-          select: { id: true, email: true, name: true, role: true, department: true, avatar: true },
-        })) || (await prisma.user.findFirst({
-          select: { id: true, email: true, name: true, role: true, department: true, avatar: true },
-        }));
-        if (devUser) {
-          req.user = devUser;
-          await setCache(`crm:session:${token}`, devUser, 86400 * 7);
-          return next();
-        }
-      } catch (_) {}
-    }
-
     return res.status(401).json({ success: false, message: 'Invalid or expired session. Please log in again.' });
   } catch (err) {
-    if (env.NODE_ENV !== 'production' && !req.headers['x-strict-auth']) {
-      try {
-        const devUser = (await prisma.user.findFirst({
-          where: { role: 'SUPER_ADMIN' },
-          select: { id: true, email: true, name: true, role: true, department: true, avatar: true },
-        })) || (await prisma.user.findFirst({
-          select: { id: true, email: true, name: true, role: true, department: true, avatar: true },
-        }));
-        if (devUser) {
-          req.user = devUser;
-          return next();
-        }
-      } catch (_) {}
-    }
     return res.status(401).json({ success: false, message: 'Invalid or expired session. Please log in again.' });
   }
 }

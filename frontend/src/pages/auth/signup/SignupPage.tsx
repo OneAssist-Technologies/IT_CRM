@@ -53,7 +53,7 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
     if (onSuccess) {
       onSuccess();
     } else {
-      setActiveNav('dashboard');
+      setActiveNav('login');
     }
   };
 

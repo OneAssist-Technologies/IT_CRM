@@ -1,5 +1,6 @@
 import { Employee, EmployeeStats } from '../types/employee';
 import { API_BASE_URL } from '../config/env';
+import { getAuthHeaders } from './api';
 
 const API_BASE = `${API_BASE_URL}/employees`;
 
@@ -50,6 +51,7 @@ export async function fetchEmployeesApi(filters?: {
     const url = `${API_BASE}${params.toString() ? `?${params.toString()}` : ''}`;
     const res = await fetch(url, {
       credentials: 'include',
+      headers: getAuthHeaders(),
     });
 
     if (!res.ok) {
@@ -83,6 +85,7 @@ export async function fetchEmployeeStatsApi(): Promise<EmployeeStats | null> {
   try {
     const res = await fetch(`${API_BASE}/stats`, {
       credentials: 'include',
+      headers: getAuthHeaders(),
     });
 
     if (!res.ok) return null;
@@ -104,7 +107,7 @@ export async function createEmployeeApi(employeeData: Partial<Employee>): Promis
   try {
     const res = await fetch(API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify(employeeData),
     });
@@ -125,7 +128,7 @@ export async function updateEmployeeApi(id: string, employeeData: Partial<Employ
     }
     const res = await fetch(`${API_BASE}/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify(employeeData),
     });
@@ -144,7 +147,7 @@ export async function updateEmployeeStatusApi(id: string, status: string): Promi
     if (!id || id === 'undefined' || id === 'null') return false;
     const res = await fetch(`${API_BASE}/${id}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ status }),
     });
@@ -162,6 +165,7 @@ export async function deleteEmployeeApi(id: string): Promise<boolean> {
     if (!id || id === 'undefined' || id === 'null') return false;
     const res = await fetch(`${API_BASE}/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
       credentials: 'include',
     });
     return res.ok;

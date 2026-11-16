@@ -9,6 +9,7 @@ import {
   ProjectModuleItem,
 } from '../types/project';
 import { projectService } from '../services/projectService';
+import { useCRM } from './CRMContext';
 
 interface ProjectPagination {
   total: number;
@@ -99,6 +100,7 @@ const getCachedMetadata = (): ProjectMetadata | null => {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAuthChecking } = useCRM();
   const [projects, setProjects] = useState<Project[]>(() => getCachedProjects());
   const [stats, setStats] = useState<ProjectStats | null>(() => getCachedStats());
   const [metadata, setMetadata] = useState<ProjectMetadata | null>(() => getCachedMetadata());
@@ -187,13 +189,15 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // Initial Data Load
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchProjects();
-  }, [fetchProjects]);
+  }, [fetchProjects, isAuthenticated, isAuthChecking]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking]);
 
   // Filters & Pagination Helpers
   const setFilters = useCallback((newFilters: Partial<ProjectFilter>) => {
