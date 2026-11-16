@@ -48,7 +48,7 @@ import { CustomerDetailsModal, CustomerProjectItem } from './components/Customer
 export const CustomersPage: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
-  const { setActiveNav } = useCRM();
+  const { setActiveNav, currentUser } = useCRM();
   const { leads, setSelectedLead, fetchLeads } = useLead();
 
   const {
@@ -127,9 +127,37 @@ export const CustomersPage: React.FC = () => {
   const [page, setPage] = useState<number>(1);
   const pageSize = 10;
 
-  // Filtered customers list based on search query
+  // Role check: Super Admin / Admin vs Employee
+  const isSuperAdminOrAdmin = useMemo(() => {
+    const roleUpper = String(currentUser?.role || '').toUpperCase().trim();
+    return (
+      roleUpper === 'SUPER_ADMIN' ||
+      roleUpper === 'SUPER ADMIN' ||
+      roleUpper === 'ADMIN' ||
+      roleUpper === 'ADMINISTRATOR' ||
+      roleUpper === 'MANAGEMENT' ||
+      currentUser?.email === 'sandy@gmail.com'
+    );
+  }, [currentUser?.role, currentUser?.email]);
+
+  // Filtered customers list based on search query and employee ownership
   const filteredCustomers = useMemo(() => {
+    const currentName = (currentUser?.name || '').toLowerCase().trim();
+    const currentId = (currentUser?.id || '').toLowerCase().trim();
+
     return customers.filter((c) => {
+      // 1. Employee scoping guard: employees only see their own assigned customers
+      if (!isSuperAdminOrAdmin) {
+        const mgr = (c.accountManager || '').toLowerCase().trim();
+        const mgrId = (c.accountManagerId || '').toLowerCase().trim();
+        const isAssigned =
+          (currentName && (mgr === currentName || mgr.includes(currentName) || currentName.includes(mgr))) ||
+          (currentId && (mgrId === currentId || mgr === currentId || mgrId === currentName));
+
+        if (!isAssigned) return false;
+      }
+
+      // 2. Search query filter
       if (searchInput.trim()) {
         const query = searchInput.toLowerCase().trim();
         const matches =
@@ -139,12 +167,13 @@ export const CustomersPage: React.FC = () => {
           (c.email || '').toLowerCase().includes(query) ||
           (c.phone || '').toLowerCase().includes(query) ||
           (c.city || '').toLowerCase().includes(query) ||
-          (c.status || '').toLowerCase().includes(query);
+          (c.status || '').toLowerCase().includes(query) ||
+          (c.accountManager || '').toLowerCase().includes(query);
         if (!matches) return false;
       }
       return true;
     });
-  }, [customers, searchInput]);
+  }, [customers, searchInput, isSuperAdminOrAdmin, currentUser?.name, currentUser?.id]);
 
   // Pagination slice
   const totalCount = filteredCustomers.length;

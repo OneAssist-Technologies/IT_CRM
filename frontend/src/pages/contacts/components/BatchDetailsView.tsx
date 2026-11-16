@@ -41,6 +41,10 @@ export interface BatchDetailsViewProps {
   onDeleteContact: (contact: Contact) => void;
   onQualifyContact: (contact: Contact) => void;
   onAssignContact?: (contact: Contact) => void;
+  searchQuery?: string;
+  statusFilter?: string;
+  assignedFilter?: string;
+  dateFilter?: any;
 }
 
 export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
@@ -50,6 +54,10 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
   onEditContact,
   onDeleteContact,
   onQualifyContact,
+  searchQuery = '',
+  statusFilter = 'All',
+  assignedFilter = 'All',
+  dateFilter,
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
@@ -98,6 +106,11 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
     }
   }, [batchId]);
 
+  // Reset page to 1 when search or filters change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter, assignedFilter]);
+
   // Fetch contacts for this batch
   const fetchBatchContacts = useCallback(async () => {
     try {
@@ -107,6 +120,9 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
         limit,
         sortBy: 'createdAt',
         sortOrder: 'desc',
+        search: searchQuery?.trim() || undefined,
+        status: statusFilter && statusFilter !== 'All' ? statusFilter : undefined,
+        assignedTo: assignedFilter && assignedFilter !== 'All' ? assignedFilter : undefined,
       });
       if (res.success) {
         // Keep all contacts in the batch (including Qualified) visible with their status
@@ -132,7 +148,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
     } finally {
       setContactsLoading(false);
     }
-  }, [batchId, page, limit]);
+  }, [batchId, page, limit, searchQuery, statusFilter, assignedFilter]);
 
   useEffect(() => {
     fetchBatchDetails();
@@ -203,8 +219,71 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  const startRecord = pagination.total === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
-  const endRecord = Math.min(pagination.page * pagination.limit, pagination.total);
+  const displayContacts = React.useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    const st = (statusFilter || 'All').trim().toLowerCase();
+    const as = (assignedFilter || 'All').trim().toLowerCase();
+
+    return contacts.filter((c) => {
+      // 1. Status Filter
+      if (st && st !== 'all') {
+        const contactStatus = (c.status || '').toLowerCase().trim();
+        const qualStatus = (c.qualificationStatus || '').toLowerCase().trim();
+        const matchesStatus =
+          contactStatus === st ||
+          qualStatus === st ||
+          (st === 'qualified' && (contactStatus === 'qualified' || qualStatus === 'qualified')) ||
+          (st === 'pending' && (contactStatus === 'pending' || qualStatus === 'pending')) ||
+          (st === 'follow-up required' && (contactStatus.includes('follow') || qualStatus.includes('follow')));
+        if (!matchesStatus) return false;
+      }
+
+      // 2. Assigned Filter
+      if (as && as !== 'all') {
+        const assignedName = (c.assignedToName || '').toLowerCase().trim();
+        const assignedId = (c.assignedTo || '').toLowerCase().trim();
+        if (as === 'unassigned') {
+          if (assignedName || assignedId) return false;
+        } else {
+          if (!assignedName.includes(as) && !assignedId.includes(as)) return false;
+        }
+      }
+
+      // 3. Search Query
+      if (q) {
+        const name = (c.name || '').toLowerCase();
+        const contactPerson = (c.contactPerson || '').toLowerCase();
+        const company = (c.companyName || '').toLowerCase();
+        const email = (c.email || '').toLowerCase();
+        const phone = (c.phone || '').toLowerCase();
+        const contactId = (c.contactId || c.id || (c as any).bulkId || '').toLowerCase();
+        const assignedTo = (c.assignedToName || '').toLowerCase();
+        const designation = (c.designation || '').toLowerCase();
+        const city = (c.city || '').toLowerCase();
+
+        const matches =
+          name.includes(q) ||
+          contactPerson.includes(q) ||
+          company.includes(q) ||
+          email.includes(q) ||
+          phone.includes(q) ||
+          contactId.includes(q) ||
+          assignedTo.includes(q) ||
+          designation.includes(q) ||
+          city.includes(q);
+
+        if (!matches) return false;
+      }
+
+      return true;
+    });
+  }, [contacts, searchQuery, statusFilter, assignedFilter]);
+
+  const hasFilter = Boolean((searchQuery && searchQuery.trim()) || (statusFilter && statusFilter !== 'All') || (assignedFilter && assignedFilter !== 'All'));
+  const effectiveTotal = hasFilter ? displayContacts.length : pagination.total;
+  const effectiveTotalPages = Math.max(1, Math.ceil(effectiveTotal / limit));
+  const startRecord = effectiveTotal === 0 ? 0 : hasFilter ? 1 : (page - 1) * limit + 1;
+  const endRecord = hasFilter ? displayContacts.length : Math.min(page * limit, effectiveTotal);
 
   const handleContactRowClick = (contact: Contact) => {
     setSelectedContactToUpdate(contact);
@@ -345,7 +424,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
       {/* Contacts Table View */}
       <Box>
           <ContactTableView
-            contacts={contacts}
+            contacts={displayContacts}
             activeTab="BULK_IMPORT"
             loading={contactsLoading}
             onView={handleContactRowClick}
@@ -371,7 +450,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
           >
             <Group justify="space-between" align="center" wrap="wrap">
               <Text size="13px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                Showing {startRecord} to {endRecord} of {pagination.total} contacts in this batch
+                Showing {startRecord} to {endRecord} of {effectiveTotal} contacts in this batch
               </Text>
 
               <Group gap={6} align="center">
@@ -379,8 +458,8 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
                   variant="default"
                   size="xs"
                   radius="md"
-                  disabled={pagination.page <= 1}
-                  onClick={() => setPage(Math.max(1, pagination.page - 1))}
+                  disabled={page <= 1}
+                  onClick={() => setPage(Math.max(1, page - 1))}
                   leftSection={<IconChevronLeft size={13} />}
                   style={{
                     fontSize: 12,
@@ -406,19 +485,19 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
                     fontSize: 12,
                   }}
                 >
-                  {pagination.page}
+                  {page}
                 </Box>
 
                 <Text size="12px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                  of {pagination.totalPages || 1}
+                  of {effectiveTotalPages}
                 </Text>
 
                 <Button
                   variant="default"
                   size="xs"
                   radius="md"
-                  disabled={pagination.page >= (pagination.totalPages || 1)}
-                  onClick={() => setPage(pagination.page + 1)}
+                  disabled={page >= effectiveTotalPages}
+                  onClick={() => setPage(page + 1)}
                   rightSection={<IconChevronRight size={13} />}
                   style={{
                     fontSize: 12,

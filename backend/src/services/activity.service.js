@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { getIO } from '../utils/socket.js';
+import { resolveLeadEmployeeFilter } from './lead.service.js';
 
 /**
  * Format activity response object
@@ -1766,6 +1767,49 @@ export async function getActivitiesService(queryParams = {}, currentUser = null)
     where.AND.push({ OR: leadOrConditions });
   }
 
+  // Scoping for employees
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'all' && leadId !== 'All Leads') {
+        const hasAccess =
+          empScope.allowedLeadIds.includes(leadId) ||
+          (leadCode && empScope.allowedLeadIds.includes(leadCode));
+        if (!hasAccess) {
+          return {
+            data: [],
+            pagination: { total: 0, page: pageNum, limit: limitNum, totalPages: 0 },
+            summary: {
+              all: 0,
+              call: 0,
+              meeting: 0,
+              proposal: 0,
+              contract: 0,
+              invoice: 0,
+              payment: 0,
+              progress: 0,
+              closure: 0,
+              negotiation: 0,
+              qualification: 0,
+              contact: 0,
+            },
+          };
+        }
+      } else {
+        const empActConditions = [
+          ...(empScope.allowedLeadIds.length > 0
+            ? [
+                { leadId: { in: empScope.allowedLeadIds } },
+                { leadCode: { in: empScope.allowedLeadIds } },
+              ]
+            : []),
+          ...empScope.names.map((name) => ({ performedBy: { equals: name, mode: 'insensitive' } })),
+        ];
+        where.AND.push({ OR: empActConditions });
+      }
+    }
+  }
+
   // 3. Customer Filter
   if (customerId && customerId !== 'all' && customerId !== 'All Customers') {
     where.AND.push({
@@ -1858,6 +1902,23 @@ export async function getActivitiesService(queryParams = {}, currentUser = null)
   } else if (endDate) {
     summaryWhere.AND.push({ activityDate: { lte: endDate } });
   }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee && (!leadId || leadId === 'all' || leadId === 'All Leads')) {
+      const empActConditions = [
+        ...(empScope.allowedLeadIds.length > 0
+          ? [
+              { leadId: { in: empScope.allowedLeadIds } },
+              { leadCode: { in: empScope.allowedLeadIds } },
+            ]
+          : []),
+        ...empScope.names.map((name) => ({ performedBy: { equals: name, mode: 'insensitive' } })),
+      ];
+      summaryWhere.AND.push({ OR: empActConditions });
+    }
+  }
+
   const finalSummaryWhere = summaryWhere.AND.length > 0 ? summaryWhere : {};
 
   // Execute count and query

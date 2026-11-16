@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma.js';
 import { getCache, setCache, delCache } from '../config/redis.js';
 import { io } from '../utils/socket.js';
 import { recordActivity } from './activity.service.js';
+import { resolveLeadEmployeeFilter } from './lead.service.js';
 
 const CACHE_KEY_PREFIX = 'crm:meetings:';
 
@@ -140,16 +141,17 @@ function getScheduledMeetingSelectQuery(whereClause = 'WHERE 1=1') {
 /**
  * 1. Get all scheduled meetings from ScheduledMeeting with date-wise sorting and filtering
  */
-export async function getMeetingsService(queryParams = {}) {
+export async function getMeetingsService(queryParams = {}, currentUser = null) {
   const { date, startDate, endDate, status, employeeId, leadId, search } = queryParams;
 
   let where = 'WHERE 1=1';
   const params = [];
   let paramIdx = 1;
 
+  let matchedIds = [];
   if (leadId && leadId !== 'ALL') {
     const cleanId = String(leadId).trim();
-    const matchedIds = [cleanId];
+    matchedIds = [cleanId];
     try {
       const foundLead = await prisma.lead.findFirst({
         where: { OR: [{ id: cleanId }, { leadId: cleanId }] },
@@ -198,6 +200,43 @@ export async function getMeetingsService(queryParams = {}) {
       c.id IN (${placeholders})
     )`;
     params.push(...uniqueIds);
+  }
+
+  // Enforce Employee lead assignment filtering
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'ALL') {
+        const cleanId = String(leadId).trim();
+        const hasAccess =
+          empScope.allowedLeadIds.includes(cleanId) ||
+          matchedIds.some((mId) => empScope.allowedLeadIds.includes(mId));
+        if (!hasAccess) {
+          return {
+            meetings: [],
+            total: 0,
+            pagination: { total: 0, page: 1, limit: 10, totalPages: 0 },
+          };
+        }
+      } else {
+        const empIdPlaceholders = empScope.ids.map(() => `$${paramIdx++}`).join(', ');
+        const empNamePlaceholders = empScope.names.map(() => `$${paramIdx++}`).join(', ');
+        params.push(...empScope.ids, ...empScope.names.map((n) => n.toLowerCase()));
+
+        let empClause = `(
+          m."employeeId" IN (${empIdPlaceholders}) OR
+          LOWER(m."employeeName") IN (${empNamePlaceholders})
+        `;
+
+        if (empScope.allowedLeadIds.length > 0) {
+          const leadPlaceholders = empScope.allowedLeadIds.map(() => `$${paramIdx++}`).join(', ');
+          params.push(...empScope.allowedLeadIds);
+          empClause += ` OR m."lead_id" IN (${leadPlaceholders}) OR l.id IN (${leadPlaceholders}) OR l."leadId" IN (${leadPlaceholders})`;
+        }
+        empClause += `)`;
+        where += ` AND ${empClause}`;
+      }
+    }
   }
 
   if (date && date !== 'ALL') {
@@ -280,7 +319,7 @@ export async function getMeetingsService(queryParams = {}) {
 /**
  * 2. Get Meeting by ID from ScheduledMeeting
  */
-export async function getMeetingByIdService(id) {
+export async function getMeetingByIdService(id, currentUser = null) {
   const query = `${getScheduledMeetingSelectQuery('WHERE m.id = $1')} LIMIT 1`;
   const results = await prisma.$queryRawUnsafe(query, id);
 
@@ -290,7 +329,27 @@ export async function getMeetingByIdService(id) {
     throw error;
   }
 
-  return results[0];
+  const meeting = results[0];
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasEmpAccess =
+        (meeting.employeeId && empScope.ids.includes(meeting.employeeId)) ||
+        (meeting.employeeName &&
+          empScope.names.some((n) => n.toLowerCase() === (meeting.employeeName || '').toLowerCase()));
+      const hasLeadAccess =
+        (meeting.lead_id && empScope.allowedLeadIds.includes(meeting.lead_id)) ||
+        (meeting.leadId && empScope.allowedLeadIds.includes(meeting.leadId));
+      if (!hasEmpAccess && !hasLeadAccess) {
+        const error = new Error('Access denied: You do not have permission to access this meeting.');
+        error.status = 403;
+        throw error;
+      }
+    }
+  }
+
+  return meeting;
 }
 
 /**
@@ -816,12 +875,26 @@ export async function deleteMeetingService(id) {
 /**
  * 6. Meeting Statistics & Overview
  */
-export async function getMeetingStatsService() {
+export async function getMeetingStatsService(currentUser = null) {
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const allMeetings = await prisma.$queryRawUnsafe(
-    `SELECT id, "meetingDate", status, "employeeName" FROM "ScheduledMeeting"`
+  let allMeetings = await prisma.$queryRawUnsafe(
+    `SELECT id, "meetingDate", status, "employeeName", "employeeId", "lead_id" FROM "ScheduledMeeting"`
   );
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      allMeetings = allMeetings.filter((m) => {
+        const hasEmpAccess =
+          (m.employeeId && empScope.ids.includes(m.employeeId)) ||
+          (m.employeeName &&
+            empScope.names.some((n) => n.toLowerCase() === (m.employeeName || '').toLowerCase()));
+        const hasLeadAccess = m.lead_id && empScope.allowedLeadIds.includes(m.lead_id);
+        return hasEmpAccess || hasLeadAccess;
+      });
+    }
+  }
 
   const total = allMeetings.length;
   let todayCount = 0;

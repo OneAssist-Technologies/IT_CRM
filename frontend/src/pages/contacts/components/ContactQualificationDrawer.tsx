@@ -61,7 +61,7 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
   const isDark = computedColorScheme === 'dark';
 
   const { currentUser } = useCRM();
-  const { updateContact, metadata } = useContact();
+  const { updateContact, metadata, setFilters } = useContact();
 
   const drawerProductServiceOptions = useMemo(() => {
     const list = new Set<string>();
@@ -190,6 +190,9 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
           });
         }
 
+        if (setFilters) {
+          setFilters({ tab: 'ASSIGNED', status: 'All', assignmentStatus: 'All' });
+        }
         if (typeof window !== 'undefined') {
           localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
           sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');

@@ -9,6 +9,7 @@ import {
   LeadMetadata,
 } from '../types/lead';
 import { leadService } from '../services/leadService';
+import { useCRM } from './CRMContext';
 
 interface LeadContextType {
   leads: Lead[];
@@ -81,6 +82,7 @@ const defaultMetadata: LeadMetadata = {
 const LeadContext = createContext<LeadContextType | undefined>(undefined);
 
 export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAuthChecking } = useCRM();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<LeadStats | null>(null);
   const [metadata, setMetadata] = useState<LeadMetadata | null>(defaultMetadata);
@@ -136,13 +138,15 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchLeads();
-  }, [fetchLeads]);
+  }, [fetchLeads, isAuthenticated, isAuthChecking]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking]);
 
   const setFilters = useCallback((newFilters: Partial<LeadFilter>) => {
     setFiltersState((prev) => {

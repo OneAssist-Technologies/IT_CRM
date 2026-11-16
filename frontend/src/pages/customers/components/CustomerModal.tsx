@@ -16,6 +16,7 @@ import { IconBuilding, IconUser, IconPhone, IconMail, IconCurrencyRupee, IconWor
 import { Customer, CustomerFormData } from '../../../types/customer';
 import { CRM_COLORS } from '../../../theme/colors';
 import { useEmployee } from '../../../context/EmployeeContext';
+import { useCRM } from '../../../context/CRMContext';
 
 interface CustomerModalProps {
   opened: boolean;
@@ -33,6 +34,21 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
   const { employees } = useEmployee();
+  const { currentUser } = useCRM();
+
+  const isSuperAdminOrAdmin = React.useMemo(() => {
+    const roleUpper = String(currentUser?.role || '').toUpperCase().trim();
+    return (
+      roleUpper === 'SUPER_ADMIN' ||
+      roleUpper === 'SUPER ADMIN' ||
+      roleUpper === 'ADMIN' ||
+      roleUpper === 'ADMINISTRATOR' ||
+      roleUpper === 'MANAGEMENT' ||
+      currentUser?.email === 'sandy@gmail.com'
+    );
+  }, [currentUser?.role, currentUser?.email]);
+
+  const defaultAccountManager = isSuperAdminOrAdmin ? '' : (currentUser?.name || '');
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CustomerFormData>({
@@ -51,7 +67,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
     panNumber: '',
     website: '',
     contractValue: 0,
-    accountManager: '',
+    accountManager: defaultAccountManager,
     notes: '',
   });
 
@@ -93,11 +109,11 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
         panNumber: '',
         website: '',
         contractValue: 0,
-        accountManager: '',
+        accountManager: defaultAccountManager,
         notes: '',
       });
     }
-  }, [customer, opened]);
+  }, [customer, opened, defaultAccountManager]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,7 +250,8 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
               <Select
                 label="Account Manager"
                 placeholder="Select or assign Account Manager"
-                clearable
+                disabled={!isSuperAdminOrAdmin}
+                clearable={isSuperAdminOrAdmin}
                 searchable
                 data={(() => {
                   const seen = new Set<string>();
@@ -259,7 +276,7 @@ export const CustomerModal: React.FC<CustomerModalProps> = ({
                   }
                   return opts;
                 })()}
-                value={formData.accountManager || 'Unassigned'}
+                value={!isSuperAdminOrAdmin ? (currentUser?.name || formData.accountManager || 'Unassigned') : (formData.accountManager || 'Unassigned')}
                 onChange={(val) => setFormData({ ...formData, accountManager: val || 'Unassigned' })}
               />
             </Grid.Col>

@@ -1,18 +1,26 @@
 import { API_BASE_URL } from '../config/env';
 
 /**
- * Standard Fetch Wrapper with automatic HttpOnly Cookie Credentials
+ * Standard Auth Headers generator attaching Bearer token from localStorage
  */
-async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+export function getAuthHeaders(extraHeaders: Record<string, string> = {}): Record<string, string> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(options.headers as Record<string, string>),
+    ...extraHeaders,
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (token && token.trim() && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token.trim()}`;
   }
+  return headers;
+}
+
+/**
+ * Standard Fetch Wrapper with automatic Bearer Token & Credentials
+ */
+export async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+  const headers = getAuthHeaders(options.headers as Record<string, string>);
 
   const response = await fetch(url, {
     ...options,

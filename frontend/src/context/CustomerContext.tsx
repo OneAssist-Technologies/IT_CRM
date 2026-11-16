@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { notifications } from '@mantine/notifications';
 import { Customer, CustomerFormData, CustomerStats } from '../types/customer';
 import { crmApi } from '../services/api';
+import { useCRM } from './CRMContext';
 
 interface CustomerContextType {
   customers: Customer[];
@@ -28,6 +29,7 @@ interface CustomerContextType {
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
 export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { currentUser, isAuthenticated, isAuthChecking } = useCRM();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -75,9 +77,10 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, [search, statusFilter, tierFilter, industryFilter]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchCustomers();
     fetchStats();
-  }, [fetchCustomers, fetchStats]);
+  }, [fetchCustomers, fetchStats, isAuthenticated, isAuthChecking, currentUser?.id, currentUser?.role]);
 
   const createCustomer = async (data: CustomerFormData) => {
     try {

@@ -80,7 +80,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
   const isDark = computedColorScheme === 'dark';
 
   const { currentUser } = useCRM();
-  const { contacts, updateContact, metadata, loading } = useContact();
+  const { contacts, updateContact, metadata, loading, setFilters } = useContact();
   const { fetchLeads, fetchStats } = useLead();
 
   const [activeContact, setActiveContact] = useState<Contact | null>(() => {
@@ -443,6 +443,9 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           });
         }
 
+        if (setFilters) {
+          setFilters({ tab: 'ASSIGNED', status: 'All', assignmentStatus: 'All' });
+        }
         if (typeof window !== 'undefined') {
           localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
           sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');

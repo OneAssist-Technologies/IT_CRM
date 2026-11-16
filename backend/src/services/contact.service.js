@@ -330,15 +330,27 @@ export async function getContactStatsService(currentUser = null) {
 
   const qualifiedCondition = {
     OR: [
-      { status: { in: ['Qualified', 'qualified'] } },
-      { qualificationStatus: { in: ['Qualified', 'qualified'] } },
-    ],
-  };
-
-  const notQualifiedCondition = {
-    NOT: [
-      { status: { in: ['Qualified', 'qualified'] } },
-      { qualificationStatus: { in: ['Qualified', 'qualified'] } },
+      { stage: { in: ['Qualification', 'qualification'] } },
+      { status: { in: ['Qualification', 'qualification', 'Qualified', 'qualified'] } },
+      {
+        qualificationStatus: {
+          in: [
+            'Qualification', 'qualification',
+            'Qualified', 'qualified',
+            'Follow-up Required', 'follow-up required',
+            'Pending', 'pending',
+            'In Progress', 'in progress',
+            'Unqualified', 'unqualified',
+            'Disqualified', 'disqualified',
+          ],
+        },
+      },
+      {
+        AND: [
+          { qualificationStatus: { not: null } },
+          { qualificationStatus: { notIn: ['', 'New', 'new', 'not connected', 'Not Connected'] } },
+        ],
+      },
     ],
   };
 
@@ -352,7 +364,6 @@ export async function getContactStatsService(currentUser = null) {
   const newWhere = {
     AND: [
       notBulkCondition,
-      notQualifiedCondition,
       notInterestedCondition,
       ...(empScope ? [empScope.combinedFilter] : []),
     ],
@@ -2435,6 +2446,7 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
     sortOrder = 'desc',
     search = '',
     status,
+    assignedTo,
   } = queryParams;
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
@@ -2445,7 +2457,32 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
   ];
 
   if (status && status !== 'All' && status !== 'ALL') {
-    andConditions.push({ status: { equals: status.trim(), mode: 'insensitive' } });
+    const s = status.trim();
+    andConditions.push({
+      OR: [
+        { status: { equals: s, mode: 'insensitive' } },
+        { qualificationStatus: { equals: s, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  if (assignedTo && assignedTo !== 'All' && assignedTo !== 'ALL') {
+    if (assignedTo.toLowerCase() === 'unassigned') {
+      andConditions.push({
+        OR: [
+          { assignedTo: null },
+          { assignedTo: '' },
+          { assignmentStatus: 'Unassigned' },
+        ],
+      });
+    } else {
+      andConditions.push({
+        OR: [
+          { assignedTo: { equals: assignedTo, mode: 'insensitive' } },
+          { assignedToName: { equals: assignedTo, mode: 'insensitive' } },
+        ],
+      });
+    }
   }
 
   if (search && search.trim()) {
@@ -2453,10 +2490,14 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
     andConditions.push({
       OR: [
         { name: { contains: q, mode: 'insensitive' } },
+        { contactPerson: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
         { phone: { contains: q, mode: 'insensitive' } },
         { companyName: { contains: q, mode: 'insensitive' } },
         { bulkId: { contains: q, mode: 'insensitive' } },
+        { assignedToName: { contains: q, mode: 'insensitive' } },
+        { designation: { contains: q, mode: 'insensitive' } },
+        { city: { contains: q, mode: 'insensitive' } },
       ],
     });
   }

@@ -10,6 +10,7 @@ import {
 } from '../types/callLog';
 
 import { API_BASE_URL } from '../config/env';
+import { getAuthHeaders } from './api';
 
 const API_BASE = `${API_BASE_URL}/call-logs`;
 
@@ -43,7 +44,10 @@ export async function fetchCallLogsApi(filters?: CallLogFilters): Promise<{
   }
 
   const url = `${API_BASE}${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url, { credentials: 'include' });
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
 
   if (!res.ok) {
     throw new Error(`Failed to fetch call logs (${res.status})`);
@@ -58,7 +62,10 @@ export async function fetchCallLogsApi(filters?: CallLogFilters): Promise<{
 }
 
 export async function fetchCallLogStatsApi(): Promise<CallLogStats> {
-  const res = await fetch(`${API_BASE}/stats`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE}/stats`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     throw new Error('Failed to fetch call log stats');
   }
@@ -69,7 +76,7 @@ export async function fetchCallLogStatsApi(): Promise<CallLogStats> {
 export async function createCallLogApi(callData: Partial<CallLog>): Promise<CallLog> {
   const res = await fetch(API_BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
     body: JSON.stringify(callData),
   });
@@ -84,7 +91,7 @@ export async function createCallLogApi(callData: Partial<CallLog>): Promise<Call
 export async function updateCallLogApi(id: string, callData: Partial<CallLog>): Promise<CallLog> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
     body: JSON.stringify(callData),
   });
@@ -99,6 +106,7 @@ export async function updateCallLogApi(id: string, callData: Partial<CallLog>): 
 export async function deleteCallLogApi(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
     credentials: 'include',
   });
 
@@ -143,7 +151,10 @@ export async function fetchSectionActivitiesApi(
   }
 
   const url = `${API_BASE}/section/${section}${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url, { credentials: 'include' });
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
 
   if (!res.ok) {
     throw new Error(`Failed to fetch ${section} activities (${res.status})`);
@@ -161,7 +172,10 @@ export async function fetchSectionActivitiesApi(
 export async function fetchSectionStatsApi(
   section: ActivityLogSection
 ): Promise<CallLogStats | WhatsAppStats | EmailStats | OthersStats> {
-  const res = await fetch(`${API_BASE}/stats/${section}`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE}/stats/${section}`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     throw new Error(`Failed to fetch ${section} stats`);
   }
@@ -175,7 +189,7 @@ export async function createSectionActivityApi(
 ): Promise<any> {
   const res = await fetch(`${API_BASE}/section/${section}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
     body: JSON.stringify(data),
   });
@@ -193,6 +207,7 @@ export async function deleteSectionActivityApi(
 ): Promise<boolean> {
   const res = await fetch(`${API_BASE}/section/${section}/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
     credentials: 'include',
   });
 

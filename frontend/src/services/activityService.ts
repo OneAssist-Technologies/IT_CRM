@@ -6,6 +6,7 @@ import {
 } from '../types/activity';
 
 import { API_BASE_URL } from '../config/env';
+import { getAuthHeaders } from './api';
 
 const API_BASE = `${API_BASE_URL}/activities`;
 
@@ -14,10 +15,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const response = await fetch(url, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers: getAuthHeaders(options.headers as Record<string, string>),
   });
 
   const json = await response.json().catch(() => ({}));
