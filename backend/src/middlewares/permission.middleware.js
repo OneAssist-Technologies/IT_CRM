@@ -261,14 +261,19 @@ export async function getDataScope(user, moduleId = 'contacts') {
   if (!userPerms) return 'Own';
   if (userPerms.isSuperAdmin) return 'All';
 
-  const configuredScope = userPerms.permissions?.[moduleId]?.dataScope;
-  if (configuredScope) return configuredScope;
-
   const roleSlug = userPerms.role?.slug?.toLowerCase();
   const appType = userPerms.role?.appType?.toLowerCase();
   if (roleSlug === 'admin' || roleSlug === 'super_admin' || appType === 'admin') {
     return 'All';
   }
+
+  // Lead module access for employees is strictly scoped to assigned leads
+  if (moduleId === 'leads') {
+    return 'Own';
+  }
+
+  const configuredScope = userPerms.permissions?.[moduleId]?.dataScope;
+  if (configuredScope) return configuredScope;
 
   return 'Own';
 }
@@ -425,20 +430,15 @@ export function buildImportBatchScopeFilter(userScope) {
 export function buildLeadScopeFilter(userScope) {
   if (!userScope || userScope.isAll) return null;
 
-  const { ids, names, emails } = userScope;
+  const { ids, names } = userScope;
   const or = [];
 
-  // Created by user
-  ids.forEach(id => or.push({ createdBy: id }));
-  names.forEach(name => {
-    or.push({ createdBy: { equals: name, mode: 'insensitive' } });
-    or.push({ createdByName: { equals: name, mode: 'insensitive' } });
-  });
-  emails.forEach(email => or.push({ createdBy: { equals: email, mode: 'insensitive' } }));
-
-  // Assigned to user
+  // Filter leads strictly by assigned employee / assigned owner
   ids.forEach(id => or.push({ assignedTo: id }));
-  names.forEach(name => or.push({ assignedToName: { equals: name, mode: 'insensitive' } }));
+  names.forEach(name => {
+    or.push({ assignedToName: { equals: name, mode: 'insensitive' } });
+    or.push({ assignedTo: { equals: name, mode: 'insensitive' } });
+  });
 
   return or.length > 0 ? { OR: or } : { id: '__none__' };
 }

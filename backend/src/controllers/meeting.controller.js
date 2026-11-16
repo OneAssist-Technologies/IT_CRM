@@ -7,7 +7,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
  */
 export async function getMeetings(req, res) {
   try {
-    const data = await meetingService.getMeetingsService(req.query);
+    const data = await meetingService.getMeetingsService(req.query, req.user);
     return sendSuccess(res, data, 'Scheduled meetings fetched successfully.');
   } catch (error) {
     console.error('getMeetings error:', error);
@@ -21,7 +21,7 @@ export async function getMeetings(req, res) {
  */
 export async function getMeetingStats(req, res) {
   try {
-    const stats = await meetingService.getMeetingStatsService();
+    const stats = await meetingService.getMeetingStatsService(req.user);
     return sendSuccess(res, stats, 'Meeting statistics retrieved.');
   } catch (error) {
     console.error('getMeetingStats error:', error);
@@ -34,7 +34,7 @@ export async function getMeetingStats(req, res) {
  */
 export async function getMeetingById(req, res) {
   try {
-    const meeting = await meetingService.getMeetingByIdService(req.params.id);
+    const meeting = await meetingService.getMeetingByIdService(req.params.id, req.user);
     return sendSuccess(res, meeting, 'Meeting details retrieved.');
   } catch (error) {
     return sendError(res, error.message || 'Meeting not found.', error.status || 404);

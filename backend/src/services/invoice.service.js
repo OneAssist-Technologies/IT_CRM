@@ -1,6 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { io } from '../utils/socket.js';
 import { recordActivity } from './activity.service.js';
+import { resolveLeadEmployeeFilter } from './lead.service.js';
 
 /**
  * -----------------------------------------------------------------------------
@@ -275,15 +276,37 @@ export async function deleteProductService(id, user) {
  * 3. QUOTATIONS SERVICE
  * -----------------------------------------------------------------------------
  */
-export async function getQuotationsService(query = {}) {
+export async function getQuotationsService(query = {}, currentUser = null) {
   const { status, search, contactId, leadId, flat } = query;
   const where = {};
 
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(leadId);
+        if (!hasAccess) {
+          return flat === 'true' ? [] : [];
+        }
+        where.leadId = leadId;
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0 ? [{ leadId: { in: empScope.allowedLeadIds } }] : []),
+          ...empScope.ids.map((id) => ({ salesOwnerId: id })),
+          ...empScope.names.map((name) => ({ salesOwnerName: { equals: name, mode: 'insensitive' } })),
+        ];
+        where.AND = where.AND || [];
+        where.AND.push({ OR: empConditions });
+      }
+    } else if (leadId && leadId !== 'All') {
+      where.leadId = leadId;
+    }
+  } else if (leadId && leadId !== 'All') {
+    where.leadId = leadId;
+  }
+
   if (contactId && contactId !== 'All') {
     where.contactId = contactId;
-  }
-  if (leadId && leadId !== 'All') {
-    where.leadId = leadId;
   }
   if (search && search.trim()) {
     const q = search.trim();
@@ -362,7 +385,7 @@ export async function getQuotationsService(query = {}) {
   return formatted;
 }
 
-export async function getQuotationByIdService(id) {
+export async function getQuotationByIdService(id, currentUser = null) {
   const quote = await prisma.quotation.findFirst({
     where: { OR: [{ id }, { quotationNumber: id }] },
     include: {
@@ -387,6 +410,22 @@ export async function getQuotationByIdService(id) {
     const err = new Error('Quotation not found.');
     err.status = 404;
     throw err;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = quote.leadId && empScope.allowedLeadIds.includes(quote.leadId);
+      const hasOwnerAccess =
+        (quote.salesOwnerId && empScope.ids.includes(quote.salesOwnerId)) ||
+        (quote.salesOwnerName &&
+          empScope.names.some((n) => n.toLowerCase() === quote.salesOwnerName.toLowerCase()));
+      if (!hasLeadAccess && !hasOwnerAccess) {
+        const err = new Error('Access denied: You do not have permission to access this quotation.');
+        err.status = 403;
+        throw err;
+      }
+    }
   }
 
   // Extract all revisions in the family
@@ -1406,9 +1445,35 @@ export async function approveMilestoneService(id, user) {
  * 6. INVOICE MANAGEMENT SERVICE
  * -----------------------------------------------------------------------------
  */
-export async function getInvoicesService(query = {}) {
-  const { status, paymentStatus, search, contactId, customerId, salesOrderId, projectId, invoiceDate, dueDate, page, limit } = query;
+export async function getInvoicesService(query = {}, currentUser = null) {
+  const { status, paymentStatus, search, contactId, customerId, salesOrderId, projectId, invoiceDate, dueDate, page, limit, leadId } = query;
   const where = {};
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(leadId);
+        if (!hasAccess) {
+          return page && limit
+            ? { data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } }
+            : [];
+        }
+        where.leadId = leadId;
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0 ? [{ leadId: { in: empScope.allowedLeadIds } }] : []),
+          ...empScope.ids.map((id) => ({ createdBy: id })),
+        ];
+        where.AND = where.AND || [];
+        where.AND.push({ OR: empConditions });
+      }
+    } else if (leadId && leadId !== 'All') {
+      where.leadId = leadId;
+    }
+  } else if (leadId && leadId !== 'All') {
+    where.leadId = leadId;
+  }
 
   if (status && status !== 'All') {
     where.status = { equals: status, mode: 'insensitive' };
@@ -1548,7 +1613,7 @@ export async function getInvoicesService(query = {}) {
   return filtered;
 }
 
-export async function getInvoiceByIdService(id) {
+export async function getInvoiceByIdService(id, currentUser = null) {
   const invoice = await prisma.invoice.findFirst({
     where: { OR: [{ id }, { invoiceNumber: id }] },
     include: {
@@ -1565,6 +1630,19 @@ export async function getInvoiceByIdService(id) {
     const err = new Error('Invoice not found.');
     err.status = 404;
     throw err;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = invoice.leadId && empScope.allowedLeadIds.includes(invoice.leadId);
+      const hasCreatedAccess = invoice.createdBy && empScope.ids.includes(invoice.createdBy);
+      if (!hasLeadAccess && !hasCreatedAccess) {
+        const err = new Error('Access denied: You do not have permission to access this invoice.');
+        err.status = 403;
+        throw err;
+      }
+    }
   }
 
   const today = new Date().toISOString().split('T')[0];
@@ -2291,9 +2369,33 @@ export async function cancelInvoiceService(id, reason, user) {
  * 7. PAYMENT MANAGEMENT SERVICE
  * -----------------------------------------------------------------------------
  */
-export async function getPaymentsService(query = {}) {
-  const { search, paymentMethod, contactId } = query;
+export async function getPaymentsService(query = {}, currentUser = null) {
+  const { search, paymentMethod, contactId, leadId } = query;
   const where = {};
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      if (leadId && leadId !== 'All') {
+        const hasAccess = empScope.allowedLeadIds.includes(leadId);
+        if (!hasAccess) {
+          return [];
+        }
+        where.allocations = {
+          some: { invoice: { leadId } },
+        };
+      } else {
+        const empConditions = [
+          ...(empScope.allowedLeadIds.length > 0
+            ? [{ allocations: { some: { invoice: { leadId: { in: empScope.allowedLeadIds } } } } }]
+            : []),
+          ...empScope.names.map((name) => ({ recordedBy: { equals: name, mode: 'insensitive' } })),
+        ];
+        where.AND = where.AND || [];
+        where.AND.push({ OR: empConditions });
+      }
+    }
+  }
 
   if (paymentMethod && paymentMethod !== 'All') {
     where.paymentMethod = { equals: paymentMethod, mode: 'insensitive' };
@@ -2335,7 +2437,7 @@ export async function getPaymentsService(query = {}) {
   return payments;
 }
 
-export async function getPaymentByIdService(id) {
+export async function getPaymentByIdService(id, currentUser = null) {
   const payment = await prisma.payment.findFirst({
     where: { OR: [{ id }, { paymentNumber: id }] },
     include: {
@@ -2351,6 +2453,23 @@ export async function getPaymentByIdService(id) {
     const err = new Error('Payment record not found.');
     err.status = 404;
     throw err;
+  }
+
+  if (currentUser) {
+    const empScope = await resolveLeadEmployeeFilter(currentUser);
+    if (empScope.isEmployee) {
+      const hasLeadAccess = payment.allocations?.some(
+        (a) => a.invoice?.leadId && empScope.allowedLeadIds.includes(a.invoice.leadId)
+      );
+      const hasRecordedAccess =
+        payment.recordedBy &&
+        empScope.names.some((n) => n.toLowerCase() === payment.recordedBy.toLowerCase());
+      if (!hasLeadAccess && !hasRecordedAccess) {
+        const err = new Error('Access denied: You do not have permission to access this payment.');
+        err.status = 403;
+        throw err;
+      }
+    }
   }
 
   return payment;

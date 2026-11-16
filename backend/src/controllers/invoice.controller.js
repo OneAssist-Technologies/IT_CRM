@@ -63,7 +63,7 @@ export async function deleteProductServiceItem(req, res) {
 // =============================================================================
 export async function getQuotations(req, res) {
   try {
-    const quotes = await billingService.getQuotationsService(req.query);
+    const quotes = await billingService.getQuotationsService(req.query, req.user);
     return sendSuccess(res, quotes, 'Quotations retrieved successfully.');
   } catch (error) {
     console.error('getQuotations error:', error);
@@ -73,7 +73,7 @@ export async function getQuotations(req, res) {
 
 export async function getQuotationById(req, res) {
   try {
-    const quote = await billingService.getQuotationByIdService(req.params.id);
+    const quote = await billingService.getQuotationByIdService(req.params.id, req.user);
     return sendSuccess(res, quote, 'Quotation details retrieved.');
   } catch (error) {
     return sendError(res, error.message || 'Quotation not found.', error.status || 404);
@@ -254,7 +254,7 @@ export async function approveMilestone(req, res) {
 // =============================================================================
 export async function getInvoices(req, res) {
   try {
-    const invoices = await billingService.getInvoicesService(req.query);
+    const invoices = await billingService.getInvoicesService(req.query, req.user);
     return sendSuccess(res, invoices, 'Invoices retrieved successfully.');
   } catch (error) {
     console.error('getInvoices error:', error);
@@ -264,7 +264,7 @@ export async function getInvoices(req, res) {
 
 export async function getInvoiceById(req, res) {
   try {
-    const invoice = await billingService.getInvoiceByIdService(req.params.id);
+    const invoice = await billingService.getInvoiceByIdService(req.params.id, req.user);
     return sendSuccess(res, invoice, 'Invoice details retrieved.');
   } catch (error) {
     return sendError(res, error.message || 'Invoice not found.', error.status || 404);
@@ -316,7 +316,7 @@ export async function sendInvoice(req, res) {
 // =============================================================================
 export async function getPayments(req, res) {
   try {
-    const payments = await billingService.getPaymentsService(req.query);
+    const payments = await billingService.getPaymentsService(req.query, req.user);
     return sendSuccess(res, payments, 'Payments retrieved successfully.');
   } catch (error) {
     console.error('getPayments error:', error);
@@ -326,7 +326,7 @@ export async function getPayments(req, res) {
 
 export async function getPaymentById(req, res) {
   try {
-    const payment = await billingService.getPaymentByIdService(req.params.id);
+    const payment = await billingService.getPaymentByIdService(req.params.id, req.user);
     return sendSuccess(res, payment, 'Payment details retrieved.');
   } catch (error) {
     return sendError(res, error.message || 'Payment not found.', error.status || 404);

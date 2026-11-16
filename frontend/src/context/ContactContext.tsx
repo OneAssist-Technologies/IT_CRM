@@ -9,6 +9,7 @@ import {
   ContactMetadata,
 } from '../types/contact';
 import { contactService } from '../services/contactService';
+import { useCRM } from './CRMContext';
 
 interface ContactContextType {
   contacts: Contact[];
@@ -88,6 +89,7 @@ const defaultFilters: ContactFilter = {
 const ContactContext = createContext<ContactContextType | undefined>(undefined);
 
 export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAuthChecking } = useCRM();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [stats, setStats] = useState<ContactStats | null>(null);
   const [metadata, setMetadata] = useState<ContactMetadata | null>(null);
@@ -158,13 +160,15 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchContacts();
-  }, [fetchContacts]);
+  }, [fetchContacts, isAuthenticated, isAuthChecking]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking]);
 
   const setFilters = (newFilters: Partial<ContactFilter>) => {
     setFiltersState((prev) => ({ ...prev, ...newFilters }));

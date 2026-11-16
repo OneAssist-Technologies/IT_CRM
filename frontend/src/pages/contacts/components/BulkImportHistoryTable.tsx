@@ -52,6 +52,7 @@ export interface BulkImportHistoryTableProps {
   onSelectBatch: (batch: ImportBatch) => void;
   onDeleteBatch?: (batch: ImportBatch) => void;
   onBatchUpdated?: (updatedBatch: ImportBatch) => void;
+  searchQuery?: string;
 }
 
 export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
@@ -62,6 +63,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
   onSelectBatch,
   onDeleteBatch,
   onBatchUpdated,
+  searchQuery = '',
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
@@ -132,9 +134,23 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
     }
   };
 
-  const totalRecords = pagination.total || batches.length || 0;
-  const startRecord = totalRecords === 0 ? 0 : (pagination.page - 1) * pagination.limit + 1;
-  const endRecord = Math.min(pagination.page * pagination.limit, totalRecords);
+  const filteredBatches = React.useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (!q) return localBatches;
+    return localBatches.filter((b) => {
+      const fn = (b.fileName || '').toLowerCase();
+      const id = (b.batchId || '').toLowerCase();
+      const owner = (b.assignedToName || '').toLowerCase();
+      const uploader = (b.createdBy || (b as any).uploadedBy || '').toLowerCase();
+      return fn.includes(q) || id.includes(q) || owner.includes(q) || uploader.includes(q);
+    });
+  }, [localBatches, searchQuery]);
+
+  const hasSearch = Boolean(searchQuery && searchQuery.trim());
+  const totalRecords = hasSearch ? filteredBatches.length : (pagination.total || batches.length || 0);
+  const totalPages = hasSearch ? Math.max(1, Math.ceil(totalRecords / (pagination.limit || 10))) : (pagination.totalPages || 1);
+  const startRecord = totalRecords === 0 ? 0 : hasSearch ? 1 : (pagination.page - 1) * pagination.limit + 1;
+  const endRecord = hasSearch ? filteredBatches.length : Math.min(pagination.page * pagination.limit, totalRecords);
 
   return (
     <Box>
@@ -248,7 +264,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                     </Table.Td>
                   </Table.Tr>
                 ))
-              ) : localBatches.length === 0 ? (
+              ) : filteredBatches.length === 0 ? (
                 <Table.Tr>
                   <Table.Td colSpan={5}>
                     <Stack align="center" justify="center" py={40} gap="xs">
@@ -272,7 +288,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                   </Table.Td>
                 </Table.Tr>
               ) : (
-                localBatches.map((batch) => (
+                filteredBatches.map((batch) => (
                   <Table.Tr
                     key={batch.batchId || batch.id}
                     onClick={() => onSelectBatch(batch)}
@@ -643,7 +659,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
               </Box>
 
               <Text size="12px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
-                of {pagination.totalPages || 1}
+                of {totalPages}
               </Text>
 
               {/* Next */}
@@ -651,7 +667,7 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                 variant="default"
                 size="xs"
                 radius="md"
-                disabled={pagination.page >= (pagination.totalPages || 1)}
+                disabled={pagination.page >= totalPages}
                 onClick={() => onPageChange(pagination.page + 1)}
                 rightSection={<IconChevronRight size={13} />}
                 style={{

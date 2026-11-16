@@ -105,7 +105,7 @@ export const DEFAULT_ACCESS_CONTROL_VALUE: AccessControlContextType = {
 const AccessControlContext = createContext<AccessControlContextType>(DEFAULT_ACCESS_CONTROL_VALUE);
 
 export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useCRM();
+  const { currentUser, isAuthenticated, isAuthChecking } = useCRM();
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [systemModules, setSystemModules] = useState<SystemModule[]>(DEFAULT_SYSTEM_MODULES);
@@ -219,19 +219,22 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchMyPermissions();
-  }, [fetchMyPermissions, currentUser?.id]);
+  }, [fetchMyPermissions, isAuthenticated, isAuthChecking, currentUser?.id]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     if (hasAccessControlAccess) {
       fetchRoles();
       fetchUsers();
       fetchAuditLogs();
     }
-  }, [hasAccessControlAccess, fetchRoles, fetchUsers, fetchAuditLogs]);
+  }, [hasAccessControlAccess, fetchRoles, fetchUsers, fetchAuditLogs, isAuthenticated, isAuthChecking]);
 
   useEffect(() => {
     const handlePermsUpdated = () => {
+      if (!isAuthenticated || isAuthChecking) return;
       fetchMyPermissions();
       if (hasAccessControlAccess) {
         fetchRoles();
@@ -241,7 +244,7 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       window.removeEventListener('crm_permissions_updated', handlePermsUpdated);
     };
-  }, [hasAccessControlAccess, fetchMyPermissions, fetchRoles]);
+  }, [hasAccessControlAccess, fetchMyPermissions, fetchRoles, isAuthenticated, isAuthChecking]);
 
   const can = useCallback(
     (moduleId: string, action: PermissionAction = 'view'): boolean => {

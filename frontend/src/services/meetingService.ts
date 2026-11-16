@@ -1,5 +1,6 @@
 import { ScheduledMeeting, MeetingStats, MeetingFilters } from '../types/meeting';
 import { API_BASE_URL } from '../config/env';
+import { getAuthHeaders } from './api';
 
 const API_BASE = `${API_BASE_URL}/meetings`;
 
@@ -18,7 +19,10 @@ export async function fetchMeetingsApi(filters?: MeetingFilters): Promise<{
   if (filters?.search && filters.search.trim()) params.append('search', filters.search.trim());
 
   const url = `${API_BASE}${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url, { credentials: 'include' });
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
 
   if (!res.ok) {
     throw new Error(`Failed to fetch scheduled meetings (${res.status})`);
@@ -34,7 +38,10 @@ export async function fetchMeetingsApi(filters?: MeetingFilters): Promise<{
 }
 
 export async function fetchMeetingStatsApi(): Promise<MeetingStats> {
-  const res = await fetch(`${API_BASE}/stats`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE}/stats`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     throw new Error('Failed to fetch meeting stats');
   }
@@ -45,7 +52,7 @@ export async function fetchMeetingStatsApi(): Promise<MeetingStats> {
 export async function createMeetingApi(meetingData: Partial<ScheduledMeeting>): Promise<ScheduledMeeting> {
   const res = await fetch(API_BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
     body: JSON.stringify(meetingData),
   });
@@ -60,7 +67,7 @@ export async function createMeetingApi(meetingData: Partial<ScheduledMeeting>): 
 export async function updateMeetingApi(id: string, meetingData: Partial<ScheduledMeeting>): Promise<ScheduledMeeting> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
     body: JSON.stringify(meetingData),
   });
@@ -75,6 +82,7 @@ export async function updateMeetingApi(id: string, meetingData: Partial<Schedule
 export async function deleteMeetingApi(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'DELETE',
+    headers: getAuthHeaders(),
     credentials: 'include',
   });
 

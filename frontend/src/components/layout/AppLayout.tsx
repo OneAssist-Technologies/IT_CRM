@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container, Drawer, Paper, Text, Button, useComputedColorScheme } from '@mantine/core';
+import { Box, Container, Drawer, Paper, Text, Button, Loader, useComputedColorScheme } from '@mantine/core';
 import { IconShieldLock } from '@tabler/icons-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -63,7 +63,15 @@ const AccessRestrictedView: React.FC<{ moduleName: string; onGoAllowed: () => vo
 export const AppLayout: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
-  const { activeNav, setActiveNav, sidebarMobileOpened, setSidebarMobileOpened, sidebarCollapsed } = useCRM();
+  const {
+    activeNav,
+    setActiveNav,
+    sidebarMobileOpened,
+    setSidebarMobileOpened,
+    sidebarCollapsed,
+    isAuthenticated,
+    isAuthChecking,
+  } = useCRM();
   const { selectedContact, deleteContact } = useContact();
   const { isSuperAdmin, can } = usePermissions();
   const { selectedLead } = useLead();
@@ -100,7 +108,7 @@ export const AppLayout: React.FC = () => {
   // Automatically redirect non-admin users to Employee Dashboard or their first permitted screen
   // (MUST be called before any conditional return to satisfy Rules of Hooks)
   React.useEffect(() => {
-    if (activeNav === 'dashboard' && !isSuperAdmin && !can('dashboard', 'view')) {
+    if (isAuthenticated && activeNav === 'dashboard' && !isSuperAdmin && !can('dashboard', 'view')) {
       if (can('employee_dashboard', 'view')) {
         setActiveNav('employee-dashboard');
       } else {
@@ -110,32 +118,93 @@ export const AppLayout: React.FC = () => {
         }
       }
     }
-  }, [activeNav, isSuperAdmin, can, findFirstAllowedNav]);
+  }, [isAuthenticated, activeNav, isSuperAdmin, can, findFirstAllowedNav, setActiveNav]);
 
-  if (activeNav === 'signup') {
+  // If user is authenticated and attempts to access signup or login, redirect to Dashboard
+  React.useEffect(() => {
+    if (isAuthenticated && (activeNav === 'signup' || activeNav === 'login')) {
+      if (isSuperAdmin || can('dashboard', 'view')) {
+        setActiveNav('dashboard');
+      } else if (can('employee_dashboard', 'view')) {
+        setActiveNav('employee-dashboard');
+      } else {
+        setActiveNav(findFirstAllowedNav());
+      }
+    }
+  }, [isAuthenticated, activeNav, isSuperAdmin, can, findFirstAllowedNav, setActiveNav]);
+
+  // If user is not authenticated and attempts to access protected routes, redirect to Signup
+  React.useEffect(() => {
+    if (!isAuthChecking && !isAuthenticated) {
+      if (activeNav !== 'signup' && activeNav !== 'login' && activeNav !== 'reset-password') {
+        setActiveNav('signup');
+      }
+    }
+  }, [isAuthChecking, isAuthenticated, activeNav, setActiveNav]);
+
+  // 1. Initial Session Checking Loading State
+  if (isAuthChecking) {
+    return (
+      <Box
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          width: '100%',
+          background: 'radial-gradient(ellipse at 85% 15%, #E1EEFD 0%, #F5F9FE 45%, #EAF2FC 100%)',
+          fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
+        }}
+      >
+        <Loader size="lg" color="blue" />
+        <Text mt="md" size="sm" c="dimmed" fw={500}>
+          Verifying session...
+        </Text>
+      </Box>
+    );
+  }
+
+  // 2. Unauthenticated Routes (Strict Route Guard)
+  if (!isAuthenticated) {
+    if (activeNav === 'login') {
+      return (
+        <LoginPage
+          onSuccess={() => {
+            if (isSuperAdmin || can('dashboard', 'view')) {
+              setActiveNav('dashboard');
+            } else if (can('employee_dashboard', 'view')) {
+              setActiveNav('employee-dashboard');
+            } else {
+              setActiveNav(findFirstAllowedNav());
+            }
+          }}
+          onSwitchToSignup={() => setActiveNav('signup')}
+        />
+      );
+    }
+
+    if (activeNav === 'reset-password') {
+      return (
+        <ResetPasswordPage
+          onSuccess={() => setActiveNav('login')}
+          onBackToLogin={() => setActiveNav('login')}
+        />
+      );
+    }
+
+    // Default route for unauthenticated requests is the SignupPage
     return (
       <SignupPage
-        onSuccess={() => setActiveNav('dashboard')}
+        onSuccess={() => setActiveNav('login')}
         onSwitchToLogin={() => setActiveNav('login')}
       />
     );
   }
 
-  if (activeNav === 'login') {
-    return (
-      <LoginPage
-        onSuccess={() => {
-          if (isSuperAdmin || can('dashboard', 'view')) {
-            setActiveNav('dashboard');
-          } else if (can('employee_dashboard', 'view')) {
-            setActiveNav('employee-dashboard');
-          } else {
-            setActiveNav(findFirstAllowedNav());
-          }
-        }}
-        onSwitchToSignup={() => setActiveNav('signup')}
-      />
-    );
+  // 3. Authenticated user attempting to visit login/signup
+  if (activeNav === 'signup' || activeNav === 'login') {
+    return null;
   }
 
   if (activeNav === 'reset-password') {

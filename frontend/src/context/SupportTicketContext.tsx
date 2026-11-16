@@ -23,6 +23,7 @@ import {
 } from '../services/supportTicketService';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconAlertCircle } from '@tabler/icons-react';
+import { useCRM } from './CRMContext';
 
 interface SupportTicketContextType {
   tickets: SupportTicket[];
@@ -68,6 +69,7 @@ const initialFilters: TicketFilters = {
 };
 
 export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAuthChecking } = useCRM();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [totalTickets, setTotalTickets] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -100,6 +102,7 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Load dropdown metadata and stats once
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     let isMounted = true;
     fetchTicketMetadataApi()
       .then((data) => {
@@ -110,11 +113,12 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
     return () => {
       isMounted = false;
     };
-  }, [fetchStats]);
+  }, [fetchStats, isAuthenticated, isAuthChecking]);
 
   // Fetch tickets function
   const fetchTickets = useCallback(
     async (customFilters?: TicketFilters, targetPage?: number) => {
+      if (!isAuthenticated || isAuthChecking) return;
       setLoading(true);
       try {
         const queryFilters = customFilters || filters;
@@ -124,22 +128,26 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
         setTotalTickets(res.total);
       } catch (err: any) {
         console.error('Failed to fetch support tickets:', err);
-        notifications.show({
-          title: 'Error Loading Tickets',
-          message: err.message || 'Could not load tickets from server.',
-          color: 'red',
-          icon: <IconAlertCircle size={16} />,
-        });
+        const errMsg = err?.message || '';
+        if (!errMsg.includes('Authentication required') && !errMsg.includes('401')) {
+          notifications.show({
+            title: 'Error Loading Tickets',
+            message: errMsg || 'Could not load tickets from server.',
+            color: 'red',
+            icon: <IconAlertCircle size={16} />,
+          });
+        }
       } finally {
         setLoading(false);
       }
     },
-    [filters, page, limit]
+    [filters, page, limit, isAuthenticated, isAuthChecking]
   );
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking) return;
     fetchTickets();
-  }, [fetchTickets]);
+  }, [fetchTickets, isAuthenticated, isAuthChecking]);
 
   // Single ticket fetcher
   const fetchTicketById = async (id: string): Promise<SupportTicket | null> => {
