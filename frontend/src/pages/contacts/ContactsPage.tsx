@@ -370,12 +370,10 @@ export const ContactsPage: React.FC = () => {
 
   // Listen to contacts update event across CRM components
   useEffect(() => {
-    const handleUpdated = () => {
-      if (typeof window !== 'undefined') {
-        const savedTab = localStorage.getItem('crm_contacts_tab') as ActiveTabType;
-        if (savedTab && (savedTab === 'ASSIGNED' || savedTab === 'NEW' || savedTab === 'BULK_IMPORT')) {
-          setActiveTab(savedTab);
-        }
+    const handleUpdated = (e?: Event) => {
+      const customEvt = e as CustomEvent<{ targetTab?: ActiveTabType }>;
+      if (customEvt?.detail?.targetTab) {
+        handleTabChange(customEvt.detail.targetTab);
       }
       fetchContacts();
       fetchStats();
@@ -1166,10 +1164,8 @@ export const ContactsPage: React.FC = () => {
         title={modalContact ? "Update contact" : "Create contact"}
         showContactMode={true}
         onSuccess={() => {
-          if (activeTab !== 'BULK_IMPORT') {
-            handleTabChange('NEW');
-          }
           fetchContacts();
+          fetchStats();
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
           }

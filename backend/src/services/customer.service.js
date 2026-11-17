@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { delCache } from '../config/redis.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 let isSyncingCompletedLeads = false;
 
@@ -177,7 +178,7 @@ export async function syncCompletedLeads() {
 /**
  * 1. List customers with search, filter, sorting, pagination
  */
-export async function getCustomersService(queryParams = {}) {
+export async function getCustomersService(queryParams = {}, currentUser = null) {
   await syncCompletedLeads();
   const {
     search = '',
@@ -196,9 +197,29 @@ export async function getCustomersService(queryParams = {}) {
 
   const where = {};
 
+  const roleUpper = String(currentUser?.role || '').toUpperCase().trim();
+  const isAdmin =
+    !currentUser ||
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'MANAGEMENT' ||
+    String(currentUser?.email || '').toLowerCase().trim() === 'sandy@gmail.com';
+
+  const scope = currentUser ? await getDataScope(currentUser, 'customers') : 'All';
+  const isAllScope = scope === 'All' || isAdmin;
+
+  const userMatchConditions =
+    !isAllScope && (currentUser?.id || currentUser?.name)
+      ? [
+          ...(currentUser.id ? [{ accountManagerId: currentUser.id }] : []),
+          ...(currentUser.name ? [{ accountManager: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+        ]
+      : null;
+
   if (search && search.trim()) {
     const term = search.trim();
-    where.OR = [
+    const searchConditions = [
       { companyName: { contains: term, mode: 'insensitive' } },
       { contactPerson: { contains: term, mode: 'insensitive' } },
       { email: { contains: term, mode: 'insensitive' } },
@@ -206,6 +227,17 @@ export async function getCustomersService(queryParams = {}) {
       { customerId: { contains: term, mode: 'insensitive' } },
       { city: { contains: term, mode: 'insensitive' } },
     ];
+
+    if (userMatchConditions && userMatchConditions.length > 0) {
+      where.AND = [
+        { OR: searchConditions },
+        { OR: userMatchConditions },
+      ];
+    } else {
+      where.OR = searchConditions;
+    }
+  } else if (userMatchConditions && userMatchConditions.length > 0) {
+    where.OR = userMatchConditions;
   }
 
   if (status && status !== 'all') {
@@ -248,14 +280,34 @@ export async function getCustomersService(queryParams = {}) {
 /**
  * 2. Get Customer Stats Summary
  */
-export async function getCustomerStatsService() {
+export async function getCustomerStatsService(currentUser = null) {
   await syncCompletedLeads();
+  const roleUpper = String(currentUser?.role || '').toUpperCase().trim();
+  const isAdmin =
+    !currentUser ||
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'MANAGEMENT' ||
+    String(currentUser?.email || '').toLowerCase().trim() === 'sandy@gmail.com';
+
+  const scope = currentUser ? await getDataScope(currentUser, 'customers') : 'All';
+  const isAllScope = scope === 'All' || isAdmin;
+
+  const baseWhere = {};
+  if (!isAllScope && (currentUser?.id || currentUser?.name)) {
+    baseWhere.OR = [
+      ...(currentUser.id ? [{ accountManagerId: currentUser.id }] : []),
+      ...(currentUser.name ? [{ accountManager: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+    ];
+  }
+
   const [total, active, onboarding, enterprise, allCustomers] = await Promise.all([
-    prisma.customer.count(),
-    prisma.customer.count({ where: { status: 'Active' } }),
-    prisma.customer.count({ where: { status: 'Onboarding' } }),
-    prisma.customer.count({ where: { customerTier: 'Enterprise' } }),
-    prisma.customer.findMany({ select: { contractValue: true } }),
+    prisma.customer.count({ where: baseWhere }),
+    prisma.customer.count({ where: { ...baseWhere, status: 'Active' } }),
+    prisma.customer.count({ where: { ...baseWhere, status: 'Onboarding' } }),
+    prisma.customer.count({ where: { ...baseWhere, customerTier: 'Enterprise' } }),
+    prisma.customer.findMany({ where: baseWhere, select: { contractValue: true } }),
   ]);
 
   const totalContractValue = allCustomers.reduce((acc, c) => acc + (c.contractValue || 0), 0);

@@ -194,7 +194,7 @@ export const ContactQualificationDrawer: React.FC<ContactQualificationDrawerProp
           localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
           sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
         }
-        window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
+        window.dispatchEvent(new CustomEvent('crm_contacts_updated', { detail: { targetTab: 'ASSIGNED' } }));
         onSuccess?.();
         onClose();
       }

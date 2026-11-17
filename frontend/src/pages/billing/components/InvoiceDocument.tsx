@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Paper, Box, Text } from '@mantine/core';
 import { Invoice, BillingSettings } from '../../../types/billing';
 import { numberToWordsINR } from '../../../utils/invoicePdfGenerator';
+import { APP_LOGO_URL } from '../../../config/env';
 
 export interface InvoiceDocumentProps {
   invoice: Invoice;
@@ -42,7 +43,7 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
   const companyGst = settings?.companyGst || (invoice as any)?.companyDetails?.gstin || '';
   const companyPhone = settings?.companyPhone || (invoice as any)?.companyDetails?.phone || '';
   const companyEmail = settings?.companyEmail || (invoice as any)?.companyDetails?.email || '';
-  const companyLogo = settings?.companyLogoUrl || (settings as any)?.logoUrl || '/oneassist-logo.png';
+  const companyLogo = settings?.companyLogoUrl || (settings as any)?.logoUrl || APP_LOGO_URL;
 
   const cleanedBrandWords = companyName
     .trim()
@@ -202,9 +203,12 @@ export const InvoiceDocument: React.FC<InvoiceDocumentProps> = ({
             }}
           >
             <img
-              src="/oneassist-logo.png"
+              src={companyLogo}
               alt="OneAssist Technologies"
               style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = APP_LOGO_URL;
+              }}
             />
           </Box>
           <Box style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

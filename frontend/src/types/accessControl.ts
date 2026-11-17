@@ -8,6 +8,7 @@ export interface SystemModule {
   category: string;
   description: string;
   isSystem?: boolean;
+  parentId?: string;
 }
 
 export interface RolePermission {

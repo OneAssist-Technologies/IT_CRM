@@ -3,6 +3,16 @@ import { API_BASE_URL } from '../config/env';
 
 const API_BASE = `${API_BASE_URL}/meetings`;
 
+function getAuthHeaders(): HeadersInit {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token && token.trim() && token !== 'null' && token !== 'undefined'
+      ? { Authorization: `Bearer ${token}` }
+      : {}),
+  };
+}
+
 export async function fetchMeetingsApi(filters?: MeetingFilters): Promise<{
   meetings: ScheduledMeeting[];
   dateWise: Record<string, ScheduledMeeting[]>;
@@ -18,7 +28,10 @@ export async function fetchMeetingsApi(filters?: MeetingFilters): Promise<{
   if (filters?.search && filters.search.trim()) params.append('search', filters.search.trim());
 
   const url = `${API_BASE}${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url, { credentials: 'include' });
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
 
   if (!res.ok) {
     throw new Error(`Failed to fetch scheduled meetings (${res.status})`);
@@ -34,7 +47,10 @@ export async function fetchMeetingsApi(filters?: MeetingFilters): Promise<{
 }
 
 export async function fetchMeetingStatsApi(): Promise<MeetingStats> {
-  const res = await fetch(`${API_BASE}/stats`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE}/stats`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     throw new Error('Failed to fetch meeting stats');
   }
@@ -45,7 +61,7 @@ export async function fetchMeetingStatsApi(): Promise<MeetingStats> {
 export async function createMeetingApi(meetingData: Partial<ScheduledMeeting>): Promise<ScheduledMeeting> {
   const res = await fetch(API_BASE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(meetingData),
   });
@@ -60,7 +76,7 @@ export async function createMeetingApi(meetingData: Partial<ScheduledMeeting>): 
 export async function updateMeetingApi(id: string, meetingData: Partial<ScheduledMeeting>): Promise<ScheduledMeeting> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(meetingData),
   });

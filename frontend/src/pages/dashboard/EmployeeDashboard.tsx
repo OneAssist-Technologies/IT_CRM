@@ -46,6 +46,7 @@ import { AreaChart, DonutChart } from '@mantine/charts';
 import { Area } from 'recharts';
 import { notifications } from '@mantine/notifications';
 import { useCRM } from '../../context/CRMContext';
+import { usePermissions } from '../../context/AccessControlContext';
 import { useLead } from '../../context/LeadContext';
 import { useCustomer } from '../../context/CustomerContext';
 import { useProject } from '../../context/ProjectContext';
@@ -59,6 +60,7 @@ interface EmployeeDashboardProps {
 
 export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate }) => {
   const { currentUser } = useCRM();
+  const { can, isSuperAdmin } = usePermissions();
   const { leads } = useLead();
   const { customers } = useCustomer();
   const { projects } = useProject();
@@ -106,38 +108,44 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     return 'Good Evening';
   }, []);
 
+  const canViewBilling = Boolean(isSuperAdmin || can('invoices', 'view') || can('billing', 'view'));
+  const canViewMeetings = Boolean(isSuperAdmin || can('scheduled_meetings', 'view') || can('meetings', 'view'));
+
   useEffect(() => {
-    // Dynamic invoices from billing service
-    billingService
-      .getInvoices({ limit: 100 })
-      .then((res) => {
-        if (Array.isArray(res)) {
-          setInvoicesCount(res.length);
-        } else if (res && 'data' in res && Array.isArray((res as any).data)) {
-          setInvoicesCount((res as any).data.length);
-        }
-      })
-      .catch(() => {});
+    if (canViewBilling) {
+      billingService
+        .getInvoices({ limit: 100 })
+        .then((res) => {
+          if (Array.isArray(res)) {
+            setInvoicesCount(res.length);
+          } else if (res && 'data' in res && Array.isArray((res as any).data)) {
+            setInvoicesCount((res as any).data.length);
+          }
+        })
+        .catch(() => {});
 
-    // Dynamic payments from billing service
-    billingService
-      .getPayments()
-      .then((res) => {
-        if (Array.isArray(res)) {
-          setPaymentsCount(res.length);
-        }
-      })
-      .catch(() => {});
+      billingService
+        .getPayments()
+        .then((res) => {
+          if (Array.isArray(res)) {
+            setPaymentsCount(res.length);
+          } else if (res && 'data' in res && Array.isArray((res as any).data)) {
+            setPaymentsCount((res as any).data.length);
+          }
+        })
+        .catch(() => {});
+    }
 
-    // Dynamic scheduled meetings for employee
-    fetchMeetingsApi()
-      .then((res) => {
-        if (res && Array.isArray(res.meetings)) {
-          setMeetings(res.meetings);
-        }
-      })
-      .catch(() => {});
-  }, [currentUser.name]);
+    if (canViewMeetings) {
+      fetchMeetingsApi()
+        .then((res) => {
+          if (res && Array.isArray(res.meetings)) {
+            setMeetings(res.meetings);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [currentUser?.name, canViewBilling, canViewMeetings]);
 
   // 2. Date Filtered Data
   const filteredLeads = useMemo(() => {

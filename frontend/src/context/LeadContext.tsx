@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { notifications } from '@mantine/notifications';
+import { useCRM } from './CRMContext';
+import { usePermissions } from './AccessControlContext';
 import {
   Lead,
   LeadFormData,
@@ -78,9 +80,33 @@ const defaultMetadata: LeadMetadata = {
   serviceOptions: [],
 };
 
-const LeadContext = createContext<LeadContextType | undefined>(undefined);
+export const DEFAULT_LEAD_CONTEXT_VALUE: LeadContextType = {
+  leads: [],
+  stats: null,
+  metadata: defaultMetadata,
+  selectedLead: null,
+  loading: false,
+  filters: defaultFilters,
+  pagination: defaultPagination,
+  fetchLeads: async () => {},
+  fetchStats: async () => {},
+  fetchMetadata: async () => {},
+  setSelectedLead: () => {},
+  setFilters: () => {},
+  resetFilters: () => {},
+  setPage: () => {},
+  setLimit: () => {},
+  setSort: () => {},
+  createLead: async () => ({ success: false }),
+  updateLead: async () => ({ success: false }),
+  deleteLead: async () => ({ success: false }),
+};
+
+const LeadContext = createContext<LeadContextType>(DEFAULT_LEAD_CONTEXT_VALUE);
 
 export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isAuthChecking, activeNav } = useCRM();
+  const { can, permissionsLoaded, isSuperAdmin } = usePermissions();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [stats, setStats] = useState<LeadStats | null>(null);
   const [metadata, setMetadata] = useState<LeadMetadata | null>(defaultMetadata);
@@ -89,7 +115,11 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [filters, setFiltersState] = useState<LeadFilter>(defaultFilters);
   const [pagination, setPagination] = useState<LeadPagination>(defaultPagination);
 
+  const isPublicPage = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+  const hasLeadPermission = Boolean(isSuperAdmin || (permissionsLoaded && can('leads', 'view')));
+
   const fetchLeads = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasLeadPermission) return;
     try {
       setLoading(true);
       const res = await leadService.getLeads(filters, {
@@ -108,9 +138,10 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.limit]);
+  }, [filters, pagination.page, pagination.limit, isAuthenticated, isAuthChecking, isPublicPage, hasLeadPermission]);
 
   const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasLeadPermission) return;
     try {
       const res = await leadService.getLeadStats();
       if (res.success && res.stats) {
@@ -119,9 +150,10 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       console.error('Error fetching lead stats:', err);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasLeadPermission]);
 
   const fetchMetadata = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasLeadPermission) return;
     try {
       const res = await leadService.getLeadMetadata();
       if (res.success && res.metadata) {
@@ -133,16 +165,18 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       console.error('Error fetching lead metadata:', err);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasLeadPermission]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasLeadPermission) return;
     fetchLeads();
-  }, [fetchLeads]);
+  }, [fetchLeads, isAuthenticated, isAuthChecking, isPublicPage, hasLeadPermission]);
 
   useEffect(() => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasLeadPermission) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking, isPublicPage, hasLeadPermission]);
 
   const setFilters = useCallback((newFilters: Partial<LeadFilter>) => {
     setFiltersState((prev) => {
@@ -345,10 +379,7 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useLead = (): LeadContextType => {
   const context = useContext(LeadContext);
-  if (!context) {
-    throw new Error('useLead must be used within a LeadProvider');
-  }
-  return context;
+  return context || DEFAULT_LEAD_CONTEXT_VALUE;
 };
 
 export default LeadContext;

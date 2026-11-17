@@ -62,7 +62,7 @@ interface NotificationItem {
 export const NotificationBell: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
-  const { currentUser, setActiveNav } = useCRM();
+  const { currentUser, setActiveNav, isAuthenticated, isAuthChecking, activeNav } = useCRM();
   const { setSelectedContact, fetchContacts: refreshContactsList } = useContact();
 
   const [opened, setOpened] = useState(false);
@@ -88,6 +88,15 @@ export const NotificationBell: React.FC = () => {
       return false;
     }
   });
+
+  // Track ref to currentUser to keep callback identity stable and prevent re-render loops
+  const currentUserRef = React.useRef(currentUser);
+  currentUserRef.current = currentUser;
+
+  // Concurrency guard and throttling refs to prevent duplicate / rapid-fire API calls
+  const isFetchingRef = React.useRef(false);
+  const lastFetchTimeRef = React.useRef(0);
+  const debounceTimerRef = React.useRef<any>(null);
 
   const pillBg = isDark ? 'rgba(30, 41, 59, 0.7)' : '#FFFFFF';
   const pillBorder = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(226, 232, 240, 0.9)';
@@ -187,9 +196,10 @@ export const NotificationBell: React.FC = () => {
   // Check if reminder is meant for this logged-in user and alert
   const checkAndAlertReminder = useCallback((rem: ReminderItem) => {
     if (!rem) return;
-    const myId = (currentUser?.id || '').toLowerCase();
-    const myName = (currentUser?.name || '').toLowerCase();
-    const myEmail = (currentUser?.email || '').toLowerCase();
+    const cur = currentUserRef.current;
+    const myId = (cur?.id || '').toLowerCase();
+    const myName = (cur?.name || '').toLowerCase();
+    const myEmail = (cur?.email || '').toLowerCase();
 
     const assignedId = (rem.assignedToId || '').toLowerCase();
     const assignedUserId = (rem.assignedUserId || '').toLowerCase();
@@ -203,7 +213,7 @@ export const NotificationBell: React.FC = () => {
       (myId && (assignedId === myId || assignedUserId === myId || assignedEmpId === myId)) ||
       (myName && assignedName === myName) ||
       (myEmail && assignedEmail === myEmail) ||
-      (currentUser?.role === 'SUPER_ADMIN' && creatorId !== myId);
+      (cur?.role === 'SUPER_ADMIN' && creatorId !== myId);
 
     if (isRecipient) {
       playNotificationSound();
@@ -225,11 +235,31 @@ export const NotificationBell: React.FC = () => {
         } catch {}
       }
     }
-  }, [currentUser]);
+  }, []);
 
-  // Fetch contacts and reminders for notifications
+  const checkAndAlertReminderRef = React.useRef(checkAndAlertReminder);
+  checkAndAlertReminderRef.current = checkAndAlertReminder;
+
+  // Fetch contacts and reminders for notifications with concurrency lock and minimum gap
   const fetchAllNotifications = useCallback(async (isInitial = false) => {
+    if (typeof window === 'undefined') return;
+    const token = localStorage.getItem('crm_token');
+    if (!token || token === 'null' || token === 'undefined') {
+      return;
+    }
+
+    // Prevent overlapping / concurrent requests
+    if (isFetchingRef.current) return;
+
+    // Minimum interval between successive requests (throttle: 3000ms) unless initial load
+    const now = Date.now();
+    if (!isInitial && now - lastFetchTimeRef.current < 3000) {
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
+      lastFetchTimeRef.current = now;
       setLoading(true);
       const [contactsRes, remindersRes] = await Promise.allSettled([
         contactService.getContacts({ limit: 150 }),
@@ -271,22 +301,40 @@ export const NotificationBell: React.FC = () => {
     } catch (err) {
       console.error('Failed to load notifications data:', err);
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   }, []);
 
+  // Debounced notification fetch scheduler for events
+  const scheduleFetchNotifications = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      fetchAllNotifications(false);
+    }, 1000);
+  }, [fetchAllNotifications]);
+
   useEffect(() => {
+    const isPublic = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !isAuthenticated || isAuthChecking || isPublic) {
+      return;
+    }
+
+    // Initial fetch once authenticated
     fetchAllNotifications(true);
 
     const handleContactsUpdated = () => {
-      fetchAllNotifications(false);
+      scheduleFetchNotifications();
     };
 
     const handleRemindersUpdated = (e: any) => {
-      fetchAllNotifications(false);
+      scheduleFetchNotifications();
       const rem = e?.detail;
-      if (rem) {
-        checkAndAlertReminder(rem);
+      if (rem && checkAndAlertReminderRef.current) {
+        checkAndAlertReminderRef.current(rem);
       }
     };
 
@@ -294,13 +342,13 @@ export const NotificationBell: React.FC = () => {
       if (e.key === 'crm_reminder_broadcast' && e.newValue) {
         try {
           const parsed = JSON.parse(e.newValue);
-          fetchAllNotifications(false);
-          if (parsed?.reminder && parsed.action === 'create') {
-            checkAndAlertReminder(parsed.reminder);
+          scheduleFetchNotifications();
+          if (parsed?.reminder && parsed.action === 'create' && checkAndAlertReminderRef.current) {
+            checkAndAlertReminderRef.current(parsed.reminder);
           }
         } catch {}
       } else if (e.key === 'crm_contacts_updated') {
-        fetchAllNotifications(false);
+        scheduleFetchNotifications();
       }
     };
 
@@ -308,18 +356,21 @@ export const NotificationBell: React.FC = () => {
     window.addEventListener('crm_reminders_updated', handleRemindersUpdated);
     window.addEventListener('storage', handleStorageChange);
 
-    // Dynamic background polling every 12 seconds so updates from other sessions appear dynamically
+    // Controlled background polling every 25 seconds
     const interval = setInterval(() => {
       fetchAllNotifications(false);
-    }, 12000);
+    }, 25000);
 
     return () => {
       window.removeEventListener('crm_contacts_updated', handleContactsUpdated);
       window.removeEventListener('crm_reminders_updated', handleRemindersUpdated);
       window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
-  }, [fetchAllNotifications, checkAndAlertReminder]);
+  }, [isAuthenticated, isAuthChecking, activeNav, fetchAllNotifications, scheduleFetchNotifications]);
 
   // Transform contacts & reminders into clean notifications
   const notificationItems = useMemo<NotificationItem[]>(() => {

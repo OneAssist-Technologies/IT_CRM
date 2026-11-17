@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma.js';
 import { getCache, setCache, delCache } from '../config/redis.js';
 import { io } from '../utils/socket.js';
 import { recordActivity } from './activity.service.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 const CACHE_KEY_PREFIX = 'crm:meetings:';
 
@@ -140,12 +141,49 @@ function getScheduledMeetingSelectQuery(whereClause = 'WHERE 1=1') {
 /**
  * 1. Get all scheduled meetings from ScheduledMeeting with date-wise sorting and filtering
  */
-export async function getMeetingsService(queryParams = {}) {
+export async function getMeetingsService(queryParams = {}, currentUser = null) {
   const { date, startDate, endDate, status, employeeId, leadId, search } = queryParams;
 
   let where = 'WHERE 1=1';
   const params = [];
   let paramIdx = 1;
+
+  if (currentUser) {
+    const scope = await getDataScope(currentUser, 'scheduled_meetings');
+    const roleUpper = String(currentUser.role || '').toUpperCase();
+    const isSuperOrAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || scope === 'All';
+    if (!isSuperOrAdmin) {
+      const emp = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+            ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+
+      const userIdentifiers = [currentUser.id, emp?.id, emp?.empCode].filter(Boolean);
+      const userNames = [currentUser.name, emp?.name].filter(Boolean);
+      const userEmails = [currentUser.email, emp?.email].filter(Boolean);
+
+      const conditions = [];
+      for (const id of userIdentifiers) {
+        conditions.push(`m."employeeId" = $${paramIdx++}`);
+        params.push(id);
+      }
+      for (const name of userNames) {
+        conditions.push(`LOWER(m."employeeName") = LOWER($${paramIdx++})`);
+        params.push(name);
+      }
+      for (const email of userEmails) {
+        conditions.push(`LOWER(m."employeeEmail") = LOWER($${paramIdx++})`);
+        params.push(email);
+      }
+      if (conditions.length > 0) {
+        where += ` AND (${conditions.join(' OR ')})`;
+      }
+    }
+  }
 
   if (leadId && leadId !== 'ALL') {
     const cleanId = String(leadId).trim();
@@ -816,11 +854,53 @@ export async function deleteMeetingService(id) {
 /**
  * 6. Meeting Statistics & Overview
  */
-export async function getMeetingStatsService() {
+export async function getMeetingStatsService(currentUser = null) {
   const todayStr = new Date().toISOString().split('T')[0];
 
+  let whereClause = '';
+  const params = [];
+  let paramIdx = 1;
+
+  if (currentUser) {
+    const scope = await getDataScope(currentUser, 'scheduled_meetings');
+    const roleUpper = String(currentUser.role || '').toUpperCase();
+    const isSuperOrAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || scope === 'All';
+    if (!isSuperOrAdmin) {
+      const emp = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+            ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+
+      const userIdentifiers = [currentUser.id, emp?.id, emp?.empCode].filter(Boolean);
+      const userNames = [currentUser.name, emp?.name].filter(Boolean);
+      const userEmails = [currentUser.email, emp?.email].filter(Boolean);
+
+      const conditions = [];
+      for (const id of userIdentifiers) {
+        conditions.push(`"employeeId" = $${paramIdx++}`);
+        params.push(id);
+      }
+      for (const name of userNames) {
+        conditions.push(`LOWER("employeeName") = LOWER($${paramIdx++})`);
+        params.push(name);
+      }
+      for (const email of userEmails) {
+        conditions.push(`LOWER("employeeEmail") = LOWER($${paramIdx++})`);
+        params.push(email);
+      }
+      if (conditions.length > 0) {
+        whereClause = `WHERE (${conditions.join(' OR ')})`;
+      }
+    }
+  }
+
   const allMeetings = await prisma.$queryRawUnsafe(
-    `SELECT id, "meetingDate", status, "employeeName" FROM "ScheduledMeeting"`
+    `SELECT id, "meetingDate", status, "employeeName" FROM "ScheduledMeeting" ${whereClause}`,
+    ...params
   );
 
   const total = allMeetings.length;

@@ -39,6 +39,7 @@ import { InvoiceModal } from './InvoiceModal';
 import { InvoicePrintModal } from './InvoicePrintModal';
 import { InvoiceDocument } from './InvoiceDocument';
 import { CancelInvoiceModal } from './CancelInvoiceModal';
+import { APP_LOGO_URL } from '../../../config/env';
 
 interface InvoicesViewProps {
   onAddNew?: () => void;
@@ -648,7 +649,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
                   }}
                 >
                   <img
-                    src="/oneassist-logo.png"
+                    src={APP_LOGO_URL}
                     alt="OneAssist"
                     style={{ width: 18, height: 18, objectFit: 'contain' }}
                   />

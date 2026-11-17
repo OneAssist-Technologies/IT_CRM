@@ -80,6 +80,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
 
   // Fetch batch metadata and details
   const fetchBatchDetails = useCallback(async () => {
+    if (!batchId) return;
     try {
       setBatchLoading(true);
       const res = await contactService.getImportBatchDetails(batchId);
@@ -100,6 +101,7 @@ export const BatchDetailsView: React.FC<BatchDetailsViewProps> = ({
 
   // Fetch contacts for this batch
   const fetchBatchContacts = useCallback(async () => {
+    if (!batchId) return;
     try {
       setContactsLoading(true);
       const res = await contactService.getBatchContacts(batchId, {

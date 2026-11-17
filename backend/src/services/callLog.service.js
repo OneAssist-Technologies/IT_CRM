@@ -2,14 +2,20 @@ import { prisma } from '../config/prisma.js';
 import { generateCallId, formatCallLogResponse } from '../utils/callLog.util.js';
 import { io } from '../utils/socket.js';
 import { recordActivity } from './activity.service.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 /**
- * Scope call logs by user (Super Admin sees all, Employees only see their own calls)
+ * Scope call logs by user (Super Admin or All-Scope sees all, Employees only see their own calls)
  */
 async function resolveCallLogScopeFilter(currentUser) {
   if (!currentUser) return null;
   const roleUpper = String(currentUser.role || '').toUpperCase();
   if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
+    return null;
+  }
+
+  const scope = await getDataScope(currentUser, 'call_logs');
+  if (scope === 'All') {
     return null;
   }
 

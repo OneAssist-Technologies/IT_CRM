@@ -46,6 +46,8 @@ import {
 
   Checkbox,
 
+  Divider,
+
 } from '@mantine/core';
 
 import {
@@ -73,6 +75,10 @@ import {
   IconUser,
 
   IconArrowRight,
+
+  IconEdit,
+
+  IconChartBar,
 
 } from '@tabler/icons-react';
 
@@ -163,6 +169,15 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
   const [updateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
 
   const [moduleModalOpen, setModuleModalOpen] = useState<boolean>(false);
+
+  // Module Progress Edit Modal State
+  const [editModuleModalOpen, setEditModuleModalOpen] = useState<boolean>(false);
+  const [editingModuleProject, setEditingModuleProject] = useState<Project | null>(null);
+  const [editingModuleItem, setEditingModuleItem] = useState<ProjectModuleItem | null>(null);
+  const [editingModuleIndex, setEditingModuleIndex] = useState<number>(0);
+  const [editingModuleProgressVal, setEditingModuleProgressVal] = useState<number>(0);
+  const [editingModuleStatusVal, setEditingModuleStatusVal] = useState<string>('In Progress');
+  const [savingModuleProgress, setSavingModuleProgress] = useState<boolean>(false);
 
 
 
@@ -988,158 +1003,197 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
 
   // Update Module Progress & Recalculate Project Overall Progress
-
   const handleUpdateModuleProgress = async (
-
     project: Project,
-
     moduleId: string,
-
-    newProgress: number
-
+    newProgress: number,
+    existingModules?: ProjectModuleItem[],
+    moduleIndex?: number
   ) => {
-
     try {
+      const rawMods: ProjectModuleItem[] = (existingModules && existingModules.length > 0)
+        ? existingModules
+        : (Array.isArray(project.modules)
+            ? project.modules
+            : (typeof project.modules === 'string'
+                ? (() => { try { return JSON.parse(project.modules); } catch { return []; } })()
+                : []));
 
-      const updatedModules = (project.modules || []).map((m) => {
-
-        if (m.id === moduleId) {
-
+      const updatedModules: ProjectModuleItem[] = rawMods.map((m: any, mIdx: number) => {
+        const isMatch = (m.id && m.id === moduleId) || (moduleIndex !== undefined && mIdx === moduleIndex) || (m.name && m.name === moduleId);
+        if (isMatch) {
           const newStatus =
-
             newProgress === 100
-
               ? 'Completed'
-
               : newProgress > 0
-
               ? 'In Progress'
-
               : 'Not Started';
-
           return {
-
             ...m,
-
             progress: newProgress,
-
             status: newStatus as any,
-
             updatedAt: new Date().toISOString(),
-
           };
-
         }
-
         return m;
-
       });
-
-
 
       // Recalculate overall project progress from modules
+      const totalProg = updatedModules.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0);
+      const overallProg = updatedModules.length > 0 ? Math.round(totalProg / updatedModules.length) : (project.progress || 0);
+      const allDone = updatedModules.length > 0 && updatedModules.every((m) => m.status === 'Completed' || (Number(m.progress) || 0) >= 100);
+      const overallStatus = allDone ? 'Completed' : 'In Progress';
 
-      const totalProg = updatedModules.reduce((acc, curr) => acc + (curr.progress || 0), 0);
-
-      const overallProg = updatedModules.length > 0 ? Math.round(totalProg / updatedModules.length) : project.progress;
-
-      const overallStatus = overallProg === 100 ? 'Completed' : project.status;
-
-
-
-      const res = await projectService.updateProject(project.id, {
-
-        modules: updatedModules,
-
-        progress: overallProg,
-
-        status: overallStatus,
-
-      });
-
-
+      // 1. Call updateProjectModules API (updates PostgreSQL Project table)
+      const res = await projectService.updateProjectModules(project.id, updatedModules);
 
       if (res.success) {
+        // Also ensure project status & progress are synchronized in project record
+        await projectService.updateProject(project.id, {
+          progress: overallProg,
+          status: overallStatus,
+        }).catch(() => {});
+
+        // 2. Dispatch custom event so Projects Management module and all tabs immediately sync
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('crm_projects_updated', {
+              detail: { projectId: project.id, progress: overallProg, status: overallStatus, modules: updatedModules }
+            })
+          );
+        }
+
+        // 3. Update lead progress state if lead pipeline is active
+        if (onUpdateProgress) {
+          onUpdateProgress({
+            leadId: lead.id,
+            projectName: project.name,
+            projectCode: project.projectId || 'PRJ',
+            overallPercentage: overallProg,
+            status: overallStatus,
+            targetDeliveryDate: project.targetEndDate || '',
+            milestones: updatedModules.map((m: any, idx: number) => ({
+              id: m.id || `mod-${idx + 1}`,
+              title: m.name || `Module ${idx + 1}`,
+              description: m.description || '',
+              percentage: Number(m.progress) || 0,
+              status: (m.status === 'Completed' ? 'Completed' : (m.status === 'In Progress' ? 'In Progress' : 'Upcoming')) as 'Completed' | 'In Progress' | 'Upcoming',
+              targetDate: m.deadline || m.endDate || '',
+            })),
+          });
+        }
 
         notifications.show({
-
           title: 'Module Progress Updated',
-
-          message: `Progress updated to ${newProgress}%`,
-
+          message: `Module updated to ${newProgress}%. Overall project progress: ${overallProg}%.`,
           color: 'teal',
-
           icon: <IconCheck size={16} />,
-
         });
 
+        // 4. Refresh project list
         await fetchProjects();
-
       }
-
     } catch (err: any) {
-
       notifications.show({
-
         title: 'Error',
-
         message: err.message || 'Failed to update module',
-
         color: 'red',
-
       });
-
     }
-
   };
 
+  const handleOpenEditModuleModal = (
+    project: Project,
+    moduleItem: ProjectModuleItem,
+    index: number,
+    existingModules?: ProjectModuleItem[]
+  ) => {
+    setEditingModuleProject(project);
+    setEditingModuleItem(moduleItem);
+    setEditingModuleIndex(index);
+    setEditingModuleProgressVal(Number(moduleItem.progress) || 0);
+    setEditingModuleStatusVal(
+      moduleItem.status || (moduleItem.progress === 100 ? 'Completed' : (moduleItem.progress && moduleItem.progress > 0 ? 'In Progress' : 'Not Started'))
+    );
+    setEditModuleModalOpen(true);
+  };
 
+  const handleSaveModalModuleProgress = async () => {
+    if (!editingModuleProject || !editingModuleItem) return;
+    setSavingModuleProgress(true);
+    try {
+      await handleUpdateModuleProgress(
+        editingModuleProject,
+        editingModuleItem.id,
+        editingModuleProgressVal,
+        undefined,
+        editingModuleIndex
+      );
+      setEditModuleModalOpen(false);
+    } finally {
+      setSavingModuleProgress(false);
+    }
+  };
 
   // Delete Module from Project
-
-  const handleDeleteModule = async (project: Project, moduleId: string) => {
-
+  const handleDeleteModule = async (
+    project: Project,
+    moduleId: string,
+    existingModules?: ProjectModuleItem[],
+    moduleIndex?: number
+  ) => {
     try {
+      const rawMods: ProjectModuleItem[] = (existingModules && existingModules.length > 0)
+        ? existingModules
+        : (Array.isArray(project.modules)
+            ? project.modules
+            : (typeof project.modules === 'string'
+                ? (() => { try { return JSON.parse(project.modules); } catch { return []; } })()
+                : []));
 
-      const updatedModules = (project.modules || []).filter((m) => m.id !== moduleId);
-
-      const totalProg = updatedModules.reduce((acc, curr) => acc + (curr.progress || 0), 0);
-
-      const overallProg = updatedModules.length > 0 ? Math.round(totalProg / updatedModules.length) : project.progress;
-
-
-
-      const res = await projectService.updateProject(project.id, {
-
-        modules: updatedModules,
-
-        progress: overallProg,
-
+      const updatedModules = rawMods.filter((m: any, mIdx: number) => {
+        if (moduleIndex !== undefined && mIdx === moduleIndex) return false;
+        if (m.id && m.id === moduleId) return false;
+        if (m.name && m.name === moduleId) return false;
+        return true;
       });
 
+      const totalProg = updatedModules.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0);
+      const overallProg = updatedModules.length > 0 ? Math.round(totalProg / updatedModules.length) : 0;
+      const allDone = updatedModules.length > 0 && updatedModules.every((m) => m.status === 'Completed' || (Number(m.progress) || 0) >= 100);
+      const overallStatus = allDone ? 'Completed' : 'In Progress';
 
-
+      const res = await projectService.updateProjectModules(project.id, updatedModules);
       if (res.success) {
+        await projectService.updateProject(project.id, {
+          progress: overallProg,
+          status: overallStatus,
+        }).catch(() => {});
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('crm_projects_updated', {
+              detail: { projectId: project.id, progress: overallProg, status: overallStatus, modules: updatedModules }
+            })
+          );
+        }
 
         notifications.show({
-
           title: 'Module Removed',
-
           message: 'Module deleted successfully',
-
           color: 'blue',
-
         });
 
         await fetchProjects();
-
       }
-
-    } catch (err) {}
-
+    } catch (err: any) {
+      notifications.show({
+        title: 'Error',
+        message: err.message || 'Failed to delete module',
+        color: 'red',
+      });
+    }
   };
-
-
 
   // If linked projects exist, show them; otherwise show all projects from Project Management
 
@@ -1778,6 +1832,14 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                   const modulesCount = projectModules.length;
 
+                  const computedProjectProgress = projectModules.length > 0
+                    ? Math.round(projectModules.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0) / projectModules.length)
+                    : (p.progress || 0);
+
+                  const computedProjectStatus = projectModules.length > 0
+                    ? (projectModules.every((m) => m.status === 'Completed' || (Number(m.progress) || 0) >= 100) ? 'Completed' : 'In Progress')
+                    : (p.status || 'In Progress');
+
 
 
                   const pModIds = projectModules.map((m, idx) => getModId(p.id, m, idx));
@@ -1956,7 +2018,7 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
                         {/* 4. Status Badge (clickable to update) */}
                         <Table.Td>
                           <Group gap={6} wrap="nowrap">
-                            {renderStatusBadge(p.status, p)}
+                            {renderStatusBadge(computedProjectStatus, undefined)}
                             {isProjHandedOver && (
                               <Badge size="xs" variant="light" color="teal" radius="sm">
                                 Handed Over ✓
@@ -1977,7 +2039,7 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
 
 
-                        {/* 6. Progress Bar */}
+                        {/* 6. Progress Bar (Calculated strictly from Modules) */}
 
                         <Table.Td>
 
@@ -1987,49 +2049,25 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                               <Text size="xs" fw={600} style={{ color: isDark ? '#CBD5E1' : '#475569' }}>
 
-                                {p.progress || 0}%
+                                {computedProjectProgress}%
 
                               </Text>
-
-                              <Button
-
-                                size="compact-xs"
-
-                                variant="subtle"
-
-                                color="blue"
-
-                                onClick={(e) => {
-
-                                  e.stopPropagation();
-
-                                  openUpdateModal(p);
-
-                                }}
-
-                                style={{ fontSize: 10, height: 18, padding: '0 4px' }}
-
-                              >
-
-                                Edit
-
-                              </Button>
 
                             </Group>
 
                             <Progress
 
-                              value={p.progress || 0}
+                              value={computedProjectProgress}
 
                               size="sm"
 
                               radius="xl"
 
-                              color={p.progress === 100 ? 'teal' : p.progress > 50 ? 'blue' : 'orange'}
+                              color={computedProjectProgress === 100 ? 'teal' : computedProjectProgress > 50 ? 'blue' : 'orange'}
 
-                              striped={p.status === 'In Progress'}
+                              striped={computedProjectStatus === 'In Progress'}
 
-                              animated={p.status === 'In Progress'}
+                              animated={computedProjectStatus === 'In Progress'}
 
                             />
 
@@ -2507,19 +2545,95 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
 
 
-                                            {/* Progress Bar */}
+                                            {/* Progress Bar with Module Edit */}
 
                                             <Table.Td>
 
-                                              <Box style={{ minWidth: 140 }}>
+                                              <Box style={{ minWidth: 160 }}>
 
-                                                <Group justify="space-between" mb={3}>
+                                                <Group justify="space-between" mb={3} wrap="nowrap">
 
                                                   <Text size="11px" fw={700} style={{ color: isDone ? '#10B981' : isDark ? '#E2E8F0' : '#1E293B' }}>
 
                                                     {m.progress || 0}% Completed
 
                                                   </Text>
+
+                                                  <Menu shadow="md" width={180} position="bottom-end">
+
+                                                    <Menu.Target>
+
+                                                      <Button
+
+                                                        size="compact-xs"
+
+                                                        variant="subtle"
+
+                                                        color="blue"
+
+                                                        style={{ fontSize: 10, height: 18, padding: '0 4px', fontWeight: 600 }}
+
+                                                        onClick={(e) => e.stopPropagation()}
+
+                                                      >
+
+                                                        Edit
+
+                                                      </Button>
+
+                                                    </Menu.Target>
+
+                                                    <Menu.Dropdown>
+
+                                                      <Menu.Label>Quick Progress Presets</Menu.Label>
+
+                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0, projectModules, index)}>
+
+                                                        0% - Not Started
+
+                                                      </Menu.Item>
+
+                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25, projectModules, index)}>
+
+                                                        25% - In Progress
+
+                                                      </Menu.Item>
+
+                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50, projectModules, index)}>
+
+                                                        50% - In Progress
+
+                                                      </Menu.Item>
+
+                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75, projectModules, index)}>
+
+                                                        75% - In Progress
+
+                                                      </Menu.Item>
+
+                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100, projectModules, index)}>
+
+                                                        100% - Completed
+
+                                                      </Menu.Item>
+
+                                                      <Divider my={4} />
+
+                                                      <Menu.Item
+
+                                                        leftSection={<IconEdit size={13} />}
+
+                                                        onClick={() => handleOpenEditModuleModal(p, m, index, projectModules)}
+
+                                                      >
+
+                                                        Custom Slider / Details...
+
+                                                      </Menu.Item>
+
+                                                    </Menu.Dropdown>
+
+                                                  </Menu>
 
                                                 </Group>
 
@@ -2581,31 +2695,31 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                                                   <Menu.Label>Change Progress</Menu.Label>
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0)}>
+                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0, projectModules, index)}>
 
                                                     Not Started (0%)
 
                                                   </Menu.Item>
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25)}>
+                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25, projectModules, index)}>
 
                                                     In Progress (25%)
 
                                                   </Menu.Item>
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50)}>
+                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50, projectModules, index)}>
 
                                                     In Progress (50%)
 
                                                   </Menu.Item>
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75)}>
+                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75, projectModules, index)}>
 
                                                     In Progress (75%)
 
                                                   </Menu.Item>
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100)}>
+                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100, projectModules, index)}>
 
                                                     Completed (100%)
 
@@ -2633,7 +2747,7 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                                                   size="sm"
 
-                                                  onClick={() => handleDeleteModule(p, m.id)}
+                                                  onClick={() => handleDeleteModule(p, m.id, projectModules, index)}
 
                                                 >
 
@@ -3118,6 +3232,80 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
       </Modal>
 
 
+
+      {/* MODAL: Edit Module Progress Modal */}
+      <Modal
+        opened={editModuleModalOpen}
+        onClose={() => setEditModuleModalOpen(false)}
+        title={
+          <Group gap={8}>
+            <ThemeIcon size={28} radius="md" color="blue" variant="light">
+              <IconChartBar size={16} />
+            </ThemeIcon>
+            <Box>
+              <Text fw={700} size="sm">
+                Update Module Progress
+              </Text>
+              <Text size="xs" c="dimmed">
+                {editingModuleItem?.name} ({editingModuleProject?.name})
+              </Text>
+            </Box>
+          </Group>
+        }
+        radius="md"
+        centered
+      >
+        <Stack gap="md">
+          <Box>
+            <Group justify="space-between" mb={6}>
+              <Text size="xs" fw={600}>
+                Module Completion:
+              </Text>
+              <Badge
+                size="sm"
+                variant="light"
+                color={editingModuleProgressVal === 100 ? 'teal' : editingModuleProgressVal > 0 ? 'orange' : 'gray'}
+              >
+                {editingModuleProgressVal}% ({editingModuleProgressVal === 100 ? 'Completed' : editingModuleProgressVal > 0 ? 'In Progress' : 'Not Started'})
+              </Badge>
+            </Group>
+            <Slider
+              value={editingModuleProgressVal}
+              onChange={setEditingModuleProgressVal}
+              min={0}
+              max={100}
+              step={5}
+              marks={[
+                { value: 0, label: '0%' },
+                { value: 25, label: '25%' },
+                { value: 50, label: '50%' },
+                { value: 75, label: '75%' },
+                { value: 100, label: '100%' },
+              ]}
+              color={editingModuleProgressVal === 100 ? 'teal' : 'blue'}
+              mb="xl"
+            />
+          </Box>
+
+          <Text size="xs" c="dimmed">
+            Updating this module will automatically recalculate the overall project progress and sync directly to Project Management.
+          </Text>
+
+          <Group justify="flex-end" mt="sm">
+            <Button variant="default" size="xs" onClick={() => setEditModuleModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="xs"
+              color="blue"
+              loading={savingModuleProgress}
+              onClick={handleSaveModalModuleProgress}
+            >
+              Save Progress
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* MODAL 4: Add Module Modal */}
 

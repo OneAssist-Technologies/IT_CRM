@@ -85,16 +85,23 @@ export function buildContactFilterQuery(queryParams = {}) {
     });
   }
 
-  if (companyName && companyName !== 'All' && companyName.trim() !== '') {
+  const isValidFilterVal = (v) =>
+    v !== undefined &&
+    v !== null &&
+    typeof v === 'string' &&
+    v.trim() !== '' &&
+    !['all', 'undefined', 'null'].includes(v.trim().toLowerCase());
+
+  if (isValidFilterVal(companyName)) {
     andConditions.push({ companyName: { equals: companyName.trim(), mode: 'insensitive' } });
   }
-  if (contactType && contactType !== 'All' && contactType.trim() !== '') {
+  if (isValidFilterVal(contactType)) {
     andConditions.push({ contactType: { equals: contactType.trim(), mode: 'insensitive' } });
   }
-  if (category && category !== 'All' && category.trim() !== '') {
+  if (isValidFilterVal(category)) {
     andConditions.push({ category: { equals: category.trim(), mode: 'insensitive' } });
   }
-  if (source && source !== 'All' && source.trim() !== '') {
+  if (isValidFilterVal(source)) {
     const s = source.trim();
     if (s.toLowerCase() === 'bulk import' || s.toLowerCase() === 'import') {
       andConditions.push({
@@ -107,7 +114,7 @@ export function buildContactFilterQuery(queryParams = {}) {
       andConditions.push({ source: { equals: s, mode: 'insensitive' } });
     }
   }
-  if (status && status !== 'All' && status.trim() !== '') {
+  if (isValidFilterVal(status)) {
     const s = status.trim();
     andConditions.push({
       OR: [
@@ -122,16 +129,16 @@ export function buildContactFilterQuery(queryParams = {}) {
       ],
     });
   }
-  if (stage && stage !== 'All' && stage.trim() !== '') {
+  if (isValidFilterVal(stage)) {
     andConditions.push({ stage: { equals: stage.trim(), mode: 'insensitive' } });
   }
-  if (qualificationStatus && qualificationStatus !== 'All' && qualificationStatus.trim() !== '') {
+  if (isValidFilterVal(qualificationStatus)) {
     andConditions.push({ qualificationStatus: { equals: qualificationStatus.trim(), mode: 'insensitive' } });
   }
-  if (priority && priority !== 'All' && priority.trim() !== '') {
+  if (isValidFilterVal(priority)) {
     andConditions.push({ priority: { equals: priority.trim(), mode: 'insensitive' } });
   }
-  if (assignedTo && assignedTo !== 'All') {
+  if (isValidFilterVal(assignedTo)) {
     if (assignedTo.toLowerCase() === 'assigned') {
       andConditions.push({
         OR: [
@@ -197,19 +204,19 @@ export function buildContactFilterQuery(queryParams = {}) {
     }
   }
 
-  if (search && search.trim() !== '') {
-    const q = search.trim();
+  const cleanSearch = typeof search === 'string' ? search.trim() : '';
+  if (cleanSearch && !['undefined', 'null'].includes(cleanSearch.toLowerCase())) {
     andConditions.push({
       OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { phone: { contains: q, mode: 'insensitive' } },
-        { companyName: { contains: q, mode: 'insensitive' } },
-        { contactId: { contains: q, mode: 'insensitive' } },
-        { gstNumber: { contains: q, mode: 'insensitive' } },
-        { cinNumber: { contains: q, mode: 'insensitive' } },
-        { city: { contains: q, mode: 'insensitive' } },
-        { internalReference: { contains: q, mode: 'insensitive' } },
+        { name: { contains: cleanSearch, mode: 'insensitive' } },
+        { email: { contains: cleanSearch, mode: 'insensitive' } },
+        { phone: { contains: cleanSearch, mode: 'insensitive' } },
+        { companyName: { contains: cleanSearch, mode: 'insensitive' } },
+        { contactId: { contains: cleanSearch, mode: 'insensitive' } },
+        { gstNumber: { contains: cleanSearch, mode: 'insensitive' } },
+        { cinNumber: { contains: cleanSearch, mode: 'insensitive' } },
+        { city: { contains: cleanSearch, mode: 'insensitive' } },
+        { internalReference: { contains: cleanSearch, mode: 'insensitive' } },
       ],
     });
   }

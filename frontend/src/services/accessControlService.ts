@@ -24,11 +24,18 @@ export const accessControlService = {
    * Get current authenticated user's permissions and role
    */
   async getMyPermissions(): Promise<{ success: boolean; data?: MyPermissionsResponse; message?: string }> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      return { success: false, message: 'Not authenticated' };
+    }
     try {
       const res = await fetch(`${API_BASE}/my-permissions`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
+      if (res.status === 401 || res.status === 403) {
+        return { success: false, message: 'Not authenticated' };
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to fetch user permissions');
       return { success: true, data };
@@ -41,11 +48,18 @@ export const accessControlService = {
    * Get all system and dynamically created modules
    */
   async getModules(): Promise<{ success: boolean; modules?: SystemModule[]; message?: string }> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      return { success: false, message: 'Not authenticated' };
+    }
     try {
       const res = await fetch(`${API_BASE}/modules`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
+      if (res.status === 401 || res.status === 403) {
+        return { success: false, modules: [], message: 'Access denied' };
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to fetch modules');
       return { success: true, modules: data.modules || [] };
@@ -87,11 +101,18 @@ export const accessControlService = {
     totalRoles?: number;
     message?: string;
   }> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      return { success: false, message: 'Not authenticated' };
+    }
     try {
       const res = await fetch(`${API_BASE}/roles`, {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
+      if (res.status === 401 || res.status === 403) {
+        return { success: false, roles: [], systemModules: [], totalRoles: 0, message: 'Access denied' };
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to fetch roles');
       return {
@@ -236,6 +257,10 @@ export const accessControlService = {
     pagination?: { total: number; page: number; limit: number; totalPages: number };
     message?: string;
   }> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      return { success: false, message: 'Not authenticated' };
+    }
     try {
       const query = new URLSearchParams();
       if (params?.search) query.append('search', params.search);
@@ -248,6 +273,9 @@ export const accessControlService = {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
+      if (res.status === 401 || res.status === 403) {
+        return { success: false, users: [], departments: [], message: 'Access denied' };
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to fetch users');
       return {
@@ -319,6 +347,10 @@ export const accessControlService = {
     pagination?: { total: number; page: number; limit: number; totalPages: number };
     message?: string;
   }> {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      return { success: false, message: 'Not authenticated' };
+    }
     try {
       const query = new URLSearchParams();
       if (params?.action) query.append('action', params.action);
@@ -330,6 +362,9 @@ export const accessControlService = {
         credentials: 'include',
         headers: getAuthHeaders(),
       });
+      if (res.status === 401 || res.status === 403) {
+        return { success: false, logs: [], message: 'Access denied' };
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to fetch audit logs');
       return { success: true, logs: data.logs || [], pagination: data.pagination };

@@ -17,6 +17,9 @@ interface CRMContextType {
   currentUser: UserProfile;
   setCurrentUser: (user: UserProfile) => void;
   setCurrentUserRole: (role: UserRole) => void;
+  isAuthenticated: boolean;
+  setIsAuthenticated: (val: boolean) => void;
+  isAuthChecking: boolean;
   logoutUser: () => Promise<void>;
   activeNav: string;
   setActiveNav: (nav: string) => void;
@@ -42,6 +45,8 @@ const CRMContext = createContext<CRMContextType | undefined>(undefined);
 export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      if (!token || token === 'null' || token === 'undefined') return defaultEmptyUser;
       const saved = localStorage.getItem('crm_user');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -53,13 +58,31 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return defaultEmptyUser;
   });
 
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('crm_token');
+      return Boolean(token && token.trim() && token !== 'null' && token !== 'undefined');
+    }
+    return false;
+  });
+
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('crm_token');
+      return Boolean(token && token.trim() && token !== 'null' && token !== 'undefined');
+    }
+    return false;
+  });
+
   const resolveNavFromPath = (rawPathname?: string): string => {
-    if (typeof window === 'undefined') return 'dashboard';
+    if (typeof window === 'undefined') return 'signup';
     const pathname = rawPathname || window.location.pathname;
     const stripped = stripAppBasePath(pathname);
     const path = stripped.replace(/^\//, '').split('?')[0].replace(/\/+$/, '').toLowerCase();
 
-    if (!path || path === 'it-crm') {
+    if (!path || path === 'it-crm' || path === 'itcrm') {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      if (!token || token === 'null' || token === 'undefined') return 'signup';
       const saved = localStorage.getItem('crm_active_nav');
       if (saved && saved !== 'login' && saved !== 'signup') {
         return saved === 'onboard-employee' || saved === 'onboard' ? 'add-employee' : saved;
@@ -328,21 +351,17 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const handlePopState = () => {
       const resolved = resolveNavFromPath();
-      setActiveNavState(resolved);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('crm_active_nav', resolved);
-      }
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+      const isPublicNav = resolved === 'signup' || resolved === 'login' || resolved === 'reset-password';
 
-  // Canonical URL redirection for /it-crm parent prefix
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const pathname = window.location.pathname.replace(/\/+$/, '').toLowerCase();
-      // If root or bare /it-crm, redirect to default IT CRM dashboard
-      if (pathname === '' || pathname === '/it-crm') {
+      if (!token && !isPublicNav) {
+        const target = getTargetPathForNav('signup');
+        setActiveNavState('signup');
+        window.history.replaceState({ nav: 'signup' }, '', target);
+        return;
+      }
+
+      if (token && (resolved === 'signup' || resolved === 'login')) {
         const roleUpper = String(currentUser?.role || '').toUpperCase();
         const isAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || roleUpper === 'ADMIN';
         const defaultNav = isAdmin ? 'dashboard' : 'employee-dashboard';
@@ -352,34 +371,130 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return;
       }
 
-      // If user accesses legacy URLs without /it-crm prefix, cleanly redirect to canonical /it-crm/...
-      if (!pathname.startsWith('/it-crm')) {
+      setActiveNavState(resolved);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('crm_active_nav', resolved);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentUser?.role]);
+
+  // Canonical URL redirection for /it-crm and /itcrm prefix
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname.replace(/\/+$/, '').toLowerCase();
+      const stripped = stripAppBasePath(pathname).replace(/^\//, '').toLowerCase();
+      const token = localStorage.getItem('crm_token');
+      const isPublicNav = stripped === 'login' || stripped === 'signup' || stripped === 'reset-password';
+
+      // If root or bare base path
+      if (pathname === '' || pathname === '/it-crm' || pathname === '/itcrm') {
+        if (!token) {
+          const target = getTargetPathForNav('signup');
+          setActiveNavState('signup');
+          window.history.replaceState({ nav: 'signup' }, '', target);
+          return;
+        }
+        const roleUpper = String(currentUser?.role || '').toUpperCase();
+        const isAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || roleUpper === 'ADMIN';
+        const defaultNav = isAdmin ? 'dashboard' : 'employee-dashboard';
+        const target = getTargetPathForNav(defaultNav);
+        setActiveNavState(defaultNav);
+        window.history.replaceState({ nav: defaultNav }, '', target);
+        return;
+      }
+
+      // If authenticated user visits public login/signup page -> redirect to dashboard
+      if (token && isAuthenticated && isPublicNav) {
+        const roleUpper = String(currentUser?.role || '').toUpperCase();
+        const isAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || roleUpper === 'ADMIN';
+        const defaultNav = isAdmin ? 'dashboard' : 'employee-dashboard';
+        const target = getTargetPathForNav(defaultNav);
+        setActiveNavState(defaultNav);
+        window.history.replaceState({ nav: defaultNav }, '', target);
+        return;
+      }
+
+      // If unauthenticated user visits protected page -> redirect to signup
+      if (!token && !isPublicNav) {
+        const target = getTargetPathForNav('signup');
+        setActiveNavState('signup');
+        window.history.replaceState({ nav: 'signup' }, '', target);
+        return;
+      }
+
+      // If user accesses legacy URLs without base prefix, cleanly redirect
+      if (!pathname.startsWith('/it-crm') && !pathname.startsWith('/itcrm')) {
         const resolved = resolveNavFromPath();
-        const target = getTargetPathForNav(resolved);
-        window.history.replaceState({ nav: resolved }, '', target);
+        const nav = (!token && resolved !== 'signup' && resolved !== 'login' && resolved !== 'reset-password')
+          ? 'signup'
+          : resolved;
+        const target = getTargetPathForNav(nav);
+        setActiveNavState(nav);
+        window.history.replaceState({ nav }, '', target);
       }
     }
-  }, [currentUser?.role]);
+  }, [currentUser?.role, isAuthenticated]);
 
   // Auto-sync current user session from API on load
   useEffect(() => {
+    let isMounted = true;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      if (isMounted) {
+        setIsAuthenticated(false);
+        setIsAuthChecking(false);
+        setCurrentUser(defaultEmptyUser);
+      }
+      return;
+    }
+
     crmApi.getMe()
       .then((res) => {
+        if (!isMounted) return;
         if (res?.user && res.user.name) {
           setCurrentUser((prev) => ({
             ...prev,
             ...res.user,
           }));
+          setIsAuthenticated(true);
+          setIsAuthChecking(false);
+        } else {
+          throw new Error('Invalid user');
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!isMounted) return;
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('crm_token');
+          localStorage.removeItem('crm_user');
+          localStorage.removeItem('crm_my_permissions');
+        }
+        setCurrentUser(defaultEmptyUser);
+        setIsAuthenticated(false);
+        setIsAuthChecking(false);
+        const target = getTargetPathForNav('signup');
+        setActiveNavState('signup');
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({ nav: 'signup' }, '', target);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const [globalSearch, setGlobalSearch] = useState<string>('');
 
   // Sync user to localStorage
   useEffect(() => {
-    localStorage.setItem('crm_user', JSON.stringify(currentUser));
+    try {
+      if (currentUser && currentUser.email) {
+        localStorage.setItem('crm_user', JSON.stringify(currentUser));
+      }
+    } catch (_) {}
   }, [currentUser]);
 
   const setCurrentUserRole = (role: UserRole) => {
@@ -441,14 +556,16 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.removeItem('crm_user');
       localStorage.removeItem('crm_token');
       localStorage.removeItem('crm_my_permissions');
+      localStorage.removeItem('crm_active_nav');
       setCurrentUser(defaultEmptyUser);
-      window.dispatchEvent(new CustomEvent('crm_permissions_updated'));
+      setIsAuthenticated(false);
+      setIsAuthChecking(false);
+      setActiveNav('signup');
       notifications.show({
         title: 'Logged Out',
-        message: 'Session closed and Redis cache purged successfully.',
+        message: 'Session closed successfully.',
         color: 'gray',
       });
-      setActiveNav('login');
     } catch (err: any) {
       notifications.show({
         title: 'Logout Error',
@@ -464,6 +581,9 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         currentUser,
         setCurrentUser,
         setCurrentUserRole,
+        isAuthenticated,
+        setIsAuthenticated,
+        isAuthChecking,
         logoutUser,
         activeNav,
         setActiveNav: (nav: string) => {

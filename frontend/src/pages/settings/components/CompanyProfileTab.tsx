@@ -39,6 +39,7 @@ import { notifications } from '@mantine/notifications';
 import QRCode from 'qrcode';
 import { CompanyProfile } from '../../../types/settings';
 import { settingsService } from '../../../services/settingsService';
+import { APP_LOGO_URL } from '../../../config/env';
 
 // GST state code mapping for Indian states
 const GST_STATE_CODES: Record<string, string> = {
@@ -813,7 +814,9 @@ export const CompanyProfileTab: React.FC = () => {
                     alt="Logo"
                     style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = '/oneassist-logo.png';
+                      if ((e.target as HTMLImageElement).src !== APP_LOGO_URL) {
+                        (e.target as HTMLImageElement).src = APP_LOGO_URL;
+                      }
                     }}
                   />
                 ) : (

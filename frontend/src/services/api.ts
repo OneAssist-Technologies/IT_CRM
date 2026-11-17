@@ -57,7 +57,13 @@ export const crmApi = {
       method: 'POST',
     });
   },
-  getMe: () => fetchWithCookies<any>('/auth/me'),
+  getMe: () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+    if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+      return Promise.reject(new Error('No active session token'));
+    }
+    return fetchWithCookies<any>('/auth/me');
+  },
   forgotPassword: (email: string) =>
     fetchWithCookies<any>('/auth/forgot-password', {
       method: 'POST',

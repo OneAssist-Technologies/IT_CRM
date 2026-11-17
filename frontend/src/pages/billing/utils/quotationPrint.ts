@@ -1,4 +1,5 @@
 import { Quotation, BillingSettings } from '../../../types/billing';
+import { APP_LOGO_URL } from '../../../config/env';
 
 /**
  * Converts Indian Rupee number into words (Crores, Lakhs, Thousands, Hundreds)
@@ -436,7 +437,7 @@ export function generateQuotationPrintHtml(quotation: Quotation, settings?: Bill
 
       <div class="logo-container">
         <div class="logo-box">
-          <img src="/oneassist-logo.png" alt="OneAssist" style="width: 100%; height: 100%; object-fit: contain;" />
+          <img src="${settings?.companyLogoUrl || (settings as any)?.logoUrl || APP_LOGO_URL}" alt="OneAssist" style="width: 100%; height: 100%; object-fit: contain;" />
         </div>
         <div>
           <div class="logo-title">OneAssist <span style="color: #0EA5E9;">CRM</span></div>

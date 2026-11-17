@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { getIO } from '../utils/socket.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 /**
  * Format activity response object
@@ -1718,6 +1719,22 @@ export async function getActivitiesService(queryParams = {}, currentUser = null)
 
   // Build Prisma filter clause
   const where = { AND: [] };
+
+  // Data Scope Filter (Own vs All)
+  if (currentUser) {
+    const scope = await getDataScope(currentUser, 'activity_timeline');
+    const roleUpper = String(currentUser.role || '').toUpperCase();
+    const isSuperOrAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || scope === 'All';
+    if (!isSuperOrAdmin) {
+      where.AND.push({
+        OR: [
+          ...(currentUser.id ? [{ performedById: currentUser.id }] : []),
+          ...(currentUser.name ? [{ performedBy: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+          ...(currentUser.email ? [{ performedBy: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+        ],
+      });
+    }
+  }
 
   // 1. Activity Type filter
   const cleanType = (type || 'all').toLowerCase().trim();

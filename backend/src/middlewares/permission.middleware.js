@@ -61,6 +61,10 @@ export async function getUserPermissions(user) {
         'employee_management',
         'access_control',
         'settings',
+        'myprofile',
+        'company_profile',
+        'calendar',
+        'project_catalog',
         'activity_timeline',
         'support_tickets',
         'tickets',
@@ -119,18 +123,49 @@ export async function getUserPermissions(user) {
       await setCache(cacheKey, result, 3600);
       return result;
     } else {
-      // Find matching role or fallback to default 'employee' role for non-admin user
-      const candidateRole = await prisma.role.findFirst({
-        where: {
-          OR: [
-            { name: { equals: dbUser?.role || user.role || 'Employee', mode: 'insensitive' } },
-            { slug: { equals: (dbUser?.role || user.role || 'employee').toLowerCase().replace(/[\s-]+/g, '_'), mode: 'insensitive' } },
-            { slug: 'employee' },
-            { name: { equals: 'Employee', mode: 'insensitive' } },
-          ],
-        },
+      // Find matching role or fallback to default staff role for non-admin user
+      const rawRole = (dbUser?.role || user.role || '').trim();
+      const cleanRole = rawRole.toLowerCase();
+
+      let matchedSlug = null;
+      if (cleanRole === 'so' || cleanRole.includes('sales oficer') || cleanRole.includes('sales officer')) {
+        matchedSlug = cleanRole.includes('madurai') ? 'so_madurai' : 'so';
+      } else if (cleanRole.includes('madurai')) {
+        matchedSlug = 'so_madurai';
+      } else if (cleanRole.includes('sales executive') || cleanRole.includes('sales exec') || cleanRole === 'se') {
+        matchedSlug = 'sales_executive';
+      } else if (cleanRole.includes('asm') || cleanRole.includes('cbe')) {
+        matchedSlug = 'asm_cbe';
+      } else if (cleanRole.includes('manage')) {
+        matchedSlug = 'management';
+      } else if (cleanRole.includes('admin')) {
+        matchedSlug = 'admin';
+      }
+
+      const orConditions = [
+        { name: { equals: rawRole || 'SO', mode: 'insensitive' } },
+        { slug: { equals: (rawRole || 'so').toLowerCase().replace(/[\s-]+/g, '_'), mode: 'insensitive' } },
+      ];
+      if (matchedSlug) {
+        orConditions.unshift({ slug: matchedSlug });
+      }
+
+      let candidateRole = await prisma.role.findFirst({
+        where: { OR: orConditions },
         include: { permissions: true },
       });
+
+      // If still not matched, fallback to first non-system staff role in DB
+      if (!candidateRole) {
+        candidateRole = await prisma.role.findFirst({
+          where: { isSystem: false },
+          orderBy: { createdAt: 'asc' },
+          include: { permissions: true },
+        }) || await prisma.role.findFirst({
+          orderBy: { createdAt: 'asc' },
+          include: { permissions: true },
+        });
+      }
 
       if (candidateRole) {
         dbUser.roleRelation = candidateRole;
@@ -170,6 +205,65 @@ export async function getUserPermissions(user) {
         approve: isSuperAdmin && p.moduleId === 'access_control' ? true : p.canApprove,
       };
     });
+
+    // Backward compatibility: If 'settings' exists in DB permissions, inherit for sub-modules if not explicitly set
+    if (permsMap['settings']) {
+      ['myprofile', 'company_profile', 'calendar', 'project_catalog'].forEach((subMod) => {
+        if (!permsMap[subMod]) {
+          permsMap[subMod] = { ...permsMap['settings'] };
+        }
+      });
+    }
+  }
+
+  // Base Guarantee: Every active CRM user always has personal access to employee_dashboard, calendar, & attendance unless explicitly configured
+  if (!isSuperAdmin) {
+    if (!permsMap['employee_dashboard'] || !permsMap['employee_dashboard'].view) {
+      permsMap['employee_dashboard'] = {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+        approve: false,
+        dataScope: 'Own',
+      };
+    }
+    // Only default calendar if it has not been configured
+    if (permsMap['calendar'] === undefined) {
+      permsMap['calendar'] = {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+        approve: false,
+        dataScope: 'Own',
+      };
+    }
+    // Only default myprofile if it has not been configured
+    if (permsMap['myprofile'] === undefined) {
+      permsMap['myprofile'] = {
+        view: true,
+        create: false,
+        edit: true,
+        delete: false,
+        export: false,
+        approve: false,
+        dataScope: 'Own',
+      };
+    }
+    if (!permsMap['attendance'] || !permsMap['attendance'].view) {
+      permsMap['attendance'] = {
+        view: true,
+        create: true,
+        edit: true,
+        delete: false,
+        export: false,
+        approve: false,
+        dataScope: 'Own',
+      };
+    }
   }
 
   const result = {
@@ -261,8 +355,33 @@ export async function getDataScope(user, moduleId = 'contacts') {
   if (!userPerms) return 'Own';
   if (userPerms.isSuperAdmin) return 'All';
 
-  const configuredScope = userPerms.permissions?.[moduleId]?.dataScope;
-  if (configuredScope) return configuredScope;
+  const normalizeMap = {
+    contacts: ['contacts'],
+    leads: ['leads'],
+    meetings: ['meetings', 'scheduled_meetings'],
+    scheduled_meetings: ['scheduled_meetings', 'meetings'],
+    calls: ['calls', 'call_logs'],
+    call_logs: ['call_logs', 'calls'],
+    customers: ['customers', 'companies'],
+    companies: ['companies', 'customers'],
+    projects: ['projects', 'projects_management'],
+    projects_management: ['projects_management', 'projects'],
+    activity_timeline: ['activity_timeline', 'activity', 'activities'],
+    activity: ['activity', 'activity_timeline', 'activities'],
+    activities: ['activities', 'activity_timeline', 'activity'],
+    support_tickets: ['support_tickets', 'tickets'],
+    tickets: ['tickets', 'support_tickets'],
+    project_catalog: ['project_catalog', 'settings'],
+    calendar: ['calendar', 'settings'],
+    myprofile: ['myprofile', 'settings'],
+    company_profile: ['company_profile', 'settings'],
+  };
+
+  const candidates = normalizeMap[moduleId.toLowerCase()] || [moduleId];
+  for (const mod of candidates) {
+    const configuredScope = userPerms.permissions?.[mod]?.dataScope;
+    if (configuredScope) return configuredScope;
+  }
 
   const roleSlug = userPerms.role?.slug?.toLowerCase();
   const appType = userPerms.role?.appType?.toLowerCase();

@@ -10,6 +10,15 @@ import { API_BASE_URL } from '../config/env';
 
 const API_BASE = `${API_BASE_URL}/support-tickets`;
 
+const getAuthHeaders = (extraHeaders: Record<string, string> = {}): Record<string, string> => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (token && token.trim() && token !== 'null' && token !== 'undefined') {
+    headers['Authorization'] = `Bearer ${token.trim()}`;
+  }
+  return headers;
+};
+
 /**
  * Fetch paginated tickets with filters
  */
@@ -26,6 +35,10 @@ export async function fetchTicketsApi(
   limit: number;
   totalPages: number;
 }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+    return { tickets: [], total: 0, page: 1, limit, totalPages: 1 };
+  }
   const params = new URLSearchParams();
   params.append('page', String(page));
   params.append('limit', String(limit));
@@ -44,7 +57,10 @@ export async function fetchTicketsApi(
   if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
   if (filters.dateTo) params.append('dateTo', filters.dateTo);
 
-  const res = await fetch(`${API_BASE}?${params.toString()}`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE}?${params.toString()}`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `Failed to fetch tickets (${res.status})`);
@@ -63,7 +79,10 @@ export async function fetchTicketsApi(
  * Fetch single ticket details
  */
 export async function fetchTicketByIdApi(id: string): Promise<SupportTicket> {
-  const res = await fetch(`${API_BASE}/${id}`, { credentials: 'include' });
+  const res = await fetch(`${API_BASE}/${id}`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `Failed to fetch ticket (${res.status})`);
@@ -76,7 +95,14 @@ export async function fetchTicketByIdApi(id: string): Promise<SupportTicket> {
  * Fetch dropdown metadata
  */
 export async function fetchTicketMetadataApi(): Promise<TicketDropdownMetadata> {
-  const res = await fetch(`${API_BASE}/metadata`, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+    return { customers: [], projects: [], contacts: [], leads: [], employees: [], contracts: [], teams: [] };
+  }
+  const res = await fetch(`${API_BASE}/metadata`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message || `Failed to fetch dropdown metadata (${res.status})`);
@@ -89,7 +115,14 @@ export async function fetchTicketMetadataApi(): Promise<TicketDropdownMetadata> 
  * Fetch ticket stats summary (all, my, unassigned)
  */
 export async function fetchTicketStatsApi(): Promise<{ all: number; my: number; unassigned: number }> {
-  const res = await fetch(`${API_BASE}/stats`, { credentials: 'include' });
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+    return { all: 0, my: 0, unassigned: 0 };
+  }
+  const res = await fetch(`${API_BASE}/stats`, {
+    credentials: 'include',
+    headers: getAuthHeaders(),
+  });
   if (!res.ok) {
     return { all: 0, my: 0, unassigned: 0 };
   }

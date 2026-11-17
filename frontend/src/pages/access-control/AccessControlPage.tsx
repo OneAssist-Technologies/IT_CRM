@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
 import {
   Box,
   Paper,
@@ -15,6 +16,7 @@ import {
   Collapse,
   Switch,
   SegmentedControl,
+  Radio,
   UnstyledButton,
   ScrollArea,
   ActionIcon,
@@ -60,6 +62,12 @@ import {
   IconX,
   IconSparkles,
   IconGitBranch,
+  IconGauge,
+  IconTrendingUp,
+  IconShieldCheck,
+  IconTicket,
+  IconBulb,
+  IconFolder,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useAccessControl } from '../../context/AccessControlContext';
@@ -277,6 +285,8 @@ const DynamicTreeNode: React.FC<DynamicTreeNodeProps> = ({
 export const AccessControlPage: React.FC = () => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const isSmallMobile = useMediaQuery('(max-width: 520px)');
 
   const {
     roles,
@@ -414,6 +424,38 @@ export const AccessControlPage: React.FC = () => {
           map[m.id].dataScope = isSuperOrAdmin ? 'All' : 'Own';
         }
       });
+
+      // Backward compatibility: If settings was defined in DB, sync sub-modules if missing
+      const settingsPerm = map['settings'];
+      const subKeys = ['myprofile', 'company_profile', 'calendar', 'project_catalog'];
+      if (settingsPerm && settingsPerm.canView) {
+        subKeys.forEach((subKey) => {
+          if (!selectedRole.permissions?.some((p) => p.moduleId === subKey)) {
+            map[subKey] = {
+              ...(map[subKey] || {
+                moduleId: subKey,
+                moduleName: subKey,
+                category: 'Administration & Security',
+                dataScope: isSuperOrAdmin ? 'All' : 'Own',
+                canView: false,
+                canCreate: false,
+                canEdit: false,
+                canDelete: false,
+                canExport: false,
+                canApprove: false,
+              }),
+              canView: true,
+              canEdit: true,
+              canCreate: subKey === 'calendar' || subKey === 'project_catalog',
+            };
+          }
+        });
+      }
+      // If any sub-module is active, ensure settings master canView is true
+      if (subKeys.some((k) => map[k]?.canView)) {
+        if (map['settings']) map['settings'].canView = true;
+      }
+
       setLocalPermissions(map);
       setHasUnsavedChanges(false);
     }
@@ -426,24 +468,46 @@ export const AccessControlPage: React.FC = () => {
       'dashboard',
       'employee_dashboard',
       'employee_management',
+      'employees',
       'contacts',
       'leads',
       'scheduled_meetings',
+      'meetings',
       'call_logs',
+      'calls',
       'customers',
+      'companies',
       'projects',
+      'projects_management',
       'activity_timeline',
+      'activity',
+      'activities',
+      'support_tickets',
+      'tickets',
       'access_control',
       'settings',
     ];
 
+    const subModuleIds = new Set(['myprofile', 'company_profile', 'calendar', 'project_catalog']);
+
     systemModules
-      .filter((mod) => mod.id !== 'negotiations' && mod.id !== 'invoices')
+      .filter((mod) => mod.id !== 'negotiations' && mod.id !== 'invoices' && !subModuleIds.has(mod.id))
       .forEach((mod) => {
         const cat = mod.category || 'Main Navigation';
         if (!map.has(cat)) map.set(cat, []);
         map.get(cat)!.push(mod);
       });
+
+    // Ensure settings is present in Administration & Security
+    const adminMods = map.get('Administration & Security');
+    if (adminMods && !adminMods.some((m) => m.id === 'settings')) {
+      adminMods.push({
+        id: 'settings',
+        name: 'Settings & Master Data',
+        category: 'Administration & Security',
+        description: 'Company profile, project & module catalog templates, CRM pipeline presets, and system configurations.',
+      });
+    }
 
     const categoryOrder = ['Main Navigation', 'Administration & Security', 'Custom Modules'];
 
@@ -480,9 +544,145 @@ export const AccessControlPage: React.FC = () => {
     );
   }, [roles, roleSearch]);
 
+  // Master Toggle for Settings in Administration & Security
+  const handleToggleSettingsMaster = () => {
+    if (!selectedRole) return;
+    const isSuperOrAdmin = selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin';
+
+    const subModuleKeys = ['myprofile', 'company_profile', 'calendar', 'project_catalog'];
+    const enabledSubCount = subModuleKeys.filter((k) => Boolean(localPermissions[k]?.canView)).length;
+    const isCurrentlyActive = Boolean(localPermissions['settings']?.canView || enabledSubCount > 0);
+
+    const nextState = !isCurrentlyActive;
+    const updatedMap = { ...localPermissions };
+
+    // Update master settings permission
+    updatedMap['settings'] = {
+      ...(updatedMap['settings'] || {
+        moduleId: 'settings',
+        moduleName: 'Settings & Master Data',
+        category: 'Administration & Security',
+        dataScope: isSuperOrAdmin ? 'All' : 'Own',
+        canView: false,
+        canCreate: false,
+        canEdit: false,
+        canDelete: false,
+        canExport: false,
+        canApprove: false,
+      }),
+      canView: nextState,
+      canEdit: nextState,
+      canCreate: nextState,
+    };
+
+    if (!nextState) {
+      // Turning OFF Settings turns OFF all 4 sub-modules
+      subModuleKeys.forEach((key) => {
+        if (updatedMap[key]) {
+          updatedMap[key] = {
+            ...updatedMap[key],
+            canView: false,
+            canCreate: false,
+            canEdit: false,
+            canDelete: false,
+          };
+        }
+      });
+    } else {
+      // Turning ON Settings: If none of the sub-modules were enabled, enable all 4
+      const anySubEnabled = subModuleKeys.some((k) => updatedMap[k]?.canView);
+      if (!anySubEnabled) {
+        subModuleKeys.forEach((key) => {
+          updatedMap[key] = {
+            ...(updatedMap[key] || {
+              moduleId: key,
+              moduleName: key,
+              category: 'Administration & Security',
+              dataScope: isSuperOrAdmin ? 'All' : 'Own',
+              canView: false,
+              canCreate: false,
+              canEdit: false,
+              canDelete: false,
+              canExport: false,
+              canApprove: false,
+            }),
+            canView: true,
+            canEdit: true,
+            canCreate: key === 'calendar' || key === 'project_catalog',
+          };
+        });
+      }
+    }
+
+    setLocalPermissions(updatedMap);
+    setHasUnsavedChanges(true);
+  };
+
+  // Toggle individual Settings sub-module (My Profile, Company Profile, Calendar, Project Catalog)
+  const handleToggleSettingsSubModule = (subId: string) => {
+    if (!selectedRole) return;
+    const isSuperOrAdmin = selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin';
+
+    const currentSub = localPermissions[subId] || {
+      moduleId: subId,
+      moduleName: subId,
+      category: 'Administration & Security',
+      dataScope: isSuperOrAdmin ? 'All' : 'Own',
+      canView: false,
+      canCreate: false,
+      canEdit: false,
+      canDelete: false,
+      canExport: false,
+      canApprove: false,
+    };
+
+    const nextSubState = !currentSub.canView;
+    const subModuleKeys = ['myprofile', 'company_profile', 'calendar', 'project_catalog'];
+
+    const updatedMap = {
+      ...localPermissions,
+      [subId]: {
+        ...currentSub,
+        canView: nextSubState,
+        canEdit: nextSubState,
+        canCreate: nextSubState && (subId === 'calendar' || subId === 'project_catalog'),
+      },
+    };
+
+    // If at least one sub-module is active, settings master must be active
+    const anySubActive = subModuleKeys.some((k) =>
+      k === subId ? nextSubState : Boolean(updatedMap[k]?.canView)
+    );
+
+    updatedMap['settings'] = {
+      ...(updatedMap['settings'] || {
+        moduleId: 'settings',
+        moduleName: 'Settings & Master Data',
+        category: 'Administration & Security',
+        dataScope: isSuperOrAdmin ? 'All' : 'Own',
+        canView: false,
+        canCreate: false,
+        canEdit: false,
+        canDelete: false,
+        canExport: false,
+        canApprove: false,
+      }),
+      canView: anySubActive,
+      canEdit: anySubActive,
+    };
+
+    setLocalPermissions(updatedMap);
+    setHasUnsavedChanges(true);
+  };
+
   // Live toggle of module permission switch
   const handleToggleModule = (moduleId: string) => {
     if (!selectedRole) return;
+
+    if (moduleId === 'settings') {
+      handleToggleSettingsMaster();
+      return;
+    }
 
     const isSuperOrAdmin = selectedRole.slug === 'admin' || selectedRole.slug === 'super_admin';
     const current = localPermissions[moduleId] || {
@@ -518,27 +718,41 @@ export const AccessControlPage: React.FC = () => {
     };
 
     // Keep aliases in sync
-    if (moduleId === 'employee_management') {
+    if (moduleId === 'employee_management' || moduleId === 'employees') {
+      updatedMap['employee_management'] = { ...updatedPerm, moduleId: 'employee_management' };
       updatedMap['employees'] = { ...updatedPerm, moduleId: 'employees' };
     }
-    if (moduleId === 'customers') {
+    if (moduleId === 'customers' || moduleId === 'companies') {
+      updatedMap['customers'] = { ...updatedPerm, moduleId: 'customers' };
       updatedMap['companies'] = { ...updatedPerm, moduleId: 'companies' };
     }
-    if (moduleId === 'call_logs') {
+    if (moduleId === 'call_logs' || moduleId === 'calls' || moduleId === 'activity_logs') {
+      updatedMap['call_logs'] = { ...updatedPerm, moduleId: 'call_logs' };
       updatedMap['calls'] = { ...updatedPerm, moduleId: 'calls' };
     }
-    if (moduleId === 'scheduled_meetings') {
+    if (moduleId === 'scheduled_meetings' || moduleId === 'meetings') {
+      updatedMap['scheduled_meetings'] = { ...updatedPerm, moduleId: 'scheduled_meetings' };
       updatedMap['meetings'] = { ...updatedPerm, moduleId: 'meetings' };
     }
-    if (moduleId === 'projects') {
+    if (moduleId === 'projects' || moduleId === 'projects_management') {
+      updatedMap['projects'] = { ...updatedPerm, moduleId: 'projects' };
       updatedMap['projects_management'] = { ...updatedPerm, moduleId: 'projects_management' };
+    }
+    if (moduleId === 'support_tickets' || moduleId === 'tickets') {
+      updatedMap['support_tickets'] = { ...updatedPerm, moduleId: 'support_tickets' };
+      updatedMap['tickets'] = { ...updatedPerm, moduleId: 'tickets' };
+    }
+    if (moduleId === 'activity_timeline' || moduleId === 'activity' || moduleId === 'activities') {
+      updatedMap['activity_timeline'] = { ...updatedPerm, moduleId: 'activity_timeline' };
+      updatedMap['activity'] = { ...updatedPerm, moduleId: 'activity' };
+      updatedMap['activities'] = { ...updatedPerm, moduleId: 'activities' };
     }
 
     setLocalPermissions(updatedMap);
     setHasUnsavedChanges(true);
   };
 
-  // Change data scope ('Own' | 'All') for scoped modules (e.g. Contacts, Leads)
+  // Change data scope ('Own' | 'All') for scoped modules (e.g. Contacts, Leads, Meetings, Call Logs, Customers, Projects, Timeline, Tickets)
   const handleDataScopeChange = (moduleId: string, scope: 'Own' | 'All') => {
     if (!selectedRole) return;
 
@@ -563,6 +777,37 @@ export const AccessControlPage: React.FC = () => {
       ...localPermissions,
       [moduleId]: updatedPerm,
     };
+
+    // Keep aliases in sync
+    if (moduleId === 'employee_management' || moduleId === 'employees') {
+      updatedMap['employee_management'] = { ...updatedPerm, moduleId: 'employee_management' };
+      updatedMap['employees'] = { ...updatedPerm, moduleId: 'employees' };
+    }
+    if (moduleId === 'customers' || moduleId === 'companies') {
+      updatedMap['customers'] = { ...updatedPerm, moduleId: 'customers' };
+      updatedMap['companies'] = { ...updatedPerm, moduleId: 'companies' };
+    }
+    if (moduleId === 'call_logs' || moduleId === 'calls' || moduleId === 'activity_logs') {
+      updatedMap['call_logs'] = { ...updatedPerm, moduleId: 'call_logs' };
+      updatedMap['calls'] = { ...updatedPerm, moduleId: 'calls' };
+    }
+    if (moduleId === 'scheduled_meetings' || moduleId === 'meetings') {
+      updatedMap['scheduled_meetings'] = { ...updatedPerm, moduleId: 'scheduled_meetings' };
+      updatedMap['meetings'] = { ...updatedPerm, moduleId: 'meetings' };
+    }
+    if (moduleId === 'projects' || moduleId === 'projects_management') {
+      updatedMap['projects'] = { ...updatedPerm, moduleId: 'projects' };
+      updatedMap['projects_management'] = { ...updatedPerm, moduleId: 'projects_management' };
+    }
+    if (moduleId === 'support_tickets' || moduleId === 'tickets') {
+      updatedMap['support_tickets'] = { ...updatedPerm, moduleId: 'support_tickets' };
+      updatedMap['tickets'] = { ...updatedPerm, moduleId: 'tickets' };
+    }
+    if (moduleId === 'activity_timeline' || moduleId === 'activity' || moduleId === 'activities') {
+      updatedMap['activity_timeline'] = { ...updatedPerm, moduleId: 'activity_timeline' };
+      updatedMap['activity'] = { ...updatedPerm, moduleId: 'activity' };
+      updatedMap['activities'] = { ...updatedPerm, moduleId: 'activities' };
+    }
 
     setLocalPermissions(updatedMap);
     setHasUnsavedChanges(true);
@@ -597,6 +842,11 @@ export const AccessControlPage: React.FC = () => {
     if (updatedMap['call_logs']) updatedMap['calls'] = { ...updatedMap['call_logs'], moduleId: 'calls' };
     if (updatedMap['scheduled_meetings']) updatedMap['meetings'] = { ...updatedMap['scheduled_meetings'], moduleId: 'meetings' };
     if (updatedMap['projects']) updatedMap['projects_management'] = { ...updatedMap['projects'], moduleId: 'projects_management' };
+    if (updatedMap['support_tickets']) updatedMap['tickets'] = { ...updatedMap['support_tickets'], moduleId: 'tickets' };
+    if (updatedMap['activity_timeline']) {
+      updatedMap['activity'] = { ...updatedMap['activity_timeline'], moduleId: 'activity' };
+      updatedMap['activities'] = { ...updatedMap['activity_timeline'], moduleId: 'activities' };
+    }
 
     setLocalPermissions(updatedMap);
     setHasUnsavedChanges(true);
@@ -628,6 +878,11 @@ export const AccessControlPage: React.FC = () => {
     if (updatedMap['call_logs']) updatedMap['calls'] = { ...updatedMap['call_logs'], moduleId: 'calls', canView: false };
     if (updatedMap['scheduled_meetings']) updatedMap['meetings'] = { ...updatedMap['scheduled_meetings'], moduleId: 'meetings', canView: false };
     if (updatedMap['projects']) updatedMap['projects_management'] = { ...updatedMap['projects'], moduleId: 'projects_management', canView: false };
+    if (updatedMap['support_tickets']) updatedMap['tickets'] = { ...updatedMap['support_tickets'], moduleId: 'tickets', canView: false };
+    if (updatedMap['activity_timeline']) {
+      updatedMap['activity'] = { ...updatedMap['activity_timeline'], moduleId: 'activity', canView: false };
+      updatedMap['activities'] = { ...updatedMap['activity_timeline'], moduleId: 'activities', canView: false };
+    }
 
     setLocalPermissions(updatedMap);
     setHasUnsavedChanges(true);
@@ -913,6 +1168,185 @@ export const AccessControlPage: React.FC = () => {
   const headingColor = isDark ? '#F8FAFC' : '#0F172A';
   const subtitleColor = isDark ? '#94A3B8' : '#64748B';
 
+  // Sub-modules nested under Settings & Master Data
+  const SETTINGS_SUBMODULES = useMemo(
+    () => [
+      {
+        id: 'myprofile',
+        name: 'My Profile',
+        subtitle: 'Manage Profile & Credentials',
+        icon: <IconUser size={18} color="#0284C7" stroke={2} />,
+        iconBg: '#E0F2FE',
+      },
+      {
+        id: 'company_profile',
+        name: 'Company Profile',
+        subtitle: 'Manage Company Details & Brand',
+        icon: <IconBuilding size={18} color="#0D9488" stroke={2} />,
+        iconBg: '#CCFBF1',
+      },
+      {
+        id: 'calendar',
+        name: 'Calendar & Reminders',
+        subtitle: 'Manage Calendar & Reminders',
+        icon: <IconCalendar size={18} color="#D97706" stroke={2} />,
+        iconBg: '#FEF3C7',
+      },
+      {
+        id: 'project_catalog',
+        name: 'Project Catalog',
+        subtitle: 'Manage Project Templates & Scope',
+        icon: <IconBriefcase size={18} color="#7C3AED" stroke={2} />,
+        iconBg: '#EDE9FE',
+      },
+    ],
+    []
+  );
+
+  // Module Metadata & Styling (Exact match for modern clean card UI)
+  const getModuleMeta = (id: string, name: string) => {
+    switch (id) {
+      case 'dashboard':
+        return {
+          title: 'Dashboard',
+          subtitle: 'Access Dashboard',
+          icon: <IconGauge size={20} color="#0284C7" stroke={2} />,
+          iconBg: '#E0F2FE',
+        };
+      case 'employee_dashboard':
+        return {
+          title: 'Employees Dashboard',
+          subtitle: 'View Employee Dashboard',
+          icon: <IconUsers size={20} color="#9333EA" stroke={2} />,
+          iconBg: '#F3E8FF',
+        };
+      case 'employee_management':
+      case 'employees':
+        return {
+          title: 'Employee Management',
+          subtitle: 'Manage Employees',
+          icon: <IconUsers size={20} color="#16A34A" stroke={2} />,
+          iconBg: '#DCFCE7',
+        };
+      case 'contacts':
+        return {
+          title: 'Contacts',
+          subtitle: 'Manage Contacts',
+          icon: <IconAddressBook size={20} color="#0D9488" stroke={2} />,
+          iconBg: '#CCFBF1',
+        };
+      case 'leads':
+        return {
+          title: 'Leads',
+          subtitle: 'Manage Leads',
+          icon: <IconTrendingUp size={20} color="#16A34A" stroke={2} />,
+          iconBg: '#DCFCE7',
+        };
+      case 'scheduled_meetings':
+      case 'meetings':
+        return {
+          title: 'Meetings',
+          subtitle: 'Manage Meetings',
+          icon: <IconCalendar size={20} color="#D97706" stroke={2} />,
+          iconBg: '#FEF3C7',
+        };
+      case 'call_logs':
+      case 'calls':
+      case 'activity_logs':
+        return {
+          title: 'Call Logs',
+          subtitle: 'View Call Logs',
+          icon: <IconPhone size={20} color="#0284C7" stroke={2} />,
+          iconBg: '#E0F2FE',
+        };
+      case 'customers':
+      case 'companies':
+        return {
+          title: 'Customers',
+          subtitle: 'Manage Customers',
+          icon: <IconUsers size={20} color="#9333EA" stroke={2} />,
+          iconBg: '#F3E8FF',
+        };
+      case 'projects':
+      case 'projects_management':
+        return {
+          title: 'Projects Management',
+          subtitle: 'Manage Projects',
+          icon: <IconFolder size={20} color="#7C3AED" stroke={2} />,
+          iconBg: '#EDE9FE',
+        };
+      case 'activity_timeline':
+      case 'activity':
+      case 'activities':
+        return {
+          title: 'Activity Timeline',
+          subtitle: 'View Activity History',
+          icon: <IconShieldCheck size={20} color="#16A34A" stroke={2} />,
+          iconBg: '#DCFCE7',
+        };
+      case 'support_tickets':
+      case 'tickets':
+        return {
+          title: 'Support Tickets',
+          subtitle: 'Manage Support Tickets',
+          icon: <IconTicket size={20} color="#E11D48" stroke={2} />,
+          iconBg: '#FFE4E6',
+        };
+      case 'access_control':
+        return {
+          title: 'Access Control & RBAC',
+          subtitle: 'Manage Access Roles',
+          icon: <IconLock size={20} color="#2563EB" stroke={2} />,
+          iconBg: '#E0F2FE',
+        };
+      case 'myprofile':
+      case 'profile':
+        return {
+          title: 'My Profile',
+          subtitle: 'Manage Profile & Credentials',
+          icon: <IconUser size={20} color="#0284C7" stroke={2} />,
+          iconBg: '#E0F2FE',
+        };
+      case 'company_profile':
+      case 'company':
+        return {
+          title: 'Company Profile',
+          subtitle: 'Manage Company Details & Brand',
+          icon: <IconBuilding size={20} color="#0D9488" stroke={2} />,
+          iconBg: '#CCFBF1',
+        };
+      case 'calendar':
+        return {
+          title: 'Calendar & Reminders',
+          subtitle: 'Manage Calendar & Reminders',
+          icon: <IconCalendar size={20} color="#D97706" stroke={2} />,
+          iconBg: '#FEF3C7',
+        };
+      case 'project_catalog':
+      case 'projects_catalog':
+        return {
+          title: 'Project Catalog',
+          subtitle: 'Manage Project Templates & Scope',
+          icon: <IconBriefcase size={20} color="#7C3AED" stroke={2} />,
+          iconBg: '#EDE9FE',
+        };
+      case 'settings':
+        return {
+          title: 'Settings & Master Data',
+          subtitle: 'Manage Master Data',
+          icon: <IconSettings size={20} color="#9333EA" stroke={2} />,
+          iconBg: '#F3E8FF',
+        };
+      default:
+        return {
+          title: name,
+          subtitle: `Manage ${name}`,
+          icon: <IconLayoutGrid size={20} color="#4F46E5" stroke={2} />,
+          iconBg: '#EEF2FF',
+        };
+    }
+  };
+
   // Module Icon mapper
   const getModuleIcon = (id: string) => {
     switch (id) {
@@ -928,6 +1362,12 @@ export const AccessControlPage: React.FC = () => {
         return <IconClipboardList size={18} color="#4F46E5" />;
       case 'access_control':
         return <IconShieldLock size={18} color="#4F46E5" />;
+      case 'myprofile':
+        return <IconUser size={18} color="#4F46E5" />;
+      case 'company_profile':
+        return <IconBuilding size={18} color="#4F46E5" />;
+      case 'project_catalog':
+        return <IconBriefcase size={18} color="#4F46E5" />;
       case 'settings':
         return <IconSettings size={18} color="#4F46E5" />;
       case 'audit_logs':
@@ -1520,6 +1960,369 @@ export const AccessControlPage: React.FC = () => {
                   const enabledInCat = modules.filter((m) => localPermissions[m.id]?.canView).length;
                   const isCollapsed = Boolean(collapsedCategories[categoryName]);
 
+                  // Special distinct container for Administration & Security
+                  if (categoryName === 'Administration & Security') {
+                    return (
+                      <Paper
+                        key={categoryName}
+                        p="md"
+                        radius="18px"
+                        style={{
+                          background: isDark ? '#0F172A' : '#F8FAFC',
+                          border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                        }}
+                      >
+                        {/* Header */}
+                        <Group justify="space-between" align="center" mb="md" wrap="wrap" gap="sm">
+                          <Group gap="sm" align="center">
+                            <Box
+                              style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                background: '#7C3AED',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 6px rgba(124, 58, 237, 0.25)',
+                              }}
+                            >
+                              <IconShieldLock size={20} color="#FFFFFF" stroke={2} />
+                            </Box>
+                            <div>
+                              <Text fw={700} size="sm" style={{ color: headingColor }}>
+                                Administration & Security
+                              </Text>
+                              <Text size="xs" c="dimmed" style={{ fontSize: '11px' }}>
+                                Manage administrative and security features
+                              </Text>
+                            </div>
+                          </Group>
+
+                          <Badge
+                            size="md"
+                            radius="100px"
+                            styles={{
+                              root: {
+                                background: '#DCFCE7',
+                                color: '#16A34A',
+                                fontWeight: 700,
+                                fontSize: '12px',
+                                height: 28,
+                                padding: '0 12px',
+                                textTransform: 'none',
+                                border: 'none',
+                              },
+                            }}
+                            leftSection={<IconCheck size={14} stroke={3} style={{ marginRight: 4 }} />}
+                          >
+                            {enabledInCat} / {modules.length} Enabled
+                          </Badge>
+                        </Group>
+
+                        {/* Grid: Access Control & RBAC, Settings & Master Data, Permission Summary */}
+                        <Box
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                            gap: '16px',
+                            alignItems: 'start',
+                          }}
+                        >
+                          {modules.map((mod) => {
+                            if (mod.id === 'settings') {
+                              const enabledSubCount = SETTINGS_SUBMODULES.filter(
+                                (s) => Boolean(localPermissions[s.id]?.canView)
+                              ).length;
+                              const isSettingsEnabled = Boolean(
+                                localPermissions['settings']?.canView || enabledSubCount > 0
+                              );
+
+                              return (
+                                <Paper
+                                  key="settings"
+                                  p="14px 16px"
+                                  radius="16px"
+                                  style={{
+                                    background: isDark ? '#1E293B' : '#FFFFFF',
+                                    border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: isSettingsEnabled ? '12px' : '0px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                    transition: 'all 0.2s ease',
+                                    gridColumn: !isMobile && isSettingsEnabled ? 'span 2' : undefined,
+                                  }}
+                                >
+                                  {/* Master Settings Row */}
+                                  <Group justify="space-between" align="center" wrap="nowrap" style={{ width: '100%' }}>
+                                    <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+                                      <Box
+                                        style={{
+                                          width: 38,
+                                          height: 38,
+                                          borderRadius: 10,
+                                          background: isDark ? 'rgba(255,255,255,0.06)' : '#F3E8FF',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        <IconSettings size={20} color="#9333EA" stroke={2} />
+                                      </Box>
+                                      <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                        <Group gap={6} align="center" wrap="nowrap">
+                                          <Text
+                                            fw={700}
+                                            size="13px"
+                                            style={{
+                                              color: headingColor,
+                                              whiteSpace: 'nowrap',
+                                              overflow: 'hidden',
+                                              textOverflow: 'ellipsis',
+                                              lineHeight: 1.25,
+                                            }}
+                                            title="Settings & Master Data"
+                                          >
+                                            Settings & Master Data
+                                          </Text>
+                                        </Group>
+                                        <Text
+                                          size="11px"
+                                          c="dimmed"
+                                          style={{
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            lineHeight: 1.25,
+                                          }}
+                                        >
+                                          {isSettingsEnabled
+                                            ? `${enabledSubCount} of 4 sub-modules enabled`
+                                            : 'Manage company, catalog & profile settings'}
+                                        </Text>
+                                      </div>
+                                    </Group>
+
+                                    <Switch
+                                      checked={isSettingsEnabled}
+                                      color="blue"
+                                      size="md"
+                                      onChange={handleToggleSettingsMaster}
+                                      styles={{
+                                        track: { cursor: 'pointer' },
+                                      }}
+                                    />
+                                  </Group>
+
+                                  {/* Sub-modules Section: Shows below when Settings is ON */}
+                                  <Collapse in={isSettingsEnabled}>
+                                    <Box
+                                      mt={4}
+                                      p="10px 12px"
+                                      style={{
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#F8FAFC',
+                                        borderRadius: '12px',
+                                        border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                                      }}
+                                    >
+                                      <Group justify="space-between" align="center" mb={8}>
+                                        <Text
+                                          fw={700}
+                                          size="10.5px"
+                                          tt="uppercase"
+                                          c="dimmed"
+                                          style={{ letterSpacing: '0.05em' }}
+                                        >
+                                          Settings Sub-Modules
+                                        </Text>
+                                        <Badge
+                                          size="xs"
+                                          radius="sm"
+                                          variant="light"
+                                          color={enabledSubCount > 0 ? 'blue' : 'gray'}
+                                          style={{ fontWeight: 650, fontSize: '10px', height: 18 }}
+                                        >
+                                          {enabledSubCount} / 4 Active
+                                        </Badge>
+                                      </Group>
+
+                                      <Box
+                                        style={{
+                                          display: 'grid',
+                                          gridTemplateColumns: isSmallMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                                          gap: '8px',
+                                        }}
+                                      >
+                                        {SETTINGS_SUBMODULES.map((subMod) => {
+                                          const isSubEnabled = Boolean(localPermissions[subMod.id]?.canView);
+
+                                          return (
+                                            <Paper
+                                              key={subMod.id}
+                                              p="8px 12px"
+                                              radius="10px"
+                                              style={{
+                                                background: isDark ? '#1E293B' : '#FFFFFF',
+                                                border: isDark
+                                                  ? '1px solid rgba(255,255,255,0.06)'
+                                                  : '1px solid #EEF2F6',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                              }}
+                                            >
+                                              <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+                                                <Box
+                                                  style={{
+                                                    width: 30,
+                                                    height: 30,
+                                                    borderRadius: 8,
+                                                    background: isDark
+                                                      ? 'rgba(255,255,255,0.06)'
+                                                      : subMod.iconBg,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                  }}
+                                                >
+                                                  {subMod.icon}
+                                                </Box>
+                                                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                                  <Text
+                                                    fw={650}
+                                                    size="12px"
+                                                    style={{
+                                                      color: headingColor,
+                                                      whiteSpace: 'nowrap',
+                                                      overflow: 'hidden',
+                                                      textOverflow: 'ellipsis',
+                                                      lineHeight: 1.25,
+                                                    }}
+                                                  >
+                                                    {subMod.name}
+                                                  </Text>
+                                                  <Text
+                                                    size="10.5px"
+                                                    c="dimmed"
+                                                    style={{
+                                                      whiteSpace: 'nowrap',
+                                                      overflow: 'hidden',
+                                                      textOverflow: 'ellipsis',
+                                                      lineHeight: 1.25,
+                                                    }}
+                                                  >
+                                                    {subMod.subtitle}
+                                                  </Text>
+                                                </div>
+                                              </Group>
+
+                                              <Switch
+                                                checked={isSubEnabled}
+                                                color="blue"
+                                                size="sm"
+                                                onChange={() => handleToggleSettingsSubModule(subMod.id)}
+                                                styles={{
+                                                  track: { cursor: 'pointer' },
+                                                }}
+                                              />
+                                            </Paper>
+                                          );
+                                        })}
+                                      </Box>
+                                    </Box>
+                                  </Collapse>
+                                </Paper>
+                              );
+                            }
+
+                            const isEnabled = Boolean(localPermissions[mod.id]?.canView);
+                            const isLocked = mod.id === 'access_control' && !['admin', 'super_admin'].includes(selectedRole.slug);
+                            const meta = getModuleMeta(mod.id, mod.name);
+
+                            return (
+                              <Paper
+                                key={mod.id}
+                                p="14px 16px"
+                                radius="16px"
+                                style={{
+                                  background: isDark ? '#1E293B' : '#FFFFFF',
+                                  border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                                }}
+                              >
+                                <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+                                  <Box
+                                    style={{
+                                      width: 38,
+                                      height: 38,
+                                      borderRadius: 10,
+                                      background: isDark ? 'rgba(255,255,255,0.06)' : meta.iconBg,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    {meta.icon}
+                                  </Box>
+                                  <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                    <Group gap={6} align="center" wrap="nowrap">
+                                      <Text
+                                        fw={700}
+                                        size="13px"
+                                        style={{
+                                          color: headingColor,
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          lineHeight: 1.25,
+                                        }}
+                                        title={meta.title}
+                                      >
+                                        {meta.title}
+                                      </Text>
+                                      {isLocked && <IconLock size={14} color="#F59E0B" />}
+                                    </Group>
+                                    <Text
+                                      size="11px"
+                                      c="dimmed"
+                                      style={{
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        lineHeight: 1.25,
+                                      }}
+                                    >
+                                      {meta.subtitle}
+                                    </Text>
+                                  </div>
+                                </Group>
+
+                                <Switch
+                                  checked={isEnabled}
+                                  disabled={['admin', 'super_admin'].includes(selectedRole.slug) && mod.id === 'access_control'}
+                                  color="blue"
+                                  size="md"
+                                  onChange={() => handleToggleModule(mod.id)}
+                                  styles={{
+                                    track: { cursor: 'pointer' },
+                                  }}
+                                />
+                              </Paper>
+                            );
+                          })}
+                        </Box>
+                      </Paper>
+                    );
+                  }
+
+                  // Standard category (Main Navigation, Custom Modules)
                   return (
                     <Box key={categoryName}>
                       {/* Category Header */}
@@ -1558,47 +2361,86 @@ export const AccessControlPage: React.FC = () => {
                           mt="sm"
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
                             gap: '16px',
                           }}
                         >
                           {modules.map((mod) => {
                             const isEnabled = Boolean(localPermissions[mod.id]?.canView);
                             const isLocked = mod.id === 'access_control' && !['admin', 'super_admin'].includes(selectedRole.slug);
-                            const isScopedModule = mod.id === 'contacts' || mod.id === 'leads';
                             const currentScope = localPermissions[mod.id]?.dataScope || (['admin', 'super_admin'].includes(selectedRole.slug) ? 'All' : 'Own');
+                            const meta = getModuleMeta(mod.id, mod.name);
 
                             return (
                               <Paper
                                 key={mod.id}
-                                p="sm"
-                                radius="14px"
+                                p="14px 16px"
+                                radius="16px"
                                 style={{
-                                  background: isDark ? '#1E293B' : '#F8FAFC',
-                                  border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9',
+                                  background: isDark ? '#1E293B' : '#FFFFFF',
+                                  border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
                                   display: 'flex',
                                   flexDirection: 'column',
-                                  gap: '8px',
+                                  justifyContent: 'space-between',
+                                  gap: '10px',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                                 }}
                               >
+                                {/* Top Row: Icon + Title/Subtitle + Switch */}
                                 <Group justify="space-between" align="center" wrap="nowrap" style={{ width: '100%' }}>
-                                  <Group gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                                    {getModuleIcon(mod.id)}
-                                    <Text
-                                      fw={600}
-                                      size="13px"
-                                      style={{ color: headingColor, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                                      title={mod.name}
+                                  <Group gap="sm" style={{ flex: 1, minWidth: 0 }} wrap="nowrap">
+                                    <Box
+                                      style={{
+                                        width: 38,
+                                        height: 38,
+                                        minWidth: 38,
+                                        borderRadius: 10,
+                                        background: isDark ? 'rgba(255,255,255,0.06)' : meta.iconBg,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                      }}
                                     >
-                                      {mod.name}
-                                    </Text>
-                                    {isLocked && <IconLock size={14} color="#F59E0B" />}
+                                      {meta.icon}
+                                    </Box>
+                                    <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                      <Group gap={6} align="center" wrap="nowrap">
+                                        <Text
+                                          fw={700}
+                                          size="13px"
+                                          style={{
+                                            color: headingColor,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            lineHeight: 1.25,
+                                          }}
+                                          title={meta.title}
+                                        >
+                                          {meta.title}
+                                        </Text>
+                                        {isLocked && <IconLock size={14} color="#F59E0B" />}
+                                      </Group>
+                                      <Text
+                                        size="11px"
+                                        c="dimmed"
+                                        style={{
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          lineHeight: 1.25,
+                                        }}
+                                      >
+                                        {meta.subtitle}
+                                      </Text>
+                                    </div>
                                   </Group>
 
                                   <Switch
                                     checked={isEnabled}
                                     disabled={['admin', 'super_admin'].includes(selectedRole.slug) && mod.id === 'access_control'}
-                                    color="indigo"
+                                    color="blue"
                                     size="md"
                                     onChange={() => handleToggleModule(mod.id)}
                                     styles={{
@@ -1607,43 +2449,59 @@ export const AccessControlPage: React.FC = () => {
                                   />
                                 </Group>
 
-                                {/* Data Scope Option for Contacts and Leads */}
-                                {isScopedModule && isEnabled && (
-                                  <Group
-                                    justify="space-between"
-                                    align="center"
-                                    pt={6}
-                                    style={{
-                                      borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
-                                      width: '100%',
-                                    }}
-                                  >
-                                    <Text size="11px" fw={600} c="dimmed">
-                                      Data Scope
+                                {/* Data Scope Option: Radio Buttons */}
+                                {isEnabled && (
+                                  <Group gap="xs" align="center" wrap="nowrap" style={{ width: '100%' }}>
+                                    <Text size="xs" c="dimmed" style={{ fontSize: '11px', fontWeight: 500, flexShrink: 0 }}>
+                                      Data Scope:
                                     </Text>
-                                    <SegmentedControl
-                                      size="xs"
+                                    <Radio.Group
                                       value={currentScope}
-                                      disabled={selectedRole.slug === 'super_admin'}
                                       onChange={(val) => handleDataScopeChange(mod.id, val as 'Own' | 'All')}
-                                      data={[
-                                        { label: 'Own Data', value: 'Own' },
-                                        { label: 'All Data', value: 'All' },
-                                      ]}
-                                      styles={{
-                                        root: {
-                                          padding: 2,
-                                          height: 24,
-                                          background: isDark ? '#0F172A' : '#E2E8F0',
-                                        },
-                                        label: {
-                                          fontSize: '10px',
-                                          fontWeight: 700,
-                                          padding: '2px 8px',
-                                          lineHeight: '18px',
-                                        },
-                                      }}
-                                    />
+                                    >
+                                      <Group gap="xs" wrap="nowrap">
+                                        <Radio
+                                          value="Own"
+                                          label="Own Data"
+                                          size="xs"
+                                          color="blue"
+                                          disabled={selectedRole.slug === 'super_admin'}
+                                          styles={{
+                                            root: { cursor: 'pointer' },
+                                            label: {
+                                              fontSize: '11px',
+                                              fontWeight: currentScope === 'Own' ? 700 : 500,
+                                              color: currentScope === 'Own' ? (isDark ? '#F8FAFC' : '#0F172A') : (isDark ? '#94A3B8' : '#64748B'),
+                                              cursor: 'pointer',
+                                              paddingLeft: 4,
+                                            },
+                                            radio: {
+                                              cursor: 'pointer',
+                                            },
+                                          }}
+                                        />
+                                        <Radio
+                                          value="All"
+                                          label="All Data"
+                                          size="xs"
+                                          color="blue"
+                                          disabled={selectedRole.slug === 'super_admin'}
+                                          styles={{
+                                            root: { cursor: 'pointer' },
+                                            label: {
+                                              fontSize: '11px',
+                                              fontWeight: currentScope === 'All' ? 700 : 500,
+                                              color: currentScope === 'All' ? (isDark ? '#F8FAFC' : '#0F172A') : (isDark ? '#94A3B8' : '#64748B'),
+                                              cursor: 'pointer',
+                                              paddingLeft: 4,
+                                            },
+                                            radio: {
+                                              cursor: 'pointer',
+                                            },
+                                          }}
+                                        />
+                                      </Group>
+                                    </Radio.Group>
                                   </Group>
                                 )}
                               </Paper>

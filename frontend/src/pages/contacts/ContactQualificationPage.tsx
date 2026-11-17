@@ -89,7 +89,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
       const saved = sessionStorage.getItem('crm_qualifying_contact');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return contacts.length > 0 ? contacts[0] : null;
+    return null;
   });
 
   // 1. Fetch live contact from server on mount to ensure fresh database data
@@ -106,7 +106,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
             return parsed?.importedContactId || parsed?.id || parsed?.contactId;
           }
         } catch (e) {}
-        return contacts.length > 0 ? (contacts[0].importedContactId || contacts[0].id || contacts[0].contactId) : null;
+        return null;
       })();
 
     if (targetId) {
@@ -448,7 +448,7 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
         }
         // Notify notification bell and other components across the CRM
-        window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
+        window.dispatchEvent(new CustomEvent('crm_contacts_updated', { detail: { targetTab: 'ASSIGNED' } }));
         if (currentStatus === 'Qualified') {
           window.dispatchEvent(new CustomEvent('crm_leads_updated'));
         }
@@ -636,6 +636,51 @@ export const ContactQualificationPage: React.FC<ContactQualificationPageProps> =
           <Text size="sm" c="dimmed">Loading contact details...</Text>
         </Stack>
       </Center>
+    );
+  }
+
+  if (!activeContact) {
+    return (
+      <Box p={{ base: 'xs', sm: 'sm', md: 'md', lg: 'lg' }} style={{ width: '100%', maxWidth: '100%' }}>
+        <Group justify="space-between" align="center" mb="md">
+          <Button
+            variant="subtle"
+            color="gray"
+            leftSection={<IconArrowLeft size={16} />}
+            onClick={onBack}
+            radius="md"
+            size="sm"
+            styles={{ root: { fontWeight: 600 } }}
+          >
+            Back to Contacts
+          </Button>
+        </Group>
+        <Paper
+          p="xl"
+          radius="md"
+          style={{
+            textAlign: 'center',
+            marginTop: 40,
+            backgroundColor: isDark ? '#111827' : '#FFFFFF',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+          }}
+        >
+          <Center mb="sm">
+            <ThemeIcon size={56} radius="xl" color="blue" variant="light">
+              <IconTargetArrow size={30} />
+            </ThemeIcon>
+          </Center>
+          <Text fw={700} size="lg" style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+            No Contact Selected for Qualification
+          </Text>
+          <Text size="sm" c="dimmed" mt={4} mb="lg">
+            Please select a contact from the Contacts list and click the "Qualify Contact" button.
+          </Text>
+          <Button onClick={onBack} variant="filled" color="blue" radius="md">
+            Go to Contacts
+          </Button>
+        </Paper>
+      </Box>
     );
   }
 

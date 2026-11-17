@@ -41,7 +41,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onSwitchToSignup,
   defaultEmail = '',
 }) => {
-  const { currentUser, setCurrentUser, setActiveNav } = useCRM();
+  const { currentUser, setCurrentUser, setActiveNav, setIsAuthenticated } = useCRM();
 
   const [loading, setLoading] = useState(false);
 
@@ -175,6 +175,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           localStorage.setItem('crm_token', res.token);
         }
         setCurrentUser(res.user);
+        setIsAuthenticated(true);
         window.dispatchEvent(new CustomEvent('crm_permissions_updated'));
         notifications.show({
           title: 'Welcome Back!',
