@@ -2880,3 +2880,91 @@ export async function getBillingAuditLogsService(query = {}) {
 
   return logs;
 }
+
+/**
+ * -----------------------------------------------------------------------------
+ * 11. DOCUMENT LOOKUP FOR QUOTATION IMPORT
+ * -----------------------------------------------------------------------------
+ */
+export async function lookupDocumentItemsService(code) {
+  if (!code) return null;
+  const rawCode = String(code).trim();
+  const invMatch = rawCode.match(/(INV-\d{4}-\d+|INV-\d+|QUO-\d{4}-\d+|QUO-\d+)/i);
+  const targetCode = (invMatch ? invMatch[0] : rawCode).toUpperCase();
+
+  // 1. Try Invoice lookup
+  if (targetCode.startsWith('INV') || !targetCode.startsWith('QUO')) {
+    const inv = await prisma.invoice.findFirst({
+      where: {
+        OR: [
+          { invoiceNumber: { equals: targetCode, mode: 'insensitive' } },
+          { invoiceNumber: { contains: targetCode, mode: 'insensitive' } },
+        ],
+      },
+      include: { items: true },
+    });
+
+    if (inv && Array.isArray(inv.items) && inv.items.length > 0) {
+      return {
+        sourceType: 'invoice',
+        referenceNumber: inv.invoiceNumber,
+        clientName: inv.contactName || inv.companyName || '',
+        totalAmount: inv.grandTotal,
+        subtotal: inv.subtotal,
+        taxAmount: inv.taxAmount,
+        notes: inv.notes,
+        termsConditions: inv.termsConditions,
+        items: inv.items.map((it) => ({
+          itemName: it.itemName || it.description || 'Service',
+          itemType: it.itemType || 'Service',
+          description: it.description || '',
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          discount: Number(it.discount) || 0,
+          discountType: 'percentage',
+          taxRate: Number(it.taxRate) || 18,
+          taxAmount: Number(it.taxAmount) || 0,
+          totalAmount: Number(it.totalAmount) || 0,
+        })),
+      };
+    }
+  }
+
+  // 2. Try Quotation lookup
+  const quo = await prisma.quotation.findFirst({
+    where: {
+      OR: [
+        { quotationNumber: { equals: targetCode, mode: 'insensitive' } },
+        { quotationNumber: { contains: targetCode, mode: 'insensitive' } },
+      ],
+    },
+    include: { items: true },
+  });
+
+  if (quo && Array.isArray(quo.items) && quo.items.length > 0) {
+    return {
+      sourceType: 'quotation',
+      referenceNumber: quo.quotationNumber,
+      clientName: quo.contactName || quo.companyName || '',
+      totalAmount: quo.grandTotal || quo.totalAmount,
+      subtotal: quo.subtotal,
+      taxAmount: quo.taxAmount,
+      notes: quo.notes,
+      termsConditions: quo.termsConditions,
+      items: quo.items.map((it) => ({
+        itemName: it.itemName || it.description || 'Service',
+        itemType: it.itemType || 'Service',
+        description: it.description || '',
+        quantity: Number(it.quantity) || 1,
+        unitPrice: Number(it.unitPrice) || 0,
+        discount: Number(it.discount) || 0,
+        discountType: it.discountType || 'percentage',
+        taxRate: Number(it.taxRate) || 18,
+        taxAmount: Number(it.taxAmount) || 0,
+        totalAmount: Number(it.totalAmount) || 0,
+      })),
+    };
+  }
+
+  return null;
+}

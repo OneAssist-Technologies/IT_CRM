@@ -22,6 +22,7 @@ import {
 import {
   IconCalculator,
   IconPlus,
+  IconUpload,
   IconCheck,
   IconRefresh,
   IconDownload,
@@ -82,6 +83,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
 }) => {
   // Modal states
   const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [isImportModal, setIsImportModal] = useState(false);
   const [isRevisionModal, setIsRevisionModal] = useState(false);
   const [revisionBaseQuote, setRevisionBaseQuote] = useState<Quotation | null>(null);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
@@ -90,6 +92,15 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   const [loading, setLoading] = useState(false);
 
   const handleOpenCreate = () => {
+    setIsImportModal(false);
+    setIsRevisionModal(false);
+    setRevisionBaseQuote(null);
+    setEditingQuotation(null);
+    setCreateModalOpened(true);
+  };
+
+  const handleOpenImport = () => {
+    setIsImportModal(true);
     setIsRevisionModal(false);
     setRevisionBaseQuote(null);
     setEditingQuotation(null);
@@ -97,6 +108,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   };
 
   const handleCreateRevision = (quote: Quotation) => {
+    setIsImportModal(false);
     setRevisionBaseQuote(quote);
     setIsRevisionModal(true);
     setEditingQuotation(null);
@@ -104,6 +116,7 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
   };
 
   const handleOpenEdit = (quote: Quotation) => {
+    setIsImportModal(false);
     setIsRevisionModal(false);
     setRevisionBaseQuote(null);
     setEditingQuotation(quote);
@@ -171,12 +184,21 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
         message: 'Quotation deleted successfully',
       });
     } catch (err: any) {
-      console.warn('Backend delete quotation note:', err);
+      console.error('Backend delete quotation error:', err);
       notifications.show({
-        color: 'teal',
+        color: 'red',
         icon: <IconTrash size={16} />,
-        message: 'Quotation removed',
+        message: err.message || 'Failed to delete quotation from server',
       });
+      // Re-fetch quotations to restore accurate list
+      billingService
+        .getQuotations({ leadId: lead.id, flat: true })
+        .then((data) => {
+          if (data && data.length > 0) {
+            onUpdateQuotations(data);
+          }
+        })
+        .catch(() => {});
     }
   };
 
@@ -323,8 +345,10 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
         <QuotationModal
           opened={createModalOpened}
           embedded={true}
+          isImport={isImportModal}
           onClose={() => {
             setCreateModalOpened(false);
+            setIsImportModal(false);
             setIsRevisionModal(false);
             setRevisionBaseQuote(null);
             setEditingQuotation(null);
@@ -350,6 +374,21 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
         </div>
 
         <Group gap="sm">
+          <Button
+            size="sm"
+            variant="light"
+            color="indigo"
+            leftSection={<IconUpload size={14} />}
+            onClick={handleOpenImport}
+            style={{
+              borderRadius: 10,
+              fontWeight: 700,
+              border: isDark ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid #C7D2FE',
+            }}
+          >
+            Import Quotation
+          </Button>
+
           <Button
             size="sm"
             leftSection={<IconPlus size={14} />}
@@ -415,6 +454,20 @@ export const LeadQuotationSection: React.FC<LeadQuotationSectionProps> = ({
             No formal quotations have been generated for {lead.name} yet.
           </Text>
           <Group justify="center" gap="sm">
+            <Button
+              size="sm"
+              variant="light"
+              color="indigo"
+              leftSection={<IconUpload size={15} />}
+              onClick={handleOpenImport}
+              style={{
+                borderRadius: 10,
+                fontWeight: 700,
+                border: isDark ? '1px solid rgba(99, 102, 241, 0.4)' : '1px solid #C7D2FE',
+              }}
+            >
+              Import Quotation
+            </Button>
             <Button
               size="sm"
               leftSection={<IconPlus size={15} />}

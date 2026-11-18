@@ -33,6 +33,7 @@ import {
   IconArrowLeft,
   IconX,
   IconCash,
+  IconUpload,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Lead, LeadInvoiceItem, Contract } from '../../../../types/lead';
@@ -78,6 +79,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
   const [backendInvoices, setBackendInvoices] = useState<Invoice[]>([]);
 
   const [createModalOpened, setCreateModalOpened] = useState<boolean>(false);
+  const [isImportModal, setIsImportModal] = useState<boolean>(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [modalKey, setModalKey] = useState<number>(0);
   const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
@@ -502,6 +504,14 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
 
 
   const handleOpenCreateInvoice = () => {
+    setIsImportModal(false);
+    setEditingInvoice(null);
+    setModalKey((k) => k + 1);
+    setCreateModalOpened(true);
+  };
+
+  const handleOpenImportInvoice = () => {
+    setIsImportModal(true);
     setEditingInvoice(null);
     setModalKey((k) => k + 1);
     setCreateModalOpened(true);
@@ -513,8 +523,10 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         <InvoiceModal
           key={createModalOpened ? (editingInvoice ? `edit-${editingInvoice.id}-${modalKey}` : `fresh-${modalKey}`) : 'closed'}
           opened={createModalOpened}
+          isImport={isImportModal}
           onClose={() => {
             setCreateModalOpened(false);
+            setIsImportModal(false);
             setEditingInvoice(null);
           }}
           invoice={editingInvoice}
@@ -549,6 +561,20 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         </div>
 
         <Group gap="xs">
+          <Button
+            size="sm"
+            variant="light"
+            color="indigo"
+            leftSection={<IconUpload size={15} />}
+            onClick={handleOpenImportInvoice}
+            style={{
+              borderRadius: 10,
+              fontWeight: 700,
+            }}
+          >
+            Import Invoice
+          </Button>
+
           <Button
             size="sm"
             leftSection={<IconPlus size={15} />}
@@ -614,16 +640,26 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
               <Text size="xs" c="dimmed" style={{ maxWidth: 340, textAlign: 'center' }}>
                 No tax invoices have been generated for {lead.name}. Click below to build a GST invoice using the full invoice generator.
               </Text>
-              <Button
-                size="xs"
-                color="blue"
-                variant="light"
-                leftSection={<IconPlus size={13} />}
-                onClick={handleOpenCreateInvoice}
-                mt={4}
-              >
-                Create Tax Invoice
-              </Button>
+              <Group gap="xs" mt={4}>
+                <Button
+                  size="xs"
+                  color="indigo"
+                  variant="light"
+                  leftSection={<IconUpload size={13} />}
+                  onClick={handleOpenImportInvoice}
+                >
+                  Import Invoice
+                </Button>
+                <Button
+                  size="xs"
+                  color="blue"
+                  variant="filled"
+                  leftSection={<IconPlus size={13} />}
+                  onClick={handleOpenCreateInvoice}
+                >
+                  Create Tax Invoice
+                </Button>
+              </Group>
             </Stack>
           </Center>
         ) : (
@@ -914,8 +950,10 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         <InvoiceModal
           key={modalKey}
           opened={createModalOpened}
+          isImport={isImportModal}
           onClose={() => {
             setCreateModalOpened(false);
+            setIsImportModal(false);
             setEditingInvoice(null);
           }}
           onSuccess={handleInvoiceSuccess}

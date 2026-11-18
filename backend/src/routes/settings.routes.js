@@ -8,17 +8,17 @@ const router = Router();
 // Require auth for settings routes (falls back safely to super admin in local dev)
 router.use(requireAuth);
 
-// Master Projects & Module Configuration (Project Catalog)
-router.get('/projects', authorizePermission(['project_catalog', 'settings'], 'view'), settingsController.getMasterProjects);
-router.get('/projects/:id', authorizePermission(['project_catalog', 'settings'], 'view'), settingsController.getMasterProjectById);
+// Master Projects & Module Configuration (Project Catalog) - accessible to all authenticated users for Quotations, Invoices & Proposals
+router.get('/projects', settingsController.getMasterProjects);
+router.get('/projects/:id', settingsController.getMasterProjectById);
 router.post('/projects', authorizePermission(['project_catalog', 'settings'], 'create'), settingsController.createMasterProject);
 router.put('/projects/:id', authorizePermission(['project_catalog', 'settings'], 'edit'), settingsController.updateMasterProject);
 router.delete('/projects/:id', authorizePermission(['project_catalog', 'settings'], 'delete'), settingsController.deleteMasterProject);
 
-// Realtime User Profile ("My Profile") Settings
-router.get('/profile', authorizePermission(['myprofile', 'settings'], 'view'), settingsController.getUserProfile);
-router.put('/profile', authorizePermission(['myprofile', 'settings'], 'edit'), settingsController.updateUserProfile);
-router.post('/change-password', authorizePermission(['myprofile', 'settings'], 'edit'), settingsController.changePassword);
+// Realtime User Profile ("My Profile") Settings (accessible to every authenticated user)
+router.get('/profile', settingsController.getUserProfile);
+router.put('/profile', settingsController.updateUserProfile);
+router.post('/change-password', settingsController.changePassword);
 
 // Company Profile Settings
 router.get('/company', authorizePermission(['company_profile', 'settings'], 'view'), settingsController.getCompanyProfile);
@@ -37,12 +37,12 @@ router.get('/audit-logs', authorizePermission(['company_profile', 'settings'], '
 router.get('/notifications', authorizePermission(['myprofile', 'settings'], 'view'), settingsController.getNotificationSettings);
 router.put('/notifications', authorizePermission(['myprofile', 'settings'], 'edit'), settingsController.updateNotificationSettings);
 
-// Calendar & Confidential Reminders
-router.get('/reminders', authorizePermission(['calendar', 'settings'], 'view'), settingsController.getReminders);
-router.post('/reminders', authorizePermission(['calendar', 'settings'], 'create'), settingsController.createReminder);
-router.put('/reminders/:id', authorizePermission(['calendar', 'settings'], 'edit'), settingsController.updateReminder);
-router.delete('/reminders/:id', authorizePermission(['calendar', 'settings'], 'delete'), settingsController.deleteReminder);
-router.get('/reminders/due', authorizePermission(['calendar', 'settings'], 'view'), settingsController.getDueReminders);
+// Calendar & Confidential Reminders (scoped to user's assigned/created reminders in service)
+router.get('/reminders', settingsController.getReminders);
+router.post('/reminders', settingsController.createReminder);
+router.put('/reminders/:id', settingsController.updateReminder);
+router.delete('/reminders/:id', settingsController.deleteReminder);
+router.get('/reminders/due', settingsController.getDueReminders);
 
 // Reset Settings
 router.post('/reset/:key', authorizePermission(['company_profile', 'settings'], 'edit'), settingsController.resetSetting);

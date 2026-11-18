@@ -241,8 +241,8 @@ export async function getUserPermissions(user) {
         dataScope: 'Own',
       };
     }
-    // Only default myprofile if it has not been configured
-    if (permsMap['myprofile'] === undefined) {
+    // Guarantee myprofile for every active user
+    if (!permsMap['myprofile'] || !permsMap['myprofile'].view) {
       permsMap['myprofile'] = {
         view: true,
         create: false,
@@ -263,6 +263,35 @@ export async function getUserPermissions(user) {
         approve: false,
         dataScope: 'Own',
       };
+    }
+    // Guarantee read-only access to standard master project catalog for creating quotations, proposals, and invoices
+    if (!permsMap['project_catalog'] || !permsMap['project_catalog'].view) {
+      permsMap['project_catalog'] = {
+        view: true,
+        create: false,
+        edit: false,
+        delete: false,
+        export: false,
+        approve: false,
+        dataScope: 'All',
+      };
+    }
+
+    // Deal Pipeline Quotations: Users who have access to leads automatically inherit quotation management rights in their deal pipeline
+    if (permsMap['leads'] && permsMap['leads'].view) {
+      if (!permsMap['quotations']) {
+        permsMap['quotations'] = {
+          view: Boolean(permsMap['leads'].view),
+          create: Boolean(permsMap['leads'].create),
+          edit: Boolean(permsMap['leads'].edit),
+          delete: Boolean(permsMap['leads'].edit || permsMap['leads'].delete),
+          export: Boolean(permsMap['leads'].export),
+          approve: Boolean(permsMap['leads'].approve),
+          dataScope: permsMap['leads'].dataScope || 'Own',
+        };
+      } else if (permsMap['quotations'].delete === undefined) {
+        permsMap['quotations'].delete = Boolean(permsMap['leads'].edit || permsMap['leads'].delete);
+      }
     }
   }
 
@@ -312,18 +341,38 @@ export function authorizePermission(moduleId, action = 'view') {
         return next();
       }
 
-      // Check requested module or fallback to leads/deals for billing/invoices
+      // Check requested module or fallback to leads/deals for billing/invoices/quotations
       const modulesToCheck = Array.isArray(moduleId) ? [...moduleId] : [moduleId];
-      if (modulesToCheck.includes('billing') || modulesToCheck.includes('invoices')) {
-        modulesToCheck.push('billing', 'invoices', 'leads', 'deals');
+      if (
+        modulesToCheck.includes('billing') ||
+        modulesToCheck.includes('invoices') ||
+        modulesToCheck.includes('quotations')
+      ) {
+        modulesToCheck.push('billing', 'invoices', 'quotations', 'leads', 'deals');
       }
 
       let hasAccess = false;
       for (const mod of modulesToCheck) {
         const modulePerms = userPerms.permissions?.[mod];
-        if (modulePerms && modulePerms[action]) {
+        if (!modulePerms) continue;
+
+        if (modulePerms[action]) {
           hasAccess = true;
           break;
+        }
+
+        // Deal pipeline quotation & proposal editing/deletion:
+        // Users who have 'edit' or 'create' access to leads, quotations, or billing
+        // are authorized to delete or modify quotations and line items within their pipeline
+        if (
+          (action === 'delete' || action === 'edit') &&
+          (mod === 'quotations' || mod === 'leads' || mod === 'billing') &&
+          (modulesToCheck.includes('quotations') || modulesToCheck.includes('billing'))
+        ) {
+          if (modulePerms.edit || modulePerms.create) {
+            hasAccess = true;
+            break;
+          }
         }
       }
 

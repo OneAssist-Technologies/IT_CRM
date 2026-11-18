@@ -530,7 +530,7 @@ export async function createMeetingService(body) {
   const finalPurpose = (purpose || finalTitle).trim();
   const finalDate = meeting_date || meetingDate || date;
   const finalStartTime = (startTime || meeting_time || meetingTime || time || '10:00 AM').trim();
-  const finalEndTime = (endTime || finalStartTime).trim();
+  const finalEndTime = (endTime || '').trim();
   const finalType = meeting_type || meetingType || 'Virtual';
   const finalLocation = (location || meetingLocation || meeting_location || meetingLink || meeting_link || '').trim();
   const finalEmployeeName = (employeeName || assignedTo || assigned_to || 'Sandy').trim();
