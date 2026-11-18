@@ -35,10 +35,6 @@ export default defineConfig({
   base: '/itcrm/',
   plugins: [react(), devBaseRedirectPlugin()],
 
-export default defineConfig({
-  base: '/itcrm/',
-  plugins: [react()],
-
   server: {
     proxy: {
       '/api': {
