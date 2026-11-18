@@ -30,6 +30,7 @@ import {
   IconFileInvoice,
   IconEye,
   IconArrowLeft,
+  IconUpload,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Invoice, BillingSettings } from '../../../types/billing';
@@ -62,6 +63,7 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
 
   // Modals State
   const [createModalOpened, setCreateModalOpened] = useState(false);
+  const [isImportModal, setIsImportModal] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [modalKey, setModalKey] = useState(0);
   const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
@@ -174,6 +176,14 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
   };
 
   const handleOpenCreate = () => {
+    setIsImportModal(false);
+    setEditingInvoice(null);
+    setModalKey((k) => k + 1);
+    setCreateModalOpened(true);
+  };
+
+  const handleOpenImport = () => {
+    setIsImportModal(true);
     setEditingInvoice(null);
     setModalKey((k) => k + 1);
     setCreateModalOpened(true);
@@ -244,24 +254,38 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
             </ActionIcon>
           </Group>
 
-          <Button
-            leftSection={<IconPlus size={16} stroke={2.5} />}
-            radius="md"
-            size="sm"
-            onClick={onAddNew || handleOpenCreate}
-            style={{
-              background: 'linear-gradient(135deg, #4F46E5 0%, #2563EB 100%)',
-              color: '#FFFFFF',
-              fontWeight: 600,
-              fontSize: 13,
-              height: 36,
-              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
-              border: 'none',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            Create Tax Invoice
-          </Button>
+          <Group gap="xs">
+            <Button
+              leftSection={<IconUpload size={15} />}
+              radius="md"
+              size="sm"
+              variant="light"
+              color="indigo"
+              onClick={handleOpenImport}
+              style={{ fontWeight: 600, fontSize: 13, height: 36 }}
+            >
+              Import Invoice
+            </Button>
+
+            <Button
+              leftSection={<IconPlus size={16} stroke={2.5} />}
+              radius="md"
+              size="sm"
+              onClick={onAddNew || handleOpenCreate}
+              style={{
+                background: 'linear-gradient(135deg, #4F46E5 0%, #2563EB 100%)',
+                color: '#FFFFFF',
+                fontWeight: 600,
+                fontSize: 13,
+                height: 36,
+                boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
+                border: 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              Create Tax Invoice
+            </Button>
+          </Group>
         </Group>
       </Paper>
 
@@ -569,8 +593,10 @@ export const InvoicesView: React.FC<InvoicesViewProps> = ({
       <InvoiceModal
         key={createModalOpened ? (editingInvoice ? `edit-${editingInvoice.id}-${modalKey}` : `fresh-${modalKey}`) : 'closed'}
         opened={createModalOpened}
+        isImport={isImportModal}
         onClose={() => {
           setCreateModalOpened(false);
+          setIsImportModal(false);
           setEditingInvoice(null);
         }}
         invoice={editingInvoice}

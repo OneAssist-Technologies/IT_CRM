@@ -17,6 +17,7 @@ import {
   Box,
   Badge,
   Tooltip,
+  ThemeIcon,
   useComputedColorScheme,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
@@ -43,7 +44,12 @@ import {
   IconCalendar,
   IconClock,
   IconHash,
+  IconUpload,
+  IconDownload,
+  IconFileSpreadsheet,
+  IconFileDescription,
 } from '@tabler/icons-react';
+import * as XLSX from 'xlsx';
 import { notifications } from '@mantine/notifications';
 import { Invoice, InvoiceItem, BillingProduct, SalesOrder, BillingMilestone, BillingSettings } from '../../../types/billing';
 import { billingService } from '../../../services/billingService';
@@ -267,6 +273,7 @@ interface InvoiceModalProps {
   onSuccess: () => void;
   initialLead?: Lead | null;
   asScreen?: boolean;
+  isImport?: boolean;
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({
@@ -278,6 +285,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   onSuccess,
   initialLead,
   asScreen = false,
+  isImport = false,
 }) => {
   const isDark = useComputedColorScheme('light') === 'dark';
   const [submitting, setSubmitting] = useState(false);
@@ -292,6 +300,16 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<string | null>(null);
   const [customRowIndices, setCustomRowIndices] = useState<number[]>([]);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState<boolean>(false);
+
+  // File upload & parsing state for Invoice Import
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [uploadedFileSize, setUploadedFileSize] = useState<string>('');
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
+  const [isParsingFile, setIsParsingFile] = useState<boolean>(false);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [referenceLookupInput, setReferenceLookupInput] = useState<string>('');
+  const [isLookingUpRef, setIsLookingUpRef] = useState<boolean>(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // 1. Scenario: Project Billing vs Standard Product
   const [scenario, setScenario] = useState<'project' | 'standard'>('project');
@@ -751,6 +769,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setNotes('');
       setSelectedCatalogueId(null);
       setCustomRowIndices([]);
+      setUploadedFileName('');
+      setUploadedFileSize('');
+      setUploadedFileUrl('');
+      setReferenceLookupInput('');
 
       setItems([
         {
@@ -791,6 +813,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
       setNotes('');
       setSelectedCatalogueId(null);
       setCustomRowIndices([]);
+      setUploadedFileName('');
+      setUploadedFileSize('');
+      setUploadedFileUrl('');
+      setReferenceLookupInput('');
 
       setItems([
         {
@@ -1257,6 +1283,353 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
   }, [grandTotal, status]);
 
+  // Helper to download sample CSV template for invoice items
+  const downloadSampleTemplate = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const csvContent =
+      'Item Name,Item Type,Description,Quantity,Unit,Unit Rate,Discount,GST Rate\n' +
+      'Custom CRM Web Application,Service,End-to-end CRM portal with lead tracking and client portal,1,Nos,250000,0,18\n' +
+      'Cloud Server Infrastructure,Service,AWS High Availability Setup,1,Nos,50000,0,18\n' +
+      'Technical Support & Maintenance,Service,Annual AMC with SLA guarantee,1,Nos,35000,0,18\n';
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Invoice_Import_Template_${initialLead?.name?.replace(/\s+/g, '_') || 'Sample'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper to map and apply extracted line items into invoice state
+  const applyLoadedItems = (rawItems: any[], sourceLabel: string, terms?: string) => {
+    if (!Array.isArray(rawItems) || rawItems.length === 0) return false;
+
+    const mappedItems: InvoiceItem[] = rawItems.map((it: any) => {
+      const qty = Number(it.quantity) || 1;
+      const price = Number(it.unitPrice ?? it.unitRate ?? it.rate ?? it.price) || 0;
+      const disc = Number(it.discount) || 0;
+      const discType = it.discountType || 'percentage';
+      const gross = qty * price;
+      const discAmt = discType === 'percentage' ? (gross * disc) / 100 : Math.min(gross, disc);
+      const base = Math.max(0, gross - discAmt);
+      const taxRate = it.taxRate !== undefined ? Number(it.taxRate) : 18;
+      const taxAmount = Number(((base * taxRate) / 100).toFixed(2));
+      const totalAmount = Number((base + taxAmount).toFixed(2));
+
+      return {
+        itemName: it.itemName || it.description || 'Service',
+        itemType: it.itemType || 'Service',
+        description: it.description || '',
+        hsnCode: it.hsnCode || '998314',
+        quantity: qty,
+        unit: it.unit || 'Nos',
+        unitPrice: price,
+        discount: disc,
+        taxRate,
+        taxAmount,
+        totalAmount,
+      };
+    });
+
+    setItems(mappedItems);
+    if (terms && !termsConditions) {
+      setTermsConditions(terms);
+    }
+
+    notifications.show({
+      title: 'Line Items Loaded Successfully',
+      message: `Extracted ${mappedItems.length} line items from ${sourceLabel}.`,
+      color: 'teal',
+      icon: <IconCheck size={16} />,
+    });
+
+    return true;
+  };
+
+  // Helper to parse uploaded file and auto-populate line items table
+  const parseInvoiceFile = async (file: File) => {
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      notifications.show({
+        title: 'File Too Large',
+        message: 'Please upload an invoice document smaller than 10MB.',
+        color: 'red',
+      });
+      return;
+    }
+
+    const formattedSize =
+      file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(file.size / 1024)} KB`;
+
+    setUploadedFileName(file.name);
+    setUploadedFileSize(formattedSize);
+    setIsParsingFile(true);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setUploadedFileUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      // 1. Check if the file name references an Invoice or Quotation
+      const invMatch = file.name.match(/(INV-\d{4}-\d+|INV-\d+|QUO-\d{4}-\d+|QUO-\d+)/i);
+      if (invMatch) {
+        const docCode = invMatch[0].toUpperCase();
+        try {
+          const docRes = await billingService.lookupDocumentItems(docCode);
+          if (docRes && Array.isArray(docRes.items) && docRes.items.length > 0) {
+            applyLoadedItems(
+              docRes.items,
+              `${docRes.sourceType === 'invoice' ? 'Invoice' : 'Quotation'} #${docRes.referenceNumber}`,
+              docRes.termsConditions
+            );
+            setIsParsingFile(false);
+            return;
+          }
+        } catch (matchErr) {
+          console.warn('Smart document lookup skipped:', matchErr);
+        }
+      }
+
+      // 2. If it is a PDF file, check content streams for embedded reference codes
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      if (ext === 'pdf') {
+        try {
+          const sampleBuffer = await file.slice(0, 262144).arrayBuffer();
+          const rawSampleText = new TextDecoder('utf-8', { fatal: false }).decode(sampleBuffer);
+          const contentDocMatch = rawSampleText.match(/(INV-\d{4}-\d+|INV-\d+|QUO-\d{4}-\d+|QUO-\d+)/i);
+          if (contentDocMatch) {
+            const detectedCode = contentDocMatch[0].toUpperCase();
+            try {
+              const docRes = await billingService.lookupDocumentItems(detectedCode);
+              if (docRes && Array.isArray(docRes.items) && docRes.items.length > 0) {
+                applyLoadedItems(
+                  docRes.items,
+                  `${docRes.sourceType === 'invoice' ? 'Invoice' : 'Quotation'} #${docRes.referenceNumber} (detected in PDF)`,
+                  docRes.termsConditions
+                );
+                setIsParsingFile(false);
+                return;
+              }
+            } catch {}
+          }
+        } catch (pdfReadErr) {
+          console.warn('PDF stream inspection skipped:', pdfReadErr);
+        }
+      }
+
+      const isSpreadsheet = ['xlsx', 'xls', 'csv', 'tsv'].includes(ext);
+      if (!isSpreadsheet) {
+        notifications.show({
+          title: 'Invoice Document Attached',
+          message: `"${file.name}" attached successfully. You can review or enter line items in the table below, or enter reference code directly.`,
+          color: 'teal',
+          icon: <IconCheck size={16} />,
+        });
+        setIsParsingFile(false);
+        return;
+      }
+
+      // 3. SPREADSHEET PARSING (Only for .xlsx, .xls, .csv files)
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array', dense: true, cellDates: false });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error('Workbook contains no sheets.');
+      }
+      const worksheet = workbook.Sheets[firstSheetName];
+      const grid: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+      if (!grid || grid.length < 1) {
+        throw new Error('No readable data rows found in the uploaded file.');
+      }
+
+      let headerRowIdx = -1;
+      let colName = -1;
+      let colDesc = -1;
+      let colQty = -1;
+      let colRate = -1;
+      let colDisc = -1;
+      let colTax = -1;
+
+      for (let r = 0; r < Math.min(15, grid.length); r++) {
+        const row = grid[r] || [];
+        const normRow = row.map((c) => String(c ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+        const findCol = (keys: string[]) => normRow.findIndex((c) => keys.some((k) => c === k || c.includes(k)));
+
+        const cName = findCol(['itemname', 'item', 'particulars', 'product', 'service', 'module', 'deliverable', 'description']);
+        const cRate = findCol(['unitrate', 'unitprice', 'rate', 'price', 'cost', 'amount']);
+
+        if (cName !== -1 && (cRate !== -1 || normRow.some((c) => ['qty', 'quantity'].includes(c)))) {
+          headerRowIdx = r;
+          colName = cName;
+          colRate = cRate;
+          colDesc = findCol(['description', 'spec', 'details', 'scope']);
+          colQty = findCol(['qty', 'quantity', 'units', 'nos', 'count']);
+          colDisc = findCol(['discount', 'disc']);
+          colTax = findCol(['gstrate', 'taxrate', 'gst', 'tax', 'vat']);
+          break;
+        }
+      }
+
+      const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
+      const extractedItems: InvoiceItem[] = [];
+
+      for (let r = startRow; r < grid.length; r++) {
+        const row = grid[r] || [];
+        if (!row || row.length === 0 || row.every((cell) => cell === '' || cell === null || cell === undefined)) {
+          continue;
+        }
+
+        let name = '';
+        let desc = '';
+        let qty = 1;
+        let rate = 0;
+        let disc = 0;
+        let tax = 18;
+
+        if (headerRowIdx !== -1) {
+          if (colName !== -1 && row[colName] !== undefined) name = String(row[colName]).trim();
+          if (colDesc !== -1 && row[colDesc] !== undefined && colDesc !== colName) desc = String(row[colDesc]).trim();
+          if (colQty !== -1 && row[colQty] !== undefined) {
+            const parsed = parseFloat(String(row[colQty]).replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed) && parsed > 0) qty = parsed;
+          }
+          if (colRate !== -1 && row[colRate] !== undefined) {
+            const parsed = parseFloat(String(row[colRate]).replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed) && parsed >= 0) rate = parsed;
+          }
+          if (colDisc !== -1 && row[colDisc] !== undefined) {
+            const parsed = parseFloat(String(row[colDisc]).replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed) && parsed >= 0) disc = parsed;
+          }
+          if (colTax !== -1 && row[colTax] !== undefined) {
+            const parsed = parseFloat(String(row[colTax]).replace(/[^0-9.]/g, ''));
+            if (!isNaN(parsed) && parsed >= 0) tax = parsed;
+          }
+        } else {
+          const textCols = row.map((c, idx) => ({ idx, val: String(c ?? '').trim() })).filter((c) => c.val.length > 0 && isNaN(Number(c.val.replace(/,/g, ''))));
+          const numCols = row.map((c, idx) => ({ idx, val: parseFloat(String(c ?? '').replace(/[^0-9.]/g, '')) })).filter((c) => !isNaN(c.val));
+
+          if (textCols.length > 0) {
+            name = textCols[0].val;
+            if (textCols.length > 1) desc = textCols[1].val;
+          }
+          if (numCols.length === 1) {
+            rate = numCols[0].val;
+          } else if (numCols.length >= 2) {
+            if (numCols[0].val <= 50 && numCols[1].val > 50) {
+              qty = numCols[0].val;
+              rate = numCols[1].val;
+            } else {
+              qty = 1;
+              rate = numCols[0].val;
+            }
+          }
+        }
+
+        if (!name && rate > 0) {
+          name = `Line Item ${extractedItems.length + 1}`;
+        }
+
+        if (name) {
+          if (qty <= 0) qty = 1;
+          const gross = qty * rate;
+          const discAmt = disc;
+          const base = Math.max(0, gross - discAmt);
+          const taxAmt = Number(((base * tax) / 100).toFixed(2));
+          const totalAmt = Number((base + taxAmt).toFixed(2));
+
+          extractedItems.push({
+            itemName: name,
+            itemType: 'Service',
+            description: desc || undefined,
+            hsnCode: '998314',
+            quantity: qty,
+            unit: 'Nos',
+            unitPrice: rate,
+            discount: disc,
+            taxRate: tax,
+            taxAmount: taxAmt,
+            totalAmount: totalAmt,
+          });
+        }
+      }
+
+      if (extractedItems.length > 0) {
+        setItems(extractedItems);
+        notifications.show({
+          title: 'Invoice Parsed Successfully',
+          message: `Extracted ${extractedItems.length} line items from "${file.name}". You can review or adjust rates below.`,
+          color: 'teal',
+          icon: <IconCheck size={16} />,
+        });
+      } else {
+        notifications.show({
+          title: 'File Attached',
+          message: `Attached "${file.name}". Could not auto-detect line item table rows. You can specify line items manually below.`,
+          color: 'blue',
+        });
+      }
+    } catch (err: any) {
+      console.warn('Error reading invoice file:', err);
+      notifications.show({
+        title: 'Parsing Notice',
+        message: 'Could not auto-parse tabular line items from this file format. You can enter items manually below.',
+        color: 'blue',
+      });
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  // Helper to manually lookup and import line items from Invoice or Quotation code
+  const handleManualCodeLookup = async (codeToLookup?: string) => {
+    const code = (codeToLookup || referenceLookupInput).trim();
+    if (!code) {
+      notifications.show({
+        color: 'yellow',
+        message: 'Please enter a CRM Invoice or Quotation # (e.g. INV-2026-000001, QUO-2026-1007)',
+      });
+      return;
+    }
+    try {
+      setIsLookingUpRef(true);
+      const res = await billingService.lookupDocumentItems(code);
+      if (res && Array.isArray(res.items) && res.items.length > 0) {
+        applyLoadedItems(
+          res.items,
+          `${res.sourceType === 'invoice' ? 'Invoice' : 'Quotation'} #${res.referenceNumber}`,
+          res.termsConditions
+        );
+        if (!uploadedFileName) {
+          setUploadedFileName(`${res.sourceType === 'invoice' ? 'Invoice' : 'Quotation'}_${res.referenceNumber}.pdf`);
+          setUploadedFileSize('CRM Ref');
+        }
+      } else {
+        notifications.show({
+          color: 'orange',
+          message: `No line items found for reference "${code}".`,
+        });
+      }
+    } catch (err: any) {
+      notifications.show({
+        color: 'red',
+        message: err.message || `Could not find invoice or quotation "${code}".`,
+      });
+    } finally {
+      setIsLookingUpRef(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setHasAttemptedSubmit(true);
@@ -1353,6 +1726,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     try {
       setSubmitting(true);
+      const notesWithDoc = uploadedFileName && !notes.includes(uploadedFileName)
+        ? `${notes ? `${notes}\n\n` : ''}[Attached Document: ${uploadedFileName} (${uploadedFileSize})]`
+        : notes;
+
       const payload: Partial<Invoice> = {
         contactId: contactId || null,
         contactName: clientName,
@@ -1376,7 +1753,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         grandTotal,
         advanceAmount,
         paymentTerms,
-        notes,
+        notes: notesWithDoc,
         termsConditions,
         companyDetails: {
           companyName,
@@ -1404,7 +1781,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
         notifications.show({ color: 'green', message: 'Invoice updated successfully' });
       } else {
         await billingService.createInvoice(payload);
-        notifications.show({ color: 'green', message: 'Invoice generated successfully' });
+        notifications.show({
+          color: 'green',
+          message: isImport ? 'Invoice imported and saved in CRM database' : 'Invoice generated successfully',
+        });
       }
 
       onSuccess();
@@ -1447,12 +1827,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               flexShrink: 0,
             }}
           >
-            <IconFileInvoice size={20} stroke={1.8} />
+            {isImport ? <IconUpload size={20} stroke={1.8} /> : <IconFileInvoice size={20} stroke={1.8} />}
           </Box>
           <div>
             <Group gap="xs" align="center">
               <Text fw={800} size="17px" style={{ color: isDark ? '#F8FAFC' : '#0F172A', lineHeight: 1.2 }}>
-                {invoice ? `Edit Tax Invoice (${invoice.invoiceNumber})` : 'Tax Invoice Generator'}
+                {isImport
+                  ? initialLead
+                    ? `Import Invoice • ${initialLead.name}`
+                    : 'Import Tax Invoice'
+                  : invoice
+                  ? `Edit Tax Invoice (${invoice.invoiceNumber})`
+                  : 'Tax Invoice Generator'}
               </Text>
               <Badge variant="light" color={isIntraState ? 'teal' : 'indigo'} radius="sm" size="xs" fw={700}>
                 {isIntraState ? 'Intra-State (CGST + SGST)' : 'Inter-State (IGST)'}
@@ -1918,6 +2304,218 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               </Paper>
             </Grid.Col>
           </Grid>
+
+          {/* Invoice Document Upload & Line Items Extraction Section (ONLY visible in Import Invoice mode) */}
+          {isImport && (
+            <Paper
+              p="md"
+              withBorder
+              radius="lg"
+              style={{
+                background: isDark ? 'rgba(79, 70, 229, 0.08)' : '#F5F7FF',
+                border: isDark ? '1px dashed #6366F1' : '1px dashed #4F46E5',
+              }}
+            >
+              <Group justify="space-between" align="center" mb="xs" wrap="wrap">
+                <Group gap="xs">
+                  <ThemeIcon
+                    size="sm"
+                    radius="md"
+                    variant="light"
+                    color="indigo"
+                  >
+                    <IconUpload size={14} />
+                  </ThemeIcon>
+                  <Text fw={700} size="xs" tt="uppercase" style={{ letterSpacing: '0.05em', color: isDark ? '#A5B4FC' : '#4338CA' }}>
+                    Upload Invoice / Quotation Document / Spreadsheet (Auto-Extracts Line Items)
+                  </Text>
+                  <Badge size="xs" variant="filled" color="indigo" radius="sm">
+                    Required for Auto-Extraction
+                  </Badge>
+                </Group>
+
+                <Group gap="xs">
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="indigo"
+                    leftSection={<IconDownload size={13} />}
+                    onClick={downloadSampleTemplate}
+                  >
+                    Download Sample CSV Template
+                  </Button>
+                </Group>
+              </Group>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".xlsx,.xls,.csv,.txt,.pdf,.doc,.docx"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) parseInvoiceFile(f);
+                }}
+              />
+
+              {!uploadedFileName ? (
+                <Box
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f) parseInvoiceFile(f);
+                  }}
+                  style={{
+                    border: isDark
+                      ? `2px dashed ${isDragOver ? '#818CF8' : '#334155'}`
+                      : `2px dashed ${isDragOver ? '#4F46E5' : '#CBD5E1'}`,
+                    borderRadius: 12,
+                    padding: '1.25rem 1rem',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: isDark
+                      ? isDragOver
+                        ? 'rgba(99, 102, 241, 0.12)'
+                        : 'rgba(30, 41, 59, 0.5)'
+                      : isDragOver
+                      ? '#EEF2FF'
+                      : '#FFFFFF',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <Group justify="center" gap="sm">
+                    <ThemeIcon size={40} radius="xl" color="indigo" variant="light">
+                      <IconFileSpreadsheet size={22} />
+                    </ThemeIcon>
+                    <div style={{ textAlign: 'left' }}>
+                      <Text size="sm" fw={700} style={{ color: isDark ? '#F1F5F9' : '#1E293B' }}>
+                        Click to upload or drag & drop Invoice Document / Spreadsheet
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Supports Excel (.xlsx, .xls), CSV (.csv), Word or PDF — auto-extracts Item Name, Quantity, Rates & GST
+                      </Text>
+                    </div>
+                  </Group>
+                </Box>
+              ) : (
+                <Paper
+                  p="xs"
+                  radius="md"
+                  style={{
+                    backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                    border: isDark ? '1px solid #334155' : '1px solid #E2E8F0',
+                  }}
+                >
+                  <Group justify="space-between" align="center" wrap="wrap">
+                    <Group gap="sm">
+                      <ThemeIcon size="md" radius="md" color="teal" variant="light">
+                        <IconFileDescription size={18} />
+                      </ThemeIcon>
+                      <div>
+                        <Group gap="xs">
+                          <Text size="sm" fw={700}>
+                            {uploadedFileName}
+                          </Text>
+                          <Badge size="xs" variant="light" color="teal">
+                            {uploadedFileSize}
+                          </Badge>
+                          <Badge
+                            size="xs"
+                            variant="filled"
+                            color={items.some((it) => it.itemName.trim()) ? 'teal' : 'gray'}
+                          >
+                            {items.some((it) => it.itemName.trim())
+                              ? `${items.filter((it) => it.itemName.trim()).length} Line ${
+                                  items.filter((it) => it.itemName.trim()).length === 1 ? 'Item' : 'Items'
+                                } Loaded`
+                              : 'File Attached'}
+                          </Badge>
+                        </Group>
+                        <Text size="11px" c="dimmed">
+                          Invoice file attached. Line items extracted and populated in the table below.
+                        </Text>
+                      </div>
+                    </Group>
+
+                    <Group gap="xs">
+                      <Button
+                        size="xs"
+                        variant="light"
+                        color="blue"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Change File
+                      </Button>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        onClick={() => {
+                          setUploadedFileName('');
+                          setUploadedFileSize('');
+                          setUploadedFileUrl('');
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                      >
+                        <IconTrash size={14} />
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                </Paper>
+              )}
+
+              {/* Quick Reference Code Lookup Bar */}
+              <Box
+                mt="xs"
+                p="xs"
+                style={{
+                  borderRadius: 8,
+                  backgroundColor: isDark ? 'rgba(30, 41, 59, 0.45)' : '#F1F5F9',
+                  border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                }}
+              >
+                <Group gap="xs" align="center" wrap="wrap">
+                  <Text size="xs" fw={700} style={{ color: isDark ? '#A5B4FC' : '#4338CA' }}>
+                    Quick Import:
+                  </Text>
+                  <TextInput
+                    placeholder="Enter Invoice or Quotation # (e.g. INV-2026-000001, QUO-2026-1007)..."
+                    value={referenceLookupInput}
+                    onChange={(e) => setReferenceLookupInput(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleManualCodeLookup();
+                      }
+                    }}
+                    size="xs"
+                    styles={{
+                      input: {
+                        minWidth: 260,
+                        backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      },
+                    }}
+                  />
+                  <Button
+                    size="xs"
+                    variant="filled"
+                    color="indigo"
+                    onClick={() => handleManualCodeLookup()}
+                    loading={isLookingUpRef}
+                  >
+                    Load Line Items
+                  </Button>
+                </Group>
+              </Box>
+            </Paper>
+          )}
 
           {/* Billed Items / Services Scope Table */}
           <Paper
@@ -2396,6 +2994,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                   type="submit"
                   radius="md"
                   loading={submitting}
+                  leftSection={isImport ? <IconUpload size={16} /> : undefined}
                   style={{
                     background: 'linear-gradient(135deg, #4F46E5 0%, #2563EB 100%)',
                     color: '#FFFFFF',
@@ -2406,7 +3005,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                     boxShadow: '0 4px 14px rgba(79, 70, 229, 0.3)',
                   }}
                 >
-                  {invoice ? 'Update Invoice' : 'Generate & Save Invoice'}
+                  {invoice ? 'Update Invoice' : isImport ? 'Import & Save Invoice' : 'Generate & Save Invoice'}
                 </Button>
               </Group>
             </Group>

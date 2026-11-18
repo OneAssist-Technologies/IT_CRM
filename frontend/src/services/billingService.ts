@@ -185,4 +185,20 @@ export const billingService = {
     if (params?.entityId) q.append('entityId', params.entityId);
     return request<BillingAuditLog[]>(`/audit-logs?${q.toString()}`);
   },
+
+  // 10. Document Lookup for Quotation Import
+  lookupDocumentItems: (code: string) => {
+    const q = new URLSearchParams({ code });
+    return request<{
+      sourceType: 'invoice' | 'quotation';
+      referenceNumber: string;
+      clientName: string;
+      totalAmount: number;
+      subtotal?: number;
+      taxAmount?: number;
+      notes?: string;
+      termsConditions?: string;
+      items: any[];
+    }>(`/document-lookup?${q.toString()}`);
+  },
 };
