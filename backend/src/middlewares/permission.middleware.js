@@ -382,6 +382,7 @@ export async function getDataScope(user, moduleId = 'contacts') {
     const configuredScope = userPerms.permissions?.[mod]?.dataScope;
     if (configuredScope) return configuredScope;
   }
+
   const roleSlug = userPerms.role?.slug?.toLowerCase();
   const appType = userPerms.role?.appType?.toLowerCase();
   if (roleSlug === 'admin' || roleSlug === 'super_admin' || appType === 'admin') {

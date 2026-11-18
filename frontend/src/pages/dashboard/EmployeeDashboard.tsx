@@ -70,8 +70,8 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
   const [dateFilter, setDateFilter] = useState<string | null>('Today');
   const [currentDate, setCurrentDate] = useState<string>('');
-  const [invoicesCount, setInvoicesCount] = useState<number>(0);
-  const [paymentsCount, setPaymentsCount] = useState<number>(0);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<ScheduledMeeting[]>([]);
   const [currentTime, setCurrentTime] = useState<string>('');
 
@@ -116,22 +116,24 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
       billingService
         .getInvoices({ limit: 100 })
         .then((res) => {
-          if (Array.isArray(res)) {
-            setInvoicesCount(res.length);
-          } else if (res && 'data' in res && Array.isArray((res as any).data)) {
-            setInvoicesCount((res as any).data.length);
-          }
+          const list = Array.isArray(res)
+            ? res
+            : res && 'data' in res && Array.isArray((res as any).data)
+            ? (res as any).data
+            : [];
+          setInvoices(list);
         })
         .catch(() => {});
 
       billingService
         .getPayments()
         .then((res) => {
-          if (Array.isArray(res)) {
-            setPaymentsCount(res.length);
-          } else if (res && 'data' in res && Array.isArray((res as any).data)) {
-            setPaymentsCount((res as any).data.length);
-          }
+          const list = Array.isArray(res)
+            ? res
+            : res && 'data' in res && Array.isArray((res as any).data)
+            ? (res as any).data
+            : [];
+          setPayments(list);
         })
         .catch(() => {});
     }
@@ -147,46 +149,215 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     }
   }, [currentUser?.name, canViewBilling, canViewMeetings]);
 
-  // 2. Date Filtered Data
-  const filteredLeads = useMemo(() => {
-    if (!dateFilter || dateFilter === 'All Time') return leads;
-    const now = new Date();
+  // Current user identifiers
+  const myName = (currentUser?.name || '').trim().toLowerCase();
+  const myId = (currentUser?.id || '').trim().toLowerCase();
+  const myEmail = (currentUser?.email || '').trim().toLowerCase();
+
+  const isAssignedToUser = (val?: string | null) => {
+    if (!val || typeof val !== 'string') return false;
+    const clean = val.trim().toLowerCase();
+    if (!clean) return false;
+    return (
+      (myName && clean === myName) ||
+      (myId && clean === myId) ||
+      (myEmail && clean === myEmail)
+    );
+  };
+
+  // 1. Scoped Leads (Only leads assigned to or created by current user)
+  const userLeads = useMemo(() => {
+    if (!currentUser || (!myName && !myId && !myEmail)) return [];
     return leads.filter((l) => {
-      const d = l.createdAt ? new Date(l.createdAt) : null;
-      if (!d) return true;
-      if (dateFilter === 'Today') {
-        return d.toDateString() === now.toDateString();
-      }
-      if (dateFilter === 'This Week') {
-        const diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
-        return diffDays >= 0 && diffDays <= 7;
-      }
-      if (dateFilter === 'This Month') {
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      }
-      return true;
+      return (
+        isAssignedToUser(l.assignedTo) ||
+        isAssignedToUser(l.assignedToName) ||
+        isAssignedToUser((l as any).assignedToId) ||
+        isAssignedToUser((l as any).assignedToEmail) ||
+        isAssignedToUser(l.createdBy) ||
+        isAssignedToUser((l as any).createdByName) ||
+        isAssignedToUser((l as any).createdById) ||
+        isAssignedToUser((l as any).employeeId)
+      );
     });
-  }, [leads, dateFilter]);
+  }, [leads, myName, myId, myEmail, currentUser]);
+
+  // 2. Scoped Customers (Only accounts managed by or assigned to current user)
+  const userCustomers = useMemo(() => {
+    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    return customers.filter((c) => {
+      return (
+        isAssignedToUser(c.accountManager) ||
+        isAssignedToUser(c.accountManagerId) ||
+        isAssignedToUser((c as any).assignedTo) ||
+        isAssignedToUser((c as any).assignedToName) ||
+        isAssignedToUser((c as any).assignedToId) ||
+        isAssignedToUser((c as any).createdBy) ||
+        isAssignedToUser((c as any).createdByName) ||
+        isAssignedToUser((c as any).createdById)
+      );
+    });
+  }, [customers, myName, myId, myEmail, currentUser]);
+
+  // 3. Scoped Projects (Managed by, assigned to, or team member)
+  const userProjects = useMemo(() => {
+    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    return projects.filter((p) => {
+      if (
+        isAssignedToUser(p.projectManagerName) ||
+        isAssignedToUser(p.projectManagerId) ||
+        isAssignedToUser((p as any).assignedTo) ||
+        isAssignedToUser((p as any).assignedToName) ||
+        isAssignedToUser((p as any).assignedToId) ||
+        isAssignedToUser(p.createdBy) ||
+        isAssignedToUser((p as any).createdById)
+      ) {
+        return true;
+      }
+      if (Array.isArray(p.teamMembers) && p.teamMembers.some((m) => isAssignedToUser(m))) {
+        return true;
+      }
+      if (
+        Array.isArray(p.teamDetails) &&
+        p.teamDetails.some(
+          (m) => isAssignedToUser(m.name) || isAssignedToUser(m.id) || isAssignedToUser(m.email)
+        )
+      ) {
+        return true;
+      }
+      return false;
+    });
+  }, [projects, myName, myId, myEmail, currentUser]);
+
+  // 4. Scoped Meetings (Organized by, assigned to, or involving current user)
+  const userMeetings = useMemo(() => {
+    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    return meetings.filter((m) => {
+      return (
+        isAssignedToUser(m.employeeName) ||
+        isAssignedToUser(m.employeeId) ||
+        isAssignedToUser(m.employeeEmail) ||
+        isAssignedToUser(m.assignedTo) ||
+        isAssignedToUser((m as any).assigned_to) ||
+        isAssignedToUser((m as any).createdBy) ||
+        isAssignedToUser((m as any).createdById)
+      );
+    });
+  }, [meetings, myName, myId, myEmail, currentUser]);
+
+  // Client/account identifiers associated with current user
+  const userAssociatedNames = useMemo(() => {
+    const set = new Set<string>();
+    userCustomers.forEach((c) => {
+      if (c.companyName) set.add(c.companyName.trim().toLowerCase());
+      if (c.contactPerson) set.add(c.contactPerson.trim().toLowerCase());
+      if (c.id) set.add(c.id.trim().toLowerCase());
+      if (c.customerId) set.add(c.customerId.trim().toLowerCase());
+    });
+    userLeads.forEach((l) => {
+      if (l.companyName) set.add(l.companyName.trim().toLowerCase());
+      if (l.name) set.add(l.name.trim().toLowerCase());
+      if (l.id) set.add(l.id.trim().toLowerCase());
+      if (l.leadId) set.add(l.leadId.trim().toLowerCase());
+    });
+    return set;
+  }, [userCustomers, userLeads]);
+
+  // 5. Scoped Invoices
+  const userInvoices = useMemo(() => {
+    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    return invoices.filter((inv) => {
+      const createdBy = (inv.createdBy || '').trim().toLowerCase();
+      const salesRep = (inv.salesRep || (inv as any).salesPerson || '').trim().toLowerCase();
+      const compName = (inv.companyName || '').trim().toLowerCase();
+      const contactName = (inv.contactName || inv.clientName || '').trim().toLowerCase();
+      const custId = (inv.customerId || inv.contactId || '').trim().toLowerCase();
+
+      const matchesUser =
+        (myName && (createdBy === myName || salesRep === myName)) ||
+        (myId && createdBy === myId);
+
+      const matchesClient =
+        (compName && userAssociatedNames.has(compName)) ||
+        (contactName && userAssociatedNames.has(contactName)) ||
+        (custId && userAssociatedNames.has(custId));
+
+      return matchesUser || matchesClient;
+    });
+  }, [invoices, myName, myId, userAssociatedNames, currentUser]);
+
+  // 6. Scoped Payments
+  const userPayments = useMemo(() => {
+    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    return payments.filter((pay) => {
+      const recordedBy = (pay.recordedBy || (pay as any).createdBy || '').trim().toLowerCase();
+      const clientName = (pay.clientName || '').trim().toLowerCase();
+      const contactId = (pay.contactId || '').trim().toLowerCase();
+
+      const matchesUser =
+        (myName && recordedBy === myName) ||
+        (myId && recordedBy === myId);
+
+      const matchesClient =
+        (clientName && userAssociatedNames.has(clientName)) ||
+        (contactId && userAssociatedNames.has(contactId));
+
+      return matchesUser || matchesClient;
+    });
+  }, [payments, myName, myId, userAssociatedNames, currentUser]);
+
+  // Date Filter helper
+  const matchesDateFilter = (dateStr?: string | null) => {
+    if (!dateFilter || dateFilter === 'All Time') return true;
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const now = new Date();
+    if (dateFilter === 'Today') {
+      return d.toDateString() === now.toDateString();
+    }
+    if (dateFilter === 'This Week') {
+      const diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
+      return diffDays >= 0 && diffDays <= 7;
+    }
+    if (dateFilter === 'This Month') {
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }
+    return true;
+  };
+
+  // Date-filtered collections
+  const filteredLeads = useMemo(() => {
+    if (!dateFilter || dateFilter === 'All Time') return userLeads;
+    return userLeads.filter((l) => matchesDateFilter(l.createdAt));
+  }, [userLeads, dateFilter]);
 
   const filteredCustomers = useMemo(() => {
-    if (!dateFilter || dateFilter === 'All Time') return customers;
-    const now = new Date();
-    return customers.filter((c) => {
-      const d = c.createdAt ? new Date(c.createdAt) : null;
-      if (!d) return true;
-      if (dateFilter === 'Today') {
-        return d.toDateString() === now.toDateString();
-      }
-      if (dateFilter === 'This Week') {
-        const diffDays = (now.getTime() - d.getTime()) / (1000 * 3600 * 24);
-        return diffDays >= 0 && diffDays <= 7;
-      }
-      if (dateFilter === 'This Month') {
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      }
-      return true;
-    });
-  }, [customers, dateFilter]);
+    if (!dateFilter || dateFilter === 'All Time') return userCustomers;
+    return userCustomers.filter((c) => matchesDateFilter(c.createdAt));
+  }, [userCustomers, dateFilter]);
+
+  const filteredProjects = useMemo(() => {
+    if (!dateFilter || dateFilter === 'All Time') return userProjects;
+    return userProjects.filter((p) => matchesDateFilter(p.createdAt));
+  }, [userProjects, dateFilter]);
+
+  const filteredInvoices = useMemo(() => {
+    if (!dateFilter || dateFilter === 'All Time') return userInvoices;
+    return userInvoices.filter((inv) => matchesDateFilter(inv.invoiceDate || inv.createdAt));
+  }, [userInvoices, dateFilter]);
+
+  const filteredPayments = useMemo(() => {
+    if (!dateFilter || dateFilter === 'All Time') return userPayments;
+    return userPayments.filter((pay) => matchesDateFilter(pay.paymentDate || pay.createdAt));
+  }, [userPayments, dateFilter]);
+
+  // Card KPI counts strictly scoped to current user
+  const myLeadsCount = filteredLeads.length;
+  const myCustomersCount = filteredCustomers.length;
+  const myProjectsCount = filteredProjects.length;
+  const myInvoicesCount = filteredInvoices.length;
+  const myPaymentsCount = filteredPayments.length;
 
   // Format meeting date & time clearly (e.g., Today · 04:30 PM, Tomorrow · 11:00 AM, 28 Oct · 02:00 PM)
   const formatMeetingDate = (dateStr?: string, timeStr?: string) => {
@@ -214,9 +385,9 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     }
   };
 
-  // Dynamic Upcoming Meetings for Employee
+  // Dynamic Upcoming Meetings for Employee (Scoped to current user)
   const upcomingMeetings = useMemo(() => {
-    const active = meetings.filter((m) => {
+    const active = userMeetings.filter((m) => {
       const st = String(m.status || m.meetingStatus || 'Scheduled').toLowerCase();
       return st !== 'cancelled' && st !== 'completed';
     });
@@ -229,65 +400,54 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
       const timeB = b.startTime || b.meetingTime || '';
       return timeA.localeCompare(timeB);
     });
-  }, [meetings]);
+  }, [userMeetings]);
 
-  // 3. Dynamic Monthly Performance Wave Data (Last 6 Months with realistic pipeline activity)
+  // 3. Dynamic Monthly Performance Wave Data (Last 6 Months based on employee's real pipeline)
   const monthlyActivityData = useMemo(() => {
     const now = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    // Baseline progressive activity benchmarks per month in the 6-month window
-    const monthlyBenchmarks = [
-      { leads: 14, meetings: 8, deals: 3 },   // 5 months ago (e.g. May)
-      { leads: 18, meetings: 11, deals: 4 },  // 4 months ago (e.g. Jun)
-      { leads: 22, meetings: 14, deals: 5 },  // 3 months ago (e.g. Jul)
-      { leads: 26, meetings: 17, deals: 6 },  // 2 months ago (e.g. Aug)
-      { leads: 30, meetings: 21, deals: 7 },  // 1 month ago (e.g. Sep)
-      { leads: 35, meetings: 24, deals: 9 },  // Current month (e.g. Oct)
-    ];
 
     return Array.from({ length: 6 }).map((_, i) => {
       const targetDate = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
       const mIdx = targetDate.getMonth();
       const y = targetDate.getFullYear();
       const mName = monthNames[mIdx];
-      const benchmark = monthlyBenchmarks[i] || { leads: 16, meetings: 10, deals: 4 };
 
-      // Actual leads created in this month
-      const realLeads = leads.filter((l) => {
+      // Actual leads created for this employee in this month
+      const realLeads = userLeads.filter((l) => {
         const ld = new Date(l.createdAt || '');
         return !isNaN(ld.getTime()) && ld.getFullYear() === y && ld.getMonth() === mIdx;
       }).length;
 
-      // Actual deals / customers converted in this month
-      const realDeals = customers.filter((c) => {
+      // Actual deals / customers converted for this employee in this month
+      const realDeals = userCustomers.filter((c) => {
         const cd = new Date(c.createdAt || '');
         return !isNaN(cd.getTime()) && cd.getFullYear() === y && cd.getMonth() === mIdx;
       }).length;
 
-      // Actual meetings scheduled in this month
-      const realMeetings = meetings.filter((m) => {
+      // Actual meetings scheduled for this employee in this month
+      const realMeetings = userMeetings.filter((m) => {
         const md = new Date(m.meetingDate || (m as any).date || '');
         return !isNaN(md.getTime()) && md.getFullYear() === y && md.getMonth() === mIdx;
       }).length;
 
-      // Dynamic blend: incorporate real database entries seamlessly
-      const finalLeads = realLeads > 0 ? (i === 5 ? benchmark.leads + realLeads : realLeads) : benchmark.leads;
-      const finalMeetings = realMeetings > 0 ? (i === 5 ? benchmark.meetings + realMeetings : realMeetings) : benchmark.meetings;
-      const finalDeals = realDeals > 0 ? (i === 5 ? benchmark.deals + realDeals : realDeals) : benchmark.deals;
-
-      const activityScore = finalLeads + finalMeetings + finalDeals;
+      const activityScore = realLeads + realMeetings + realDeals;
 
       return {
         month: mName,
         year: y,
         Activity: activityScore,
-        Leads: finalLeads,
-        Meetings: finalMeetings,
-        Deals: finalDeals,
+        Leads: realLeads,
+        Meetings: realMeetings,
+        Deals: realDeals,
       };
     });
-  }, [leads, meetings, customers]);
+  }, [userLeads, userMeetings, userCustomers]);
+
+  const hasAnyActivity = useMemo(
+    () => monthlyActivityData.some((d) => d.Activity > 0),
+    [monthlyActivityData]
+  );
 
   // 4. Dynamic Pipeline Stage Breakdown (Donut Chart)
   const pipelineDistribution = useMemo(() => {
@@ -299,7 +459,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
       'New': 0,
     };
 
-    leads.forEach((l) => {
+    userLeads.forEach((l) => {
       const rawStage = (l.stage && l.stage.trim()) || (l.status && l.status.trim()) || 'New';
       const st = rawStage.charAt(0).toUpperCase() + rawStage.slice(1);
       if (counts[st] !== undefined) {
@@ -330,22 +490,18 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
     if (data.length === 0) {
       return [
-        { name: 'Active Pipeline', value: Math.max(leads.length, 1), color: '#3B82F6' },
-        { name: 'Active Accounts', value: Math.max(customers.length, 1), color: '#10B981' },
+        { name: 'Active Pipeline', value: Math.max(userLeads.length, 0), color: '#3B82F6' },
+        { name: 'Active Accounts', value: Math.max(userCustomers.length, 0), color: '#10B981' },
       ];
     }
     return data;
-  }, [leads, customers]);
+  }, [userLeads, userCustomers]);
 
   // Theme Styling
   const cardBg = isDark ? '#111827' : '#FFFFFF';
   const cardBorder = isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(15, 23, 42, 0.07)';
   const headingColor = isDark ? '#F8FAFC' : '#0F172A';
   const textMuted = isDark ? '#94A3B8' : '#64748B';
-
-  const myLeadsCount = filteredLeads.length > 0 ? filteredLeads.length : leads.length;
-  const myCustomersCount = filteredCustomers.length > 0 ? filteredCustomers.length : customers.length;
-  const myProjectsCount = projects.length;
 
   return (
     <Stack gap="xl">
@@ -425,7 +581,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
               <Group gap={6} align="center">
                 <Box style={{ width: 6, height: 6, borderRadius: '50%', background: myLeadsCount > 0 ? '#10B981' : '#94A3B8' }} />
                 <Text size="xs" fw={600} c="dimmed">
-                  {myLeadsCount > 0 ? `${myLeadsCount} in pipeline` : '0 assigned'}
+                  {myLeadsCount > 0 ? `${myLeadsCount} in pipeline` : (userLeads.length > 0 ? `${userLeads.length} total assigned` : '0 assigned')}
                 </Text>
               </Group>
             </Box>
@@ -472,7 +628,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
               <Group gap={6} align="center">
                 <Box style={{ width: 6, height: 6, borderRadius: '50%', background: myCustomersCount > 0 ? '#10B981' : '#94A3B8' }} />
                 <Text size="xs" fw={600} c="dimmed">
-                  {myCustomersCount > 0 ? `${myCustomersCount} active account` : '0 accounts'}
+                  {myCustomersCount > 0 ? `${myCustomersCount} active account` : (userCustomers.length > 0 ? `${userCustomers.length} total accounts` : '0 accounts')}
                 </Text>
               </Group>
             </Box>
@@ -519,7 +675,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
               <Group gap={6} align="center">
                 <Box style={{ width: 6, height: 6, borderRadius: '50%', background: myProjectsCount > 0 ? '#8B5CF6' : '#94A3B8' }} />
                 <Text size="xs" fw={600} c="dimmed">
-                  {myProjectsCount > 0 ? `${myProjectsCount} in delivery` : '0 assigned'}
+                  {myProjectsCount > 0 ? `${myProjectsCount} in delivery` : (userProjects.length > 0 ? `${userProjects.length} total projects` : '0 assigned')}
                 </Text>
               </Group>
             </Box>
@@ -559,14 +715,14 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
                 My Invoices
               </Text>
               <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                {invoicesCount}
+                {myInvoicesCount}
               </Text>
             </Box>
             <Box mt="md">
               <Group gap={6} align="center">
-                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: invoicesCount > 0 ? '#F59E0B' : '#94A3B8' }} />
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: myInvoicesCount > 0 ? '#F59E0B' : '#94A3B8' }} />
                 <Text size="xs" fw={600} c="dimmed">
-                  {invoicesCount > 0 ? `${invoicesCount} active bills` : '0 pending'}
+                  {myInvoicesCount > 0 ? `${myInvoicesCount} active bills` : (userInvoices.length > 0 ? `${userInvoices.length} total bills` : '0 pending')}
                 </Text>
               </Group>
             </Box>
@@ -606,14 +762,14 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
                 My Payments
               </Text>
               <Text fw={800} size="28px" mt={2} style={{ color: headingColor, lineHeight: 1.1 }}>
-                {paymentsCount}
+                {myPaymentsCount}
               </Text>
             </Box>
             <Box mt="md">
               <Group gap={6} align="center">
-                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: paymentsCount > 0 ? '#10B981' : '#94A3B8' }} />
+                <Box style={{ width: 6, height: 6, borderRadius: '50%', background: myPaymentsCount > 0 ? '#10B981' : '#94A3B8' }} />
                 <Text size="xs" fw={600} c="dimmed">
-                  {paymentsCount > 0 ? `${paymentsCount} received` : '0 recorded'}
+                  {myPaymentsCount > 0 ? `${myPaymentsCount} received` : (userPayments.length > 0 ? `${userPayments.length} total recorded` : '0 recorded')}
                 </Text>
               </Group>
             </Box>
@@ -623,7 +779,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
       {/* =========================================================================
           SECTION 2.5: DYNAMIC CHARTS & PERFORMANCE ANALYTICS (WAVE + DONUT)
-         ========================================================================= */}
+          ========================================================================= */}
       <Grid gutter="lg" align="stretch">
         {/* Left: Performance & Pipeline Wave Chart (7 cols) */}
         <Grid.Col span={{ base: 12, lg: 7 }}>
@@ -656,9 +812,15 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
               </Box>
 
               <Group gap="xs">
-                <Badge size="sm" color="teal" variant="light" leftSection={<IconTrendingUp size={12} />}>
-                  +24% Target Pace
-                </Badge>
+                {hasAnyActivity ? (
+                  <Badge size="sm" color="teal" variant="light" leftSection={<IconTrendingUp size={12} />}>
+                    Active Pipeline
+                  </Badge>
+                ) : (
+                  <Badge size="sm" color="gray" variant="light">
+                    No Recent Activity
+                  </Badge>
+                )}
               </Group>
             </Group>
 
