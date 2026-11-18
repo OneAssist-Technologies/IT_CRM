@@ -4,15 +4,21 @@ import { io } from '../utils/socket.js';
 import { PROJECT_MODULE } from '../models/project.model.js';
 import { generateProjectId, buildProjectFilterQuery, formatProjectResponse } from '../utils/project.util.js';
 import { recordActivity } from './activity.service.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 /**
- * Scope projects by user (Super Admin sees all, Employees only see projects created by them)
+ * Scope projects by user (Super Admin or All-Scope sees all, Employees only see projects created by them)
  */
 async function resolveProjectScopeFilter(currentUser) {
   if (!currentUser) return null;
   const roleUpper = String(currentUser.role || '').toUpperCase();
   if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
     return null; // Super Admin sees all projects
+  }
+
+  const scope = await getDataScope(currentUser, 'projects');
+  if (scope === 'All') {
+    return null;
   }
 
   if (currentUser.id) {
@@ -614,6 +620,8 @@ export async function updateProjectService(id, body, user) {
   let calculatedProgress = body.progress !== undefined ? body.progress : existing.progress;
 
   if (cleanModulesForUpdate.length > 0) {
+    const totalProg = cleanModulesForUpdate.reduce((acc, m) => acc + (parseInt(m.progress, 10) || 0), 0);
+    calculatedProgress = Math.round(totalProg / cleanModulesForUpdate.length);
     const allModulesCompleted = cleanModulesForUpdate.every((m) => {
       const isStatusDone = m.status === 'Completed';
       const isProgDone = parseInt(m.progress, 10) === 100;

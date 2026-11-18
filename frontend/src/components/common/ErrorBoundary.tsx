@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { getAppPath } from '../../config/env';
 
 interface Props {
   children: ReactNode;
@@ -28,12 +29,12 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
-    window.location.href = '/settings';
+    window.location.href = getAppPath('/settings');
   };
 
   private handleGoHome = () => {
     this.setState({ hasError: false, error: null, errorInfo: null });
-    window.location.href = '/';
+    window.location.href = getAppPath('/');
   };
 
   public render() {

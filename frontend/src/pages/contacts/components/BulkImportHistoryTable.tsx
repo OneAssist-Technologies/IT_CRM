@@ -70,7 +70,24 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
 
   const { employees, fetchEmployees } = useEmployee();
   const { currentUser } = useCRM();
-  const { isSuperAdmin } = usePermissions();
+  const { isSuperAdmin, can } = usePermissions();
+
+  const roleUpper = String(currentUser?.role || '').toUpperCase().trim();
+  const isExplicitEmployee = Boolean(
+    roleUpper &&
+      roleUpper !== 'SUPER_ADMIN' &&
+      roleUpper !== 'SUPER ADMIN' &&
+      roleUpper !== 'ADMIN' &&
+      roleUpper !== 'MANAGEMENT'
+  );
+  const isAdmin = !isExplicitEmployee && Boolean(
+    isSuperAdmin ||
+    roleUpper === 'SUPER_ADMIN' ||
+    roleUpper === 'SUPER ADMIN' ||
+    roleUpper === 'ADMIN' ||
+    can('dashboard', 'view') ||
+    can('employees', 'view')
+  );
 
   const [assigningBatchId, setAssigningBatchId] = useState<string | null>(null);
   const [localBatches, setLocalBatches] = useState<ImportBatch[]>(batches);
@@ -497,56 +514,61 @@ export const BulkImportHistoryTable: React.FC<BulkImportHistoryTableProps> = ({
                             </Box>
                           </Menu.Item>
 
-                          <Menu.Divider />
-                          <Menu.Label>EMPLOYEES LIST</Menu.Label>
+                          {/* EMPLOYEES LIST: Only shown in Admin login */}
+                          {isAdmin && (
+                            <>
+                              <Menu.Divider />
+                              <Menu.Label>EMPLOYEES LIST</Menu.Label>
 
-                          <ScrollArea.Autosize mah={200} type="scroll">
-                            {employees && employees.length > 0 ? (
-                              employees.map((emp) => {
-                                const isCurrent =
-                                  batch.assignedTo === emp.id ||
-                                  batch.assignedTo === emp.empCode ||
-                                  (batch.assignedToName &&
-                                    batch.assignedToName.toLowerCase() === emp.name.toLowerCase());
-                                return (
-                                  <Menu.Item
-                                    key={emp.id}
-                                    leftSection={
-                                      <IconUserCheck
-                                        size={14}
-                                        color={isCurrent ? '#10B981' : undefined}
-                                      />
-                                    }
-                                    rightSection={
-                                      isCurrent ? (
-                                        <Badge size="xs" color="teal" variant="light">
-                                          Current
-                                        </Badge>
-                                      ) : undefined
-                                    }
-                                    onClick={() => handleAssignOwner(batch, emp.id)}
-                                  >
-                                    <Box>
-                                      <Text size="13px" fw={isCurrent ? 700 : 500}>
-                                        {emp.name}
-                                      </Text>
-                                      {(emp.designation || emp.department || emp.empCode) && (
-                                        <Text size="10.5px" c="dimmed">
-                                          {[emp.designation, emp.empCode ? `(${emp.empCode})` : '']
-                                            .filter(Boolean)
-                                            .join(' ')}
-                                        </Text>
-                                      )}
-                                    </Box>
-                                  </Menu.Item>
-                                );
-                              })
-                            ) : (
-                              <Menu.Item disabled>No employees available</Menu.Item>
-                            )}
-                          </ScrollArea.Autosize>
+                              <ScrollArea.Autosize mah={200} type="scroll">
+                                {employees && employees.length > 0 ? (
+                                  employees.map((emp) => {
+                                    const isCurrent =
+                                      batch.assignedTo === emp.id ||
+                                      batch.assignedTo === emp.empCode ||
+                                      (batch.assignedToName &&
+                                        batch.assignedToName.toLowerCase() === emp.name.toLowerCase());
+                                    return (
+                                      <Menu.Item
+                                        key={emp.id}
+                                        leftSection={
+                                          <IconUserCheck
+                                            size={14}
+                                            color={isCurrent ? '#10B981' : undefined}
+                                          />
+                                        }
+                                        rightSection={
+                                          isCurrent ? (
+                                            <Badge size="xs" color="teal" variant="light">
+                                              Current
+                                            </Badge>
+                                          ) : undefined
+                                        }
+                                        onClick={() => handleAssignOwner(batch, emp.id)}
+                                      >
+                                        <Box>
+                                          <Text size="13px" fw={isCurrent ? 700 : 500}>
+                                            {emp.name}
+                                          </Text>
+                                          {(emp.designation || emp.department || emp.empCode) && (
+                                            <Text size="10.5px" c="dimmed">
+                                              {[emp.designation, emp.empCode ? `(${emp.empCode})` : '']
+                                                .filter(Boolean)
+                                                .join(' ')}
+                                            </Text>
+                                          )}
+                                        </Box>
+                                      </Menu.Item>
+                                    );
+                                  })
+                                ) : (
+                                  <Menu.Item disabled>No employees available</Menu.Item>
+                                )}
+                              </ScrollArea.Autosize>
+                            </>
+                          )}
 
-                          {batch.assignedToName && (
+                          {batch.assignedToName && (isAdmin || ((currentUser?.name && batch.assignedToName && batch.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) || (currentUser?.id && batch.assignedTo === currentUser.id))) && (
                             <>
                               <Menu.Divider />
                               <Menu.Item

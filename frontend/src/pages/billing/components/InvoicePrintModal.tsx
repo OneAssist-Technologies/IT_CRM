@@ -18,6 +18,7 @@ import {
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Invoice, BillingSettings } from '../../../types/billing';
+import { APP_LOGO_URL } from '../../../config/env';
 import { billingService } from '../../../services/billingService';
 import {
   downloadInvoicePDF,
@@ -162,9 +163,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             <Box style={{ width: 1, height: 26, background: '#CBD5E1', margin: '0 4px' }} />
 
             <img
-              src="/oneassist-logo.png"
+              src={settings?.companyLogoUrl || (settings as any)?.logoUrl || APP_LOGO_URL}
               alt="OneAssist"
               style={{ width: 32, height: 32, objectFit: 'contain' }}
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = APP_LOGO_URL;
+              }}
             />
 
             <Box>

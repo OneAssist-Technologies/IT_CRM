@@ -16,6 +16,7 @@ import { IconPrinter } from '@tabler/icons-react';
 import { Quotation, BillingSettings } from '../../../types/billing';
 import { billingService } from '../../../services/billingService';
 import { printQuotationDirect } from '../utils/quotationPrint';
+import { APP_LOGO_URL } from '../../../config/env';
 
 interface QuotationPrintModalProps {
   opened: boolean;
@@ -361,9 +362,12 @@ export const QuotationPrintModal: React.FC<QuotationPrintModalProps> = ({
                 }}
               >
                 <img
-                  src="/oneassist-logo.png"
+                  src={settings?.companyLogoUrl || (settings as any)?.logoUrl || APP_LOGO_URL}
                   alt="OneAssist Technologies"
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = APP_LOGO_URL;
+                  }}
                 />
               </Box>
               <Box>

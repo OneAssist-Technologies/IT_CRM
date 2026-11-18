@@ -603,6 +603,7 @@ exports.Prisma.ProposalScalarFieldEnum = {
   documentSize: 'documentSize',
   notes: 'notes',
   terms: 'terms',
+  rejectionReason: 'rejectionReason',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };

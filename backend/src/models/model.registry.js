@@ -82,9 +82,37 @@ export const SYSTEM_MODULES = [
   },
   {
     id: 'settings',
-    name: 'Settings & Master Catalog',
+    name: 'Settings & Master Data',
     category: 'Administration & Security',
     description: 'Company profile, project & module catalog templates, CRM pipeline presets, and system configurations.',
+  },
+  {
+    id: 'myprofile',
+    name: 'My Profile',
+    category: 'Administration & Security',
+    description: 'Personal user profile, account credentials, and password settings.',
+    parentId: 'settings',
+  },
+  {
+    id: 'company_profile',
+    name: 'Company Profile',
+    category: 'Administration & Security',
+    description: 'Company registration details, corporate branding, GSTIN, and organization settings.',
+    parentId: 'settings',
+  },
+  {
+    id: 'calendar',
+    name: 'Calendar & Reminders',
+    category: 'Administration & Security',
+    description: 'Personal and organizational calendar, event scheduling, and reminder alerts.',
+    parentId: 'settings',
+  },
+  {
+    id: 'project_catalog',
+    name: 'Project Catalog',
+    category: 'Administration & Security',
+    description: 'Master projects catalog, deliverables scope, pricing presets, and module templates.',
+    parentId: 'settings',
   },
 ];
 
@@ -96,7 +124,6 @@ export const MODULE_CATEGORIES = [
 
 // Obsolete / legacy template module IDs to exclude from display
 export const EXCLUDED_LEGACY_MODULES = new Set([
-  'calendar',
   'daily_working_plan',
   'distributor_dashboard',
   'client_visits',

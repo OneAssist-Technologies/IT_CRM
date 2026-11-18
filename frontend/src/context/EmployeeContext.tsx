@@ -32,17 +32,34 @@ interface EmployeeContextType {
   deleteEmployee: (id: string) => Promise<boolean>;
 }
 
-const EmployeeContext = createContext<EmployeeContextType | undefined>(undefined);
+export const DEFAULT_EMPLOYEE_CONTEXT_VALUE: EmployeeContextType = {
+  employees: [],
+  employeeStats: null,
+  loading: false,
+  selectedEmployee: null,
+  setSelectedEmployee: () => {},
+  fetchEmployees: async () => {},
+  fetchEmployeeStats: async () => {},
+  addEmployee: async () => false,
+  updateEmployee: async () => false,
+  updateEmployeeStatus: async () => false,
+  deleteEmployee: async () => false,
+};
+
+const EmployeeContext = createContext<EmployeeContextType>(DEFAULT_EMPLOYEE_CONTEXT_VALUE);
 
 export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isAuthChecking } = useCRM();
+  const { isAuthenticated, isAuthChecking, activeNav } = useCRM();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employeeStats, setEmployeeStats] = useState<EmployeeStats | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
+  const isPublicPage = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+
   // Fetch employees from API (Memoized with useCallback)
   const fetchEmployees = useCallback(async (filters?: any) => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage) return;
     setLoading(true);
     try {
       const res = await fetchEmployeesApi(filters);
@@ -52,25 +69,24 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage]);
 
   // Fetch statistics from API (Memoized with useCallback)
   const fetchEmployeeStats = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage) return;
     try {
       const stats = await fetchEmployeeStatsApi();
-      if (stats) {
-        setEmployeeStats(stats);
-      }
-    } catch (_) {
-      // Suppress errors gracefully for non-admin users
+      setEmployeeStats(stats);
+    } catch (err) {
+      console.error('Failed to load employee stats:', err);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage]);
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage) return;
     fetchEmployees();
     fetchEmployeeStats();
-  }, [fetchEmployees, fetchEmployeeStats, isAuthenticated, isAuthChecking]);
+  }, [fetchEmployees, fetchEmployeeStats, isAuthenticated, isAuthChecking, isPublicPage]);
 
   // Onboard / Add Employee
   const addEmployee = async (empData: Partial<Employee>): Promise<boolean> => {
@@ -258,8 +274,5 @@ export const EmployeeProvider: React.FC<{ children: ReactNode }> = ({ children }
 
 export const useEmployee = (): EmployeeContextType => {
   const context = useContext(EmployeeContext);
-  if (!context) {
-    throw new Error('useEmployee must be used within an EmployeeProvider');
-  }
-  return context;
+  return context || DEFAULT_EMPLOYEE_CONTEXT_VALUE;
 };

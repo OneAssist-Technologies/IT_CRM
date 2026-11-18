@@ -24,6 +24,7 @@ import {
   printInvoiceElement,
 } from '../../../utils/invoicePdfGenerator';
 import { InvoiceDocument } from '../../billing/components/InvoiceDocument';
+import { APP_LOGO_URL } from '../../../config/env';
 
 interface InvoicePrintModalProps {
   opened: boolean;
@@ -162,7 +163,12 @@ export const InvoicePrintModal: React.FC<InvoicePrintModalProps> = ({
             <Box style={{ width: 1, height: 26, background: '#CBD5E1', margin: '0 4px' }} />
 
             <img
-              src="/oneassist-logo.png"
+              src={settings?.companyLogoUrl || APP_LOGO_URL}
+              onError={(e) => {
+                if ((e.target as HTMLImageElement).src !== APP_LOGO_URL) {
+                  (e.target as HTMLImageElement).src = APP_LOGO_URL;
+                }
+              }}
               alt="OneAssist"
               style={{ width: 32, height: 32, objectFit: 'contain' }}
             />

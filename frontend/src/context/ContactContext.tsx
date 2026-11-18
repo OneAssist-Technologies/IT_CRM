@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { notifications } from '@mantine/notifications';
+import { useCRM } from './CRMContext';
+import { usePermissions } from './AccessControlContext';
 import {
   Contact,
   ContactFormData,
@@ -9,7 +11,6 @@ import {
   ContactMetadata,
 } from '../types/contact';
 import { contactService } from '../services/contactService';
-import { useCRM } from './CRMContext';
 
 interface ContactContextType {
   contacts: Contact[];
@@ -86,10 +87,35 @@ const defaultFilters: ContactFilter = {
   sortOrder: 'desc',
 };
 
-const ContactContext = createContext<ContactContextType | undefined>(undefined);
+export const DEFAULT_CONTACT_CONTEXT_VALUE: ContactContextType = {
+  contacts: [],
+  stats: null,
+  metadata: null,
+  selectedContact: null,
+  loading: false,
+  filters: defaultFilters,
+  pagination: defaultPagination,
+  fetchContacts: async () => {},
+  fetchStats: async () => {},
+  fetchMetadata: async () => {},
+  setSelectedContact: () => {},
+  setFilters: () => {},
+  resetFilters: () => {},
+  setPage: () => {},
+  setLimit: () => {},
+  setSort: () => {},
+  createContact: async () => ({ success: false }),
+  updateContact: async () => ({ success: false }),
+  deleteContact: async () => ({ success: false }),
+  assignContact: async () => ({ success: false }),
+  bulkImportContacts: async () => ({ success: false, importedCount: 0, errorCount: 0 }),
+};
+
+const ContactContext = createContext<ContactContextType>(DEFAULT_CONTACT_CONTEXT_VALUE);
 
 export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isAuthChecking } = useCRM();
+  const { isAuthenticated, isAuthChecking, activeNav } = useCRM();
+  const { can, permissionsLoaded, isSuperAdmin } = usePermissions();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [stats, setStats] = useState<ContactStats | null>(null);
   const [metadata, setMetadata] = useState<ContactMetadata | null>(null);
@@ -98,7 +124,11 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [filters, setFiltersState] = useState<ContactFilter>(defaultFilters);
   const [pagination, setPagination] = useState<ContactPagination>(defaultPagination);
 
+  const isPublicPage = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+  const hasContactPermission = Boolean(isSuperAdmin || (permissionsLoaded && can('contacts', 'view')));
+
   const fetchContacts = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
     try {
       setLoading(true);
       const res = await contactService.getContacts({
@@ -134,9 +164,10 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.limit]);
+  }, [filters, pagination.page, pagination.limit, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
   const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
     try {
       const res = await contactService.getContactStats();
       if (res.success && res.stats) {
@@ -145,9 +176,10 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
     } catch (err: any) {
       console.error('Error fetching contact stats:', err);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
   const fetchMetadata = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
     try {
       const res = await contactService.getContactMetadata();
       const meta = res.metadata || (res as any).data;
@@ -157,18 +189,18 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
     } catch (err: any) {
       console.error('Error fetching contact metadata:', err);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
     fetchContacts();
-  }, [fetchContacts, isAuthenticated, isAuthChecking]);
+  }, [fetchContacts, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
   const setFilters = (newFilters: Partial<ContactFilter>) => {
     setFiltersState((prev) => ({ ...prev, ...newFilters }));
@@ -423,12 +455,9 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
   );
 };
 
-export const useContact = () => {
+export const useContact = (): ContactContextType => {
   const context = useContext(ContactContext);
-  if (!context) {
-    throw new Error('useContact must be used within a ContactProvider');
-  }
-  return context;
+  return context || DEFAULT_CONTACT_CONTEXT_VALUE;
 };
 
 export default ContactContext;

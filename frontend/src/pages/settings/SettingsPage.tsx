@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import React, { useState, useEffect, useMemo, Component, ErrorInfo, ReactNode } from 'react';
 import {
   Stack,
   Text,
@@ -11,11 +11,12 @@ import {
   useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconAlertCircle, IconUser, IconCalendar, IconFolders, IconBuildingSkyscraper } from '@tabler/icons-react';
+import { IconAlertCircle, IconUser, IconCalendar, IconFolders, IconBuildingSkyscraper, IconLock } from '@tabler/icons-react';
 import { ProjectCatalogTab } from './components/ProjectCatalogTab';
 import { CompanyProfileTab } from './components/CompanyProfileTab';
 import { UserProfileTab } from './components/UserProfileTab';
 import { CalendarRemindersTab } from './components/CalendarRemindersTab';
+import { useAccessControl } from '../../context/AccessControlContext';
 
 type SettingsTabKey = 'profile' | 'company' | 'calendar' | 'projects';
 
@@ -24,6 +25,7 @@ interface NavItem {
   label: string;
   shortLabel: string;
   icon: React.ReactNode;
+  permModule: string;
 }
 
 interface TabErrorBoundaryProps {
@@ -101,18 +103,34 @@ const getInitialSettingsTab = (): SettingsTabKey => {
 };
 
 export const SettingsPage: React.FC = () => {
+  const { can, isSuperAdmin } = useAccessControl();
   const [activeTab, setActiveTabState] = useState<SettingsTabKey>(getInitialSettingsTab);
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 768px)');
   const isSmallMobile = useMediaQuery('(max-width: 520px)');
 
-  const navItems: NavItem[] = [
-    { key: 'profile', label: 'My Profile', shortLabel: 'Profile', icon: <IconUser size={15} /> },
-    { key: 'company', label: 'Company Profile', shortLabel: 'Company', icon: <IconBuildingSkyscraper size={15} /> },
-    { key: 'calendar', label: 'Calendar & Reminders', shortLabel: 'Calendar', icon: <IconCalendar size={15} /> },
-    { key: 'projects', label: 'Project Catalog', shortLabel: 'Catalog', icon: <IconFolders size={15} /> },
-  ];
+  const allNavItems: NavItem[] = useMemo(
+    () => [
+      { key: 'profile', label: 'My Profile', shortLabel: 'Profile', icon: <IconUser size={15} />, permModule: 'myprofile' },
+      { key: 'company', label: 'Company Profile', shortLabel: 'Company', icon: <IconBuildingSkyscraper size={15} />, permModule: 'company_profile' },
+      { key: 'calendar', label: 'Calendar & Reminders', shortLabel: 'Calendar', icon: <IconCalendar size={15} />, permModule: 'calendar' },
+      { key: 'projects', label: 'Project Catalog', shortLabel: 'Catalog', icon: <IconFolders size={15} />, permModule: 'project_catalog' },
+    ],
+    []
+  );
+
+  const navItems = useMemo(() => {
+    if (isSuperAdmin) return allNavItems;
+    return allNavItems.filter((item) => can(item.permModule, 'view'));
+  }, [isSuperAdmin, can, allNavItems]);
+
+  // Ensure active tab is allowed, otherwise switch to first allowed tab
+  useEffect(() => {
+    if (navItems.length > 0 && !navItems.some((item) => item.key === activeTab)) {
+      setActiveTabState(navItems[0].key);
+    }
+  }, [navItems, activeTab]);
 
   const handleTabChange = (key: SettingsTabKey) => {
     setActiveTabState(key);
@@ -150,6 +168,26 @@ export const SettingsPage: React.FC = () => {
     window.addEventListener('popstate', handlePop);
     return () => window.removeEventListener('popstate', handlePop);
   }, [activeTab]);
+
+  if (navItems.length === 0) {
+    return (
+      <Paper p="xl" radius="md" withBorder style={{ maxWidth: 600, margin: '40px auto' }}>
+        <Group gap="sm" mb="sm">
+          <ThemeIcon color="red" variant="light" size="lg" radius="md">
+            <IconAlertCircle size={22} />
+          </ThemeIcon>
+          <Box>
+            <Text fw={700} size="md">
+              Access Restricted
+            </Text>
+            <Text size="sm" c="dimmed">
+              You do not have permission to view any settings modules. Please contact your system administrator.
+            </Text>
+          </Box>
+        </Group>
+      </Paper>
+    );
+  }
 
   return (
     <Box style={{ width: '100%', maxWidth: '100%' }}>

@@ -3,6 +3,7 @@ import { notifications } from '@mantine/notifications';
 import { Customer, CustomerFormData, CustomerStats } from '../types/customer';
 import { crmApi } from '../services/api';
 import { useCRM } from './CRMContext';
+import { usePermissions } from './AccessControlContext';
 
 interface CustomerContextType {
   customers: Customer[];
@@ -26,14 +27,39 @@ interface CustomerContextType {
   deleteCustomer: (id: string) => Promise<{ success: boolean; message?: string }>;
 }
 
-const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
+export const DEFAULT_CUSTOMER_CONTEXT_VALUE: CustomerContextType = {
+  customers: [],
+  stats: null,
+  selectedCustomer: null,
+  loading: false,
+  search: '',
+  setSearch: () => {},
+  statusFilter: 'all',
+  setStatusFilter: () => {},
+  tierFilter: 'all',
+  setTierFilter: () => {},
+  industryFilter: 'all',
+  setIndustryFilter: () => {},
+  setSelectedCustomer: () => {},
+  fetchCustomers: async () => {},
+  fetchStats: async () => {},
+  createCustomer: async () => ({ success: false }),
+  updateCustomer: async () => ({ success: false }),
+  deleteCustomer: async () => ({ success: false }),
+};
+
+const CustomerContext = createContext<CustomerContextType>(DEFAULT_CUSTOMER_CONTEXT_VALUE);
 
 export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { currentUser, isAuthenticated, isAuthChecking } = useCRM();
+  const { currentUser, isAuthenticated, isAuthChecking, activeNav } = useCRM();
+  const { getDataScope, can, permissionsLoaded, isSuperAdmin } = usePermissions();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+
+  const isPublicPage = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+  const hasCustomerPermission = Boolean(isSuperAdmin || (permissionsLoaded && can('customers', 'view')));
 
   // Filters
   const [search, setSearch] = useState<string>('');
@@ -42,6 +68,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [industryFilter, setIndustryFilter] = useState<string>('all');
 
   const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasCustomerPermission) return;
     try {
       const res = await crmApi.getCustomerStats();
       if (res.success && res.stats) {
@@ -50,9 +77,10 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     } catch (e) {
       console.error('Failed to fetch customer stats', e);
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasCustomerPermission]);
 
   const fetchCustomers = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasCustomerPermission) return;
     setLoading(true);
     try {
       const params: Record<string, string> = {};
@@ -63,7 +91,24 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       const res = await crmApi.getCustomers(params);
       if (res.success && res.data) {
-        setCustomers(res.data);
+        const roleUpper = String(currentUser?.role || '').toUpperCase();
+        const isAdmin =
+          roleUpper === 'SUPER_ADMIN' ||
+          roleUpper === 'SUPER ADMIN' ||
+          roleUpper === 'ADMIN' ||
+          roleUpper === 'MANAGEMENT' ||
+          String(currentUser?.email || '').toLowerCase().trim() === 'sandy@gmail.com';
+
+        const customerScope = getDataScope('customers');
+        const isAllScope = isAdmin || customerScope === 'All';
+
+        const filtered = isAllScope
+          ? res.data
+          : res.data.filter((c: any) =>
+              (currentUser?.id && c.accountManagerId === currentUser.id) ||
+              (currentUser?.name && c.accountManager && c.accountManager.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+            );
+        setCustomers(filtered);
       }
     } catch (e: any) {
       notifications.show({
@@ -74,13 +119,13 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, tierFilter, industryFilter]);
+  }, [search, statusFilter, tierFilter, industryFilter, isAuthenticated, isAuthChecking, isPublicPage, currentUser, getDataScope, hasCustomerPermission]);
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasCustomerPermission) return;
     fetchCustomers();
     fetchStats();
-  }, [fetchCustomers, fetchStats, isAuthenticated, isAuthChecking, currentUser?.id, currentUser?.role]);
+  }, [fetchCustomers, fetchStats, isAuthenticated, isAuthChecking, isPublicPage, hasCustomerPermission]);
 
   const createCustomer = async (data: CustomerFormData) => {
     try {
@@ -206,10 +251,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
-export const useCustomer = () => {
+export const useCustomer = (): CustomerContextType => {
   const context = useContext(CustomerContext);
-  if (!context) {
-    throw new Error('useCustomer must be used within a CustomerProvider');
-  }
-  return context;
+  return context || DEFAULT_CUSTOMER_CONTEXT_VALUE;
 };

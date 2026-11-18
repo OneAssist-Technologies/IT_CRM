@@ -1543,11 +1543,11 @@ export async function updateContactService(id, body, user) {
         assignmentStatus: body.assignedTo && body.assignedTo !== 'none' && body.assignedTo !== 'Unassigned' ? 'Assigned' : 'Unassigned',
       }),
       ...(body.assignmentStatus !== undefined ? { assignmentStatus: body.assignmentStatus } : {}),
-      ...((body.qualificationStatus || body.stage === 'Qualification') ? {
+      ...(((body.qualificationStatus === 'Qualified') || body.stage === 'Qualification') ? {
         assignmentStatus: 'Assigned',
         stage: body.stage || 'Qualification',
       } : {}),
-      ...((!existing.assignedTo && !body.assignedTo && (body.qualificationStatus || body.stage === 'Qualification') && user) ? {
+      ...((!existing.assignedTo && !body.assignedTo && ((body.qualificationStatus === 'Qualified') || body.stage === 'Qualification') && user) ? {
         assignedTo: user.id,
         assignedToName: user.name || user.email || 'Assigned User',
       } : {}),
@@ -2133,35 +2133,59 @@ export async function getBulkUploadContactsService(queryParams = {}, currentUser
     andConditions.push(batchScope);
   }
 
-  if (batchId) {
-    andConditions.push({ batchId });
+  if (batchId && batchId !== 'undefined' && batchId !== 'null' && String(batchId).trim() !== '') {
+    andConditions.push({ batchId: String(batchId).trim() });
   }
 
-  if (status && status !== 'All' && status !== 'ALL') {
-    andConditions.push({ status: { equals: status.trim(), mode: 'insensitive' } });
+  const cleanStatus = typeof status === 'string' ? status.trim() : '';
+  if (
+    cleanStatus &&
+    cleanStatus !== '' &&
+    !['all', 'undefined', 'null'].includes(cleanStatus.toLowerCase())
+  ) {
+    andConditions.push({ status: { equals: cleanStatus, mode: 'insensitive' } });
   }
 
-  if (search && search.trim()) {
-    const q = search.trim();
+  const cleanSearch = typeof search === 'string' ? search.trim() : '';
+  if (
+    cleanSearch &&
+    cleanSearch !== '' &&
+    !['undefined', 'null'].includes(cleanSearch.toLowerCase())
+  ) {
     andConditions.push({
       OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { phone: { contains: q, mode: 'insensitive' } },
-        { companyName: { contains: q, mode: 'insensitive' } },
-        { bulkId: { contains: q, mode: 'insensitive' } },
+        { name: { contains: cleanSearch, mode: 'insensitive' } },
+        { email: { contains: cleanSearch, mode: 'insensitive' } },
+        { phone: { contains: cleanSearch, mode: 'insensitive' } },
+        { companyName: { contains: cleanSearch, mode: 'insensitive' } },
+        { bulkId: { contains: cleanSearch, mode: 'insensitive' } },
       ],
     });
   }
 
   const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
+  const validSortFields = [
+    'createdAt',
+    'updatedAt',
+    'name',
+    'companyName',
+    'status',
+    'stage',
+    'priority',
+    'bulkId',
+    'phone',
+    'email',
+  ];
+  const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+  const safeSortOrder = String(sortOrder || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
   const total = await prisma.bulkUploadContact.count({ where });
   const rawContacts = await prisma.bulkUploadContact.findMany({
     where,
     skip: (pageNum - 1) * limitNum,
     take: limitNum,
-    orderBy: { [sortBy]: sortOrder.toLowerCase() === 'asc' ? 'asc' : 'desc' },
+    orderBy: { [safeSortBy]: safeSortOrder },
   });
 
   const importedIds = rawContacts.map((c) => c.importedContactId).filter(Boolean);
@@ -2456,12 +2480,16 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
     { OR: [{ batchId: batch.batchId }, { batchId: batch.id }] },
   ];
 
-  if (status && status !== 'All' && status !== 'ALL') {
-    const s = status.trim();
+  const cleanStatus = typeof status === 'string' ? status.trim() : '';
+  if (
+    cleanStatus &&
+    cleanStatus !== '' &&
+    !['all', 'undefined', 'null'].includes(cleanStatus.toLowerCase())
+  ) {
     andConditions.push({
       OR: [
-        { status: { equals: s, mode: 'insensitive' } },
-        { qualificationStatus: { equals: s, mode: 'insensitive' } },
+        { status: { equals: cleanStatus, mode: 'insensitive' } },
+        { qualificationStatus: { equals: cleanStatus, mode: 'insensitive' } },
       ],
     });
   }
@@ -2485,31 +2513,50 @@ export async function getBatchContactsService(batchId, queryParams = {}, current
     }
   }
 
-  if (search && search.trim()) {
-    const q = search.trim();
+  const cleanSearch = typeof search === 'string' ? search.trim() : '';
+  if (
+    cleanSearch &&
+    cleanSearch !== '' &&
+    !['undefined', 'null'].includes(cleanSearch.toLowerCase())
+  ) {
     andConditions.push({
       OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { contactPerson: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { phone: { contains: q, mode: 'insensitive' } },
-        { companyName: { contains: q, mode: 'insensitive' } },
-        { bulkId: { contains: q, mode: 'insensitive' } },
-        { assignedToName: { contains: q, mode: 'insensitive' } },
-        { designation: { contains: q, mode: 'insensitive' } },
-        { city: { contains: q, mode: 'insensitive' } },
+        { name: { contains: cleanSearch, mode: 'insensitive' } },
+        { contactPerson: { contains: cleanSearch, mode: 'insensitive' } },
+        { email: { contains: cleanSearch, mode: 'insensitive' } },
+        { phone: { contains: cleanSearch, mode: 'insensitive' } },
+        { companyName: { contains: cleanSearch, mode: 'insensitive' } },
+        { bulkId: { contains: cleanSearch, mode: 'insensitive' } },
+        { assignedToName: { contains: cleanSearch, mode: 'insensitive' } },
+        { designation: { contains: cleanSearch, mode: 'insensitive' } },
+        { city: { contains: cleanSearch, mode: 'insensitive' } },
       ],
     });
   }
 
   const where = { AND: andConditions };
 
+  const validSortFields = [
+    'createdAt',
+    'updatedAt',
+    'name',
+    'companyName',
+    'status',
+    'stage',
+    'priority',
+    'bulkId',
+    'phone',
+    'email',
+  ];
+  const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+  const safeSortOrder = String(sortOrder || '').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
   const total = await prisma.bulkUploadContact.count({ where });
   const rawContacts = await prisma.bulkUploadContact.findMany({
     where,
     skip: (pageNum - 1) * limitNum,
     take: limitNum,
-    orderBy: { [sortBy]: sortOrder.toLowerCase() === 'asc' ? 'asc' : 'desc' },
+    orderBy: { [safeSortBy]: safeSortOrder },
   });
 
   const importedIds = rawContacts.map((c) => c.importedContactId).filter(Boolean);
@@ -2628,15 +2675,29 @@ export async function deleteImportBatchService(batchId, currentUser = null) {
  * 17. Assign Import Batch and its contacts
  */
 export async function assignImportBatchService(batchId, body, currentUser = null) {
+  const { employeeId, assignedTo } = body || {};
+  let targetId = employeeId !== undefined ? employeeId : assignedTo;
+
   const batchScope = await resolveBatchScopedFilter(currentUser);
   if (batchScope) {
-    const error = new Error('Access denied. Only Super Admin can assign import batches.');
-    error.status = 403;
-    throw error;
-  }
+    const myName = String(currentUser?.name || '').toLowerCase().trim();
+    const myEmail = String(currentUser?.email || '').toLowerCase().trim();
+    const myId = String(currentUser?.id || '').toLowerCase().trim();
+    const targetStr = String(targetId || '').toLowerCase().trim();
 
-  const { employeeId, assignedTo } = body || {};
-  const targetId = employeeId !== undefined ? employeeId : assignedTo;
+    const isSelfAssign =
+      targetStr === 'me' ||
+      (myName && targetStr === myName) ||
+      (myEmail && targetStr === myEmail) ||
+      (myId && targetStr === myId);
+
+    // Regular employees can assign to themselves or unassign if currently assigned to them
+    if (targetId && !isSelfAssign) {
+      const error = new Error('Access denied. Regular employees can only assign import batches to themselves.');
+      error.status = 403;
+      throw error;
+    }
+  }
 
   const batch = await prisma.importBatch.findFirst({
     where: { OR: [{ id: batchId }, { batchId }] },
@@ -2653,12 +2714,19 @@ export async function assignImportBatchService(batchId, body, currentUser = null
   let assignmentStatus = 'Unassigned';
 
   if (targetId && targetId !== 'Unassigned' && targetId !== 'none' && targetId !== 'null' && String(targetId).trim() !== '') {
+    let lookupTarget = targetId;
+    if (targetId === 'me' && currentUser) {
+      lookupTarget = currentUser.name || currentUser.email || currentUser.id;
+    }
+
     const emp = await prisma.employee.findFirst({
       where: {
         OR: [
-          { id: targetId },
-          { empCode: targetId },
-          { name: { equals: targetId, mode: 'insensitive' } },
+          { id: lookupTarget },
+          { empCode: lookupTarget },
+          { name: { equals: lookupTarget, mode: 'insensitive' } },
+          ...(currentUser?.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+          ...(currentUser?.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
         ],
       },
     });
@@ -2667,8 +2735,8 @@ export async function assignImportBatchService(batchId, body, currentUser = null
       resolvedTargetId = emp.id;
       assignmentStatus = 'Assigned';
     } else {
-      assignedToName = targetId;
-      resolvedTargetId = targetId;
+      assignedToName = currentUser?.name || lookupTarget;
+      resolvedTargetId = currentUser?.id || lookupTarget;
       assignmentStatus = 'Assigned';
     }
   }

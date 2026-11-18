@@ -183,24 +183,47 @@ export async function ensureSystemRolesService() {
   for (const r of allRoles) {
     const existingPerms = await prisma.rolePermission.findMany({
       where: { roleId: r.id },
-      select: { moduleId: true },
     });
     const existingSet = new Set(existingPerms.map((p) => p.moduleId));
+    const settingsPerm = existingPerms.find((p) => p.moduleId === 'settings');
     const missing = SYSTEM_MODULES.filter((m) => !existingSet.has(m.id));
     if (missing.length > 0) {
       await prisma.rolePermission.createMany({
-        data: missing.map((m) => ({
-          roleId: r.id,
-          moduleId: m.id,
-          moduleName: m.name,
-          category: m.category,
-          canView: r.slug === 'admin' || r.slug === 'super_admin' || m.id === 'employee_dashboard',
-          canCreate: r.slug === 'admin' || r.slug === 'super_admin' || m.id === 'employee_dashboard',
-          canEdit: r.slug === 'admin' || r.slug === 'super_admin' || m.id === 'employee_dashboard',
-          canDelete: r.slug === 'admin' || r.slug === 'super_admin',
-          canExport: r.slug === 'admin' || r.slug === 'super_admin',
-          canApprove: r.slug === 'admin' || r.slug === 'super_admin',
-        })),
+        data: missing.map((m) => {
+          const isStaffBaseMod = m.id === 'employee_dashboard' || m.id === 'myprofile' || m.id === 'calendar';
+          const fallbackView = settingsPerm
+            ? settingsPerm.canView
+            : r.slug === 'admin' || r.slug === 'super_admin' || isStaffBaseMod;
+          const fallbackCreate = settingsPerm
+            ? settingsPerm.canCreate
+            : r.slug === 'admin' || r.slug === 'super_admin' || m.id === 'calendar' || m.id === 'employee_dashboard';
+          const fallbackEdit = settingsPerm
+            ? settingsPerm.canEdit
+            : r.slug === 'admin' || r.slug === 'super_admin' || isStaffBaseMod;
+          const fallbackDelete = settingsPerm
+            ? settingsPerm.canDelete
+            : r.slug === 'admin' || r.slug === 'super_admin';
+          const fallbackExport = settingsPerm
+            ? settingsPerm.canExport
+            : r.slug === 'admin' || r.slug === 'super_admin';
+          const fallbackApprove = settingsPerm
+            ? settingsPerm.canApprove
+            : r.slug === 'admin' || r.slug === 'super_admin';
+
+          return {
+            roleId: r.id,
+            moduleId: m.id,
+            moduleName: m.name,
+            category: m.category,
+            canView: Boolean(fallbackView),
+            canCreate: Boolean(fallbackCreate),
+            canEdit: Boolean(fallbackEdit),
+            canDelete: Boolean(fallbackDelete),
+            canExport: Boolean(fallbackExport),
+            canApprove: Boolean(fallbackApprove),
+            dataScope: settingsPerm?.dataScope || (r.slug === 'admin' || r.slug === 'super_admin' ? 'All' : 'Own'),
+          };
+        }),
       });
     }
   }

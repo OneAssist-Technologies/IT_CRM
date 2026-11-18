@@ -1545,22 +1545,34 @@ export async function getInvoicesService(query = {}, currentUser = null) {
 
   // Process invoices with computed paymentStatus and unpacked metadata
   const processed = invoices.map((inv) => {
-    let effectiveStatus = inv.status;
+    let effectiveStatus = inv.status || 'Draft';
     let computedPaymentStatus = 'Unpaid';
 
     if (effectiveStatus === 'Cancelled') {
       computedPaymentStatus = 'Cancelled';
-    } else if (effectiveStatus === 'Paid' || inv.outstandingBalance <= 0.05) {
+    } else if (effectiveStatus === 'Void') {
+      computedPaymentStatus = 'Void';
+    } else if (effectiveStatus === 'Paid' || (inv.grandTotal > 0 && inv.outstandingBalance <= 0.05)) {
       computedPaymentStatus = 'Paid';
       effectiveStatus = 'Paid';
-    } else if (inv.dueDate < today && inv.outstandingBalance > 0) {
+    } else if (effectiveStatus === 'Overdue') {
+      effectiveStatus = 'Overdue';
+      computedPaymentStatus = inv.amountPaid > 0 ? 'Partially Paid' : 'Overdue';
+    } else if (effectiveStatus === 'Partially Paid') {
+      effectiveStatus = 'Partially Paid';
+      computedPaymentStatus = 'Partially Paid';
+    } else if (effectiveStatus === 'Sent' || effectiveStatus === 'Viewed') {
+      computedPaymentStatus = inv.amountPaid > 0 ? 'Partially Paid' : (inv.dueDate && inv.dueDate < today && inv.outstandingBalance > 0 ? 'Overdue' : 'Unpaid');
+    } else if (inv.dueDate && inv.dueDate < today && inv.outstandingBalance > 0) {
       computedPaymentStatus = 'Overdue';
       if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
         effectiveStatus = 'Overdue';
       }
     } else if (inv.amountPaid > 0 && inv.outstandingBalance > 0) {
       computedPaymentStatus = 'Partially Paid';
-      effectiveStatus = 'Partially Paid';
+      if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
+        effectiveStatus = 'Partially Paid';
+      }
     } else {
       computedPaymentStatus = 'Unpaid';
     }
@@ -1646,22 +1658,34 @@ export async function getInvoiceByIdService(id, currentUser = null) {
   }
 
   const today = new Date().toISOString().split('T')[0];
-  let effectiveStatus = invoice.status;
+  let effectiveStatus = invoice.status || 'Draft';
   let computedPaymentStatus = 'Unpaid';
 
   if (effectiveStatus === 'Cancelled') {
     computedPaymentStatus = 'Cancelled';
-  } else if (effectiveStatus === 'Paid' || invoice.outstandingBalance <= 0.05) {
+  } else if (effectiveStatus === 'Void') {
+    computedPaymentStatus = 'Void';
+  } else if (effectiveStatus === 'Paid' || (invoice.grandTotal > 0 && invoice.outstandingBalance <= 0.05)) {
     computedPaymentStatus = 'Paid';
     effectiveStatus = 'Paid';
-  } else if (invoice.dueDate < today && invoice.outstandingBalance > 0) {
+  } else if (effectiveStatus === 'Overdue') {
+    effectiveStatus = 'Overdue';
+    computedPaymentStatus = invoice.amountPaid > 0 ? 'Partially Paid' : 'Overdue';
+  } else if (effectiveStatus === 'Partially Paid') {
+    effectiveStatus = 'Partially Paid';
+    computedPaymentStatus = 'Partially Paid';
+  } else if (effectiveStatus === 'Sent' || effectiveStatus === 'Viewed') {
+    computedPaymentStatus = invoice.amountPaid > 0 ? 'Partially Paid' : (invoice.dueDate && invoice.dueDate < today && invoice.outstandingBalance > 0 ? 'Overdue' : 'Unpaid');
+  } else if (invoice.dueDate && invoice.dueDate < today && invoice.outstandingBalance > 0) {
     computedPaymentStatus = 'Overdue';
     if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
       effectiveStatus = 'Overdue';
     }
   } else if (invoice.amountPaid > 0 && invoice.outstandingBalance > 0) {
     computedPaymentStatus = 'Partially Paid';
-    effectiveStatus = 'Partially Paid';
+    if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
+      effectiveStatus = 'Partially Paid';
+    }
   } else {
     computedPaymentStatus = 'Unpaid';
   }
@@ -2202,13 +2226,23 @@ export async function updateInvoiceService(id, data, user) {
       headerAmountPaid = Number((existing.grandTotal / 2).toFixed(2));
       headerOutstanding = Number((existing.grandTotal - headerAmountPaid).toFixed(2));
     }
-  } else if (data.amountPaid !== undefined || data.advanceAmount !== undefined) {
+  } else if (data.status) {
+    newStatus = data.status;
+    if (newStatus === 'Overdue' && headerOutstanding <= 0) {
+      headerOutstanding = existing.grandTotal;
+      headerAmountPaid = 0;
+    }
+  }
+
+  if (data.amountPaid !== undefined || data.advanceAmount !== undefined) {
     headerAmountPaid = Math.max(0, Math.min(existing.grandTotal, Number(data.amountPaid ?? data.advanceAmount ?? 0)));
     headerOutstanding = Math.max(0, Number((existing.grandTotal - headerAmountPaid).toFixed(2)));
-    if (headerAmountPaid >= existing.grandTotal && existing.grandTotal > 0) {
-      newStatus = 'Paid';
-    } else if (headerAmountPaid > 0) {
-      newStatus = 'Partially Paid';
+    if (!data.status) {
+      if (headerAmountPaid >= existing.grandTotal && existing.grandTotal > 0) {
+        newStatus = 'Paid';
+      } else if (headerAmountPaid > 0) {
+        newStatus = 'Partially Paid';
+      }
     }
   }
 

@@ -1,21 +1,58 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 
-// https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
-  base: process.env.VITE_BASE_PATH || (mode === 'production' ? '/it-crm/' : '/'),
-  plugins: [react()],
+// Plugin to automatically redirect bare root/paths (like / or /settings) to /itcrm/... during local dev
+function devBaseRedirectPlugin(): Plugin {
+  return {
+    name: 'dev-base-redirect',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url || '';
+        // If request is already on /itcrm or is an internal vite/asset/api path, pass through
+        if (
+          url.startsWith('/itcrm') ||
+          url.startsWith('/@') ||
+          url.startsWith('/node_modules') ||
+          url.startsWith('/src') ||
+          url.startsWith('/api') ||
+          url.startsWith('/itcrmapi') ||
+          url.includes('.')
+        ) {
+          return next();
+        }
+
+        // Redirect bare paths (e.g. /settings -> /itcrm/settings)
+        const cleanPath = url.startsWith('/') ? url : `/${url}`;
+        const target = `/itcrm${cleanPath === '/' ? '/' : cleanPath}`;
+        res.writeHead(302, { Location: target });
+        res.end();
+      });
+    },
+  };
+}
+
+export default defineConfig({
+  base: '/itcrm/',
+  plugins: [react(), devBaseRedirectPlugin()],
+
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: `http://127.0.0.1:${process.env.VITE_BACKEND_PORT || 5000}`,
         changeOrigin: true,
       },
       '/itcrmapi': {
-        target: 'http://localhost:5000',
+        target: `http://127.0.0.1:${process.env.VITE_BACKEND_PORT || 5000}`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/itcrmapi/, ''),
       },
     },
   },
-}))
+
+  preview: {
+    allowedHosts: [
+      'oneassist.net.in',
+      'www.oneassist.net.in',
+    ],
+  },
+})

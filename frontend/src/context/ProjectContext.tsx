@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { notifications } from '@mantine/notifications';
+import { useCRM } from './CRMContext';
+import { usePermissions } from './AccessControlContext';
 import {
   Project,
   ProjectFormData,
@@ -9,7 +11,6 @@ import {
   ProjectModuleItem,
 } from '../types/project';
 import { projectService } from '../services/projectService';
-import { useCRM } from './CRMContext';
 
 interface ProjectPagination {
   total: number;
@@ -97,10 +98,34 @@ const getCachedMetadata = (): ProjectMetadata | null => {
   }
 };
 
-const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
+export const DEFAULT_PROJECT_CONTEXT_VALUE: ProjectContextType = {
+  projects: [],
+  stats: null,
+  metadata: null,
+  selectedProject: null,
+  loading: false,
+  filters: defaultFilters,
+  pagination: defaultPagination,
+  fetchProjects: async () => {},
+  fetchStats: async () => {},
+  fetchMetadata: async () => {},
+  setSelectedProject: () => {},
+  setFilters: () => {},
+  resetFilters: () => {},
+  setPage: () => {},
+  setLimit: () => {},
+  setSort: () => {},
+  createProject: async () => ({ success: false }),
+  updateProject: async () => ({ success: false }),
+  deleteProject: async () => ({ success: false }),
+  updateProjectModules: async () => ({ success: false }),
+};
+
+const ProjectContext = createContext<ProjectContextType>(DEFAULT_PROJECT_CONTEXT_VALUE);
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isAuthChecking } = useCRM();
+  const { isAuthenticated, isAuthChecking, activeNav } = useCRM();
+  const { can, permissionsLoaded, isSuperAdmin } = usePermissions();
   const [projects, setProjects] = useState<Project[]>(() => getCachedProjects());
   const [stats, setStats] = useState<ProjectStats | null>(() => getCachedStats());
   const [metadata, setMetadata] = useState<ProjectMetadata | null>(() => getCachedMetadata());
@@ -116,12 +141,13 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     };
   });
 
+  const isPublicPage = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+  const hasProjectPermission = Boolean(isSuperAdmin || (permissionsLoaded && can('projects', 'view')));
+
   // 1. Fetch Projects List
   const fetchProjects = useCallback(async () => {
-    // Only show full loader if there are no projects in cache/view
-    if (projects.length === 0) {
-      setLoading(true);
-    }
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasProjectPermission) return;
+    setLoading(true);
     try {
       const res = await projectService.getProjects(filters);
       if (res.success) {
@@ -151,10 +177,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     } finally {
       setLoading(false);
     }
-  }, [filters, projects.length]);
+  }, [filters, isAuthenticated, isAuthChecking, isPublicPage, hasProjectPermission]);
 
   // 2. Fetch KPI Stats
   const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasProjectPermission) return;
     try {
       const res = await projectService.getProjectStats();
       if (res.success) {
@@ -165,13 +192,16 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
           } catch (_) {}
         }
       }
-    } catch (err) {
-      console.error('[fetchStats Error]:', err);
+    } catch (err: any) {
+      if (!err?.message?.includes('permission') && !err?.message?.includes('Access denied')) {
+        console.error('[fetchStats Error]:', err);
+      }
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasProjectPermission]);
 
   // 3. Fetch Dropdown Metadata
   const fetchMetadata = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasProjectPermission) return;
     try {
       const res = await projectService.getProjectMetadata();
       if (res.success) {
@@ -182,22 +212,24 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
           } catch (_) {}
         }
       }
-    } catch (err) {
-      console.error('[fetchMetadata Error]:', err);
+    } catch (err: any) {
+      if (!err?.message?.includes('permission') && !err?.message?.includes('Access denied')) {
+        console.error('[fetchMetadata Error]:', err);
+      }
     }
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasProjectPermission]);
 
   // Initial Data Load
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasProjectPermission) return;
     fetchProjects();
-  }, [fetchProjects, isAuthenticated, isAuthChecking]);
+  }, [fetchProjects, isAuthenticated, isAuthChecking, isPublicPage, hasProjectPermission]);
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasProjectPermission) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking, isPublicPage, hasProjectPermission]);
 
   // Filters & Pagination Helpers
   const setFilters = useCallback((newFilters: Partial<ProjectFilter>) => {
@@ -380,10 +412,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
 export const useProject = (): ProjectContextType => {
   const context = useContext(ProjectContext);
-  if (!context) {
-    throw new Error('useProject must be used within a ProjectProvider');
-  }
-  return context;
+  return context || DEFAULT_PROJECT_CONTEXT_VALUE;
 };
 
 export default ProjectContext;

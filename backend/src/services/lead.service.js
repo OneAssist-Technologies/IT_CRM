@@ -1568,11 +1568,11 @@ export async function createLeadNegotiationService(data, user = {}) {
     throw err;
   }
 
-  // Conditional follow-up date validation: required when status is "Awaiting Client"
+  // Conditional follow-up date: if status is "Awaiting Client" and date not supplied, auto-default to +3 days
   if (status === 'Awaiting Client' && (!nextFollowUpDate || !nextFollowUpDate.trim())) {
-    const err = new Error('Next Follow-up Date is required when status is Awaiting Client');
-    err.status = 400;
-    throw err;
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    nextFollowUpDate = d.toISOString().split('T')[0];
   }
 
   const numQuoted = Math.max(0, parseFloat(quotedAmount) || 0);
@@ -1700,26 +1700,33 @@ export async function updateLeadNegotiationService(id, data, user = {}) {
 
   const targetStatus = status !== undefined ? status : existing.status;
 
+  let finalFollowUpDate =
+    nextFollowUpDate !== undefined
+      ? nextFollowUpDate && typeof nextFollowUpDate === 'string'
+        ? nextFollowUpDate.trim()
+        : nextFollowUpDate || null
+      : existing.nextFollowUpDate;
+
   if (targetStatus === 'Awaiting Client') {
-    const checkDate = nextFollowUpDate !== undefined ? nextFollowUpDate : existing.nextFollowUpDate;
-    if (!checkDate || !checkDate.trim()) {
-      const err = new Error('Next Follow-up Date is required when status is Awaiting Client');
-      err.status = 400;
-      throw err;
+    if (!finalFollowUpDate || (typeof finalFollowUpDate === 'string' && !finalFollowUpDate.trim())) {
+      // Auto-assign default follow-up date (+3 days from today) to prevent quick status changes from failing
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      finalFollowUpDate = d.toISOString().split('T')[0];
     }
   }
 
-  const numQuoted = quotedAmount !== undefined ? Math.max(0, parseFloat(quotedAmount) || 0) : existing.quotedAmount;
+  const numQuoted = quotedAmount !== undefined ? Math.max(0, parseFloat(quotedAmount) || 0) : (Number(existing.quotedAmount) || 0);
   let numDiscountPct =
     discountPercentage !== undefined
       ? Math.max(0, parseFloat(discountPercentage) || 0)
-      : existing.discountPercentage;
+      : (Number(existing.discountPercentage) || 0);
   let numExpected =
     expectedFinalAmount !== undefined
       ? Math.max(0, parseFloat(expectedFinalAmount) || 0)
-      : existing.expectedFinalAmount;
+      : (Number(existing.expectedFinalAmount) || 0);
 
-  let calcDiscountAmount = existing.discountAmount;
+  let calcDiscountAmount = Number(existing.discountAmount) || 0;
   if (expectedFinalAmount !== undefined && numQuoted > 0) {
     calcDiscountAmount = Math.max(0, numQuoted - numExpected);
     numDiscountPct = Math.round(((numQuoted - numExpected) / numQuoted) * 100);
@@ -1728,17 +1735,20 @@ export async function updateLeadNegotiationService(id, data, user = {}) {
     numExpected = Math.max(0, numQuoted - calcDiscountAmount);
   }
 
-  const finalFollowUpDate =
-    nextFollowUpDate !== undefined
-      ? nextFollowUpDate
-        ? nextFollowUpDate.trim()
-        : null
-      : existing.nextFollowUpDate;
-
-  const existingHistory = Array.isArray(existing.discussionHistory) ? existing.discussionHistory : [];
+  let existingHistory = [];
+  if (Array.isArray(existing.discussionHistory)) {
+    existingHistory = existing.discussionHistory;
+  } else if (typeof existing.discussionHistory === 'string') {
+    try {
+      const parsed = JSON.parse(existing.discussionHistory);
+      existingHistory = Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      existingHistory = [];
+    }
+  }
   let updatedHistory = existingHistory;
 
-  if (notes && notes.trim() !== existing.notes) {
+  if (notes && typeof notes === 'string' && notes.trim() !== (existing.notes || '')) {
     const authorName = user?.name || assignedToName || existing.assignedToName || 'System';
     const newEntry = {
       id: `entry-${Date.now()}`,
@@ -1754,15 +1764,15 @@ export async function updateLeadNegotiationService(id, data, user = {}) {
 
   const updatePayload = {
     ...(leadId !== undefined && { leadId }),
-    ...(leadName !== undefined && { leadName: leadName.trim() }),
-    ...(clientName !== undefined && { clientName: clientName.trim() }),
+    ...(leadName !== undefined && { leadName: typeof leadName === 'string' ? leadName.trim() : leadName }),
+    ...(clientName !== undefined && { clientName: typeof clientName === 'string' ? clientName.trim() : clientName }),
     ...(contactId !== undefined && { contactId }),
     ...(quotationId !== undefined && { quotationId }),
-    ...(quotationNumber !== undefined && { quotationNumber: quotationNumber?.trim() || null }),
+    ...(quotationNumber !== undefined && { quotationNumber: typeof quotationNumber === 'string' ? quotationNumber.trim() : null }),
     ...(proposalId !== undefined && { proposalId }),
-    ...(proposalNumber !== undefined && { proposalNumber: proposalNumber?.trim() || null }),
+    ...(proposalNumber !== undefined && { proposalNumber: typeof proposalNumber === 'string' ? proposalNumber.trim() : null }),
     ...(assignedTo !== undefined && { assignedTo }),
-    ...(assignedToName !== undefined && { assignedToName: assignedToName.trim() }),
+    ...(assignedToName !== undefined && { assignedToName: typeof assignedToName === 'string' ? assignedToName.trim() : assignedToName }),
     ...(negotiationDate !== undefined && { negotiationDate }),
     ...(status !== undefined && { status }),
     quotedAmount: numQuoted,
@@ -1770,13 +1780,13 @@ export async function updateLeadNegotiationService(id, data, user = {}) {
     discountPercentage: numDiscountPct,
     discountAmount: calcDiscountAmount,
     ...(paymentTerms !== undefined && { paymentTerms }),
-    ...(scopeChanges !== undefined && { scopeChanges: scopeChanges?.trim() || null }),
-    ...(deliveryTimeline !== undefined && { deliveryTimeline: deliveryTimeline?.trim() || null }),
-    ...(clientRequirements !== undefined && { clientRequirements: clientRequirements?.trim() || null }),
-    ...(notes !== undefined && { notes: notes?.trim() || null }),
+    ...(scopeChanges !== undefined && { scopeChanges: typeof scopeChanges === 'string' ? scopeChanges.trim() : null }),
+    ...(deliveryTimeline !== undefined && { deliveryTimeline: typeof deliveryTimeline === 'string' ? deliveryTimeline.trim() : deliveryTimeline || null }),
+    ...(clientRequirements !== undefined && { clientRequirements: typeof clientRequirements === 'string' ? clientRequirements.trim() : null }),
+    ...(notes !== undefined && { notes: typeof notes === 'string' ? notes.trim() : null }),
     nextFollowUpDate: finalFollowUpDate,
     discussionHistory: updatedHistory,
-    ...(lossReason !== undefined && { lossReason: lossReason?.trim() || null }),
+    ...(lossReason !== undefined && { lossReason: typeof lossReason === 'string' ? lossReason.trim() : null }),
   };
 
   const updated = await prisma.negotiation.update({

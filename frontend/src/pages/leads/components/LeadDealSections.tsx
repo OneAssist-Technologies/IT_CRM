@@ -1108,6 +1108,19 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
   const handleStatusChange = (newStatus: string | null) => {
     const st = (newStatus as NegotiationStatus) || 'In Progress';
     setFormStatus(st);
+    if (st === 'Awaiting Client' && (!formNextFollowUpDate || !formNextFollowUpDate.trim())) {
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      setFormNextFollowUpDate(`${yyyy}-${mm}-${dd}`);
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.nextFollowUpDate;
+        return next;
+      });
+    }
     if (st !== 'Awaiting Client') {
       setErrors((prev) => {
         const next = { ...prev };
@@ -1252,16 +1265,31 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
   // Quick Update Status
   const handleQuickStatusChange = async (neg: Negotiation, newStatus: NegotiationStatus) => {
     try {
-      await leadService.updateNegotiation(neg.id, {
+      const payload: any = {
         status: newStatus,
         notes: `Status updated to ${newStatus} from Negotiation list view.`,
-      });
+      };
+      if (newStatus === 'Awaiting Client') {
+        const existingFollowUp = neg.nextFollowUpDate;
+        if (!existingFollowUp || !existingFollowUp.trim()) {
+          const d = new Date();
+          d.setDate(d.getDate() + 3);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          payload.nextFollowUpDate = `${yyyy}-${mm}-${dd}`;
+        } else {
+          payload.nextFollowUpDate = existingFollowUp.trim();
+        }
+      }
+
+      await leadService.updateNegotiation(neg.id, payload);
       notifications.show({
         title: newStatus === 'Won' ? 'Negotiation Won! 🎉' : 'Status Updated',
         message:
           newStatus === 'Won'
             ? `${neg.negotiationId} commercial terms accepted. Ready for Contract.`
-            : `${neg.negotiationId} status changed to ${newStatus}.`,
+            : `${neg.negotiationId} status changed to ${newStatus}.${payload.nextFollowUpDate ? ` Next follow-up set for ${payload.nextFollowUpDate}.` : ''}`,
         color: newStatus === 'Won' ? 'teal' : newStatus === 'Lost' ? 'red' : 'blue',
       });
       if (onUpdateNegotiation && legacyNegotiation) {
@@ -1289,15 +1317,30 @@ export const LeadNegotiationSection: React.FC<LeadNegotiationSectionProps> = ({
   };
 
   const handleDetailsStatusChange = async (newStatus: string) => {
-    if (!detailsNegotiation || detailsNegotiation.status === newStatus) return;
+    if (!detailsNegotiation) return;
     try {
-      await leadService.updateNegotiation(detailsNegotiation.id, {
+      const payload: any = {
         status: newStatus as NegotiationStatus,
-      });
-      setDetailsNegotiation((prev) => (prev ? { ...prev, status: newStatus as NegotiationStatus } : null));
+      };
+      if (newStatus === 'Awaiting Client') {
+        const existingFollowUp = detailsNegotiation.nextFollowUpDate;
+        if (!existingFollowUp || !existingFollowUp.trim()) {
+          const d = new Date();
+          d.setDate(d.getDate() + 3);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, '0');
+          const dd = String(d.getDate()).padStart(2, '0');
+          payload.nextFollowUpDate = `${yyyy}-${mm}-${dd}`;
+        } else {
+          payload.nextFollowUpDate = existingFollowUp.trim();
+        }
+      }
+
+      const res = await leadService.updateNegotiation(detailsNegotiation.id, payload);
+      setDetailsNegotiation((prev) => (prev ? { ...prev, ...payload, ...(res || {}) } : null));
       notifications.show({
         title: 'Status Updated',
-        message: `Negotiation status changed to ${newStatus}.`,
+        message: `Negotiation status changed to ${newStatus}.${payload.nextFollowUpDate ? ` Next follow-up set for ${payload.nextFollowUpDate}.` : ''}`,
         color: 'blue',
       });
       await loadData();

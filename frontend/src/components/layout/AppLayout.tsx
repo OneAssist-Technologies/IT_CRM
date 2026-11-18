@@ -424,7 +424,7 @@ export const AppLayout: React.FC = () => {
                 sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
               }
               setActiveNav('contacts');
-              window.dispatchEvent(new CustomEvent('crm_contacts_updated'));
+              window.dispatchEvent(new CustomEvent('crm_contacts_updated', { detail: { targetTab: 'ASSIGNED' } }));
             }}
           />
         );
@@ -574,7 +574,14 @@ export const AppLayout: React.FC = () => {
       case 'setting':
       case 'master-catalog':
       case 'catalog': {
-        if (!can('settings', 'view') && !isSuperAdmin) {
+        const hasSettingsAccess =
+          isSuperAdmin ||
+          can('settings', 'view') ||
+          can('myprofile', 'view') ||
+          can('company_profile', 'view') ||
+          can('calendar', 'view') ||
+          can('project_catalog', 'view');
+        if (!hasSettingsAccess) {
           return (
             <AccessRestrictedView
               moduleName="Settings"

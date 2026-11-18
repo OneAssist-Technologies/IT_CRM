@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { delCache } from '../config/redis.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 let isSyncingCompletedLeads = false;
 
