@@ -1545,22 +1545,34 @@ export async function getInvoicesService(query = {}, currentUser = null) {
 
   // Process invoices with computed paymentStatus and unpacked metadata
   const processed = invoices.map((inv) => {
-    let effectiveStatus = inv.status;
+    let effectiveStatus = inv.status || 'Draft';
     let computedPaymentStatus = 'Unpaid';
 
     if (effectiveStatus === 'Cancelled') {
       computedPaymentStatus = 'Cancelled';
-    } else if (effectiveStatus === 'Paid' || inv.outstandingBalance <= 0.05) {
+    } else if (effectiveStatus === 'Void') {
+      computedPaymentStatus = 'Void';
+    } else if (effectiveStatus === 'Paid' || (inv.grandTotal > 0 && inv.outstandingBalance <= 0.05)) {
       computedPaymentStatus = 'Paid';
       effectiveStatus = 'Paid';
-    } else if (inv.dueDate < today && inv.outstandingBalance > 0) {
+    } else if (effectiveStatus === 'Overdue') {
+      effectiveStatus = 'Overdue';
+      computedPaymentStatus = inv.amountPaid > 0 ? 'Partially Paid' : 'Overdue';
+    } else if (effectiveStatus === 'Partially Paid') {
+      effectiveStatus = 'Partially Paid';
+      computedPaymentStatus = 'Partially Paid';
+    } else if (effectiveStatus === 'Sent' || effectiveStatus === 'Viewed') {
+      computedPaymentStatus = inv.amountPaid > 0 ? 'Partially Paid' : (inv.dueDate && inv.dueDate < today && inv.outstandingBalance > 0 ? 'Overdue' : 'Unpaid');
+    } else if (inv.dueDate && inv.dueDate < today && inv.outstandingBalance > 0) {
       computedPaymentStatus = 'Overdue';
       if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
         effectiveStatus = 'Overdue';
       }
     } else if (inv.amountPaid > 0 && inv.outstandingBalance > 0) {
       computedPaymentStatus = 'Partially Paid';
-      effectiveStatus = 'Partially Paid';
+      if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
+        effectiveStatus = 'Partially Paid';
+      }
     } else {
       computedPaymentStatus = 'Unpaid';
     }
@@ -1646,22 +1658,34 @@ export async function getInvoiceByIdService(id, currentUser = null) {
   }
 
   const today = new Date().toISOString().split('T')[0];
-  let effectiveStatus = invoice.status;
+  let effectiveStatus = invoice.status || 'Draft';
   let computedPaymentStatus = 'Unpaid';
 
   if (effectiveStatus === 'Cancelled') {
     computedPaymentStatus = 'Cancelled';
-  } else if (effectiveStatus === 'Paid' || invoice.outstandingBalance <= 0.05) {
+  } else if (effectiveStatus === 'Void') {
+    computedPaymentStatus = 'Void';
+  } else if (effectiveStatus === 'Paid' || (invoice.grandTotal > 0 && invoice.outstandingBalance <= 0.05)) {
     computedPaymentStatus = 'Paid';
     effectiveStatus = 'Paid';
-  } else if (invoice.dueDate < today && invoice.outstandingBalance > 0) {
+  } else if (effectiveStatus === 'Overdue') {
+    effectiveStatus = 'Overdue';
+    computedPaymentStatus = invoice.amountPaid > 0 ? 'Partially Paid' : 'Overdue';
+  } else if (effectiveStatus === 'Partially Paid') {
+    effectiveStatus = 'Partially Paid';
+    computedPaymentStatus = 'Partially Paid';
+  } else if (effectiveStatus === 'Sent' || effectiveStatus === 'Viewed') {
+    computedPaymentStatus = invoice.amountPaid > 0 ? 'Partially Paid' : (invoice.dueDate && invoice.dueDate < today && invoice.outstandingBalance > 0 ? 'Overdue' : 'Unpaid');
+  } else if (invoice.dueDate && invoice.dueDate < today && invoice.outstandingBalance > 0) {
     computedPaymentStatus = 'Overdue';
     if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
       effectiveStatus = 'Overdue';
     }
   } else if (invoice.amountPaid > 0 && invoice.outstandingBalance > 0) {
     computedPaymentStatus = 'Partially Paid';
-    effectiveStatus = 'Partially Paid';
+    if (effectiveStatus === 'Issued' || effectiveStatus === 'Draft') {
+      effectiveStatus = 'Partially Paid';
+    }
   } else {
     computedPaymentStatus = 'Unpaid';
   }
@@ -2202,13 +2226,23 @@ export async function updateInvoiceService(id, data, user) {
       headerAmountPaid = Number((existing.grandTotal / 2).toFixed(2));
       headerOutstanding = Number((existing.grandTotal - headerAmountPaid).toFixed(2));
     }
-  } else if (data.amountPaid !== undefined || data.advanceAmount !== undefined) {
+  } else if (data.status) {
+    newStatus = data.status;
+    if (newStatus === 'Overdue' && headerOutstanding <= 0) {
+      headerOutstanding = existing.grandTotal;
+      headerAmountPaid = 0;
+    }
+  }
+
+  if (data.amountPaid !== undefined || data.advanceAmount !== undefined) {
     headerAmountPaid = Math.max(0, Math.min(existing.grandTotal, Number(data.amountPaid ?? data.advanceAmount ?? 0)));
     headerOutstanding = Math.max(0, Number((existing.grandTotal - headerAmountPaid).toFixed(2)));
-    if (headerAmountPaid >= existing.grandTotal && existing.grandTotal > 0) {
-      newStatus = 'Paid';
-    } else if (headerAmountPaid > 0) {
-      newStatus = 'Partially Paid';
+    if (!data.status) {
+      if (headerAmountPaid >= existing.grandTotal && existing.grandTotal > 0) {
+        newStatus = 'Paid';
+      } else if (headerAmountPaid > 0) {
+        newStatus = 'Partially Paid';
+      }
     }
   }
 
@@ -2845,4 +2879,92 @@ export async function getBillingAuditLogsService(query = {}) {
   });
 
   return logs;
+}
+
+/**
+ * -----------------------------------------------------------------------------
+ * 11. DOCUMENT LOOKUP FOR QUOTATION IMPORT
+ * -----------------------------------------------------------------------------
+ */
+export async function lookupDocumentItemsService(code) {
+  if (!code) return null;
+  const rawCode = String(code).trim();
+  const invMatch = rawCode.match(/(INV-\d{4}-\d+|INV-\d+|QUO-\d{4}-\d+|QUO-\d+)/i);
+  const targetCode = (invMatch ? invMatch[0] : rawCode).toUpperCase();
+
+  // 1. Try Invoice lookup
+  if (targetCode.startsWith('INV') || !targetCode.startsWith('QUO')) {
+    const inv = await prisma.invoice.findFirst({
+      where: {
+        OR: [
+          { invoiceNumber: { equals: targetCode, mode: 'insensitive' } },
+          { invoiceNumber: { contains: targetCode, mode: 'insensitive' } },
+        ],
+      },
+      include: { items: true },
+    });
+
+    if (inv && Array.isArray(inv.items) && inv.items.length > 0) {
+      return {
+        sourceType: 'invoice',
+        referenceNumber: inv.invoiceNumber,
+        clientName: inv.contactName || inv.companyName || '',
+        totalAmount: inv.grandTotal,
+        subtotal: inv.subtotal,
+        taxAmount: inv.taxAmount,
+        notes: inv.notes,
+        termsConditions: inv.termsConditions,
+        items: inv.items.map((it) => ({
+          itemName: it.itemName || it.description || 'Service',
+          itemType: it.itemType || 'Service',
+          description: it.description || '',
+          quantity: Number(it.quantity) || 1,
+          unitPrice: Number(it.unitPrice) || 0,
+          discount: Number(it.discount) || 0,
+          discountType: 'percentage',
+          taxRate: Number(it.taxRate) || 18,
+          taxAmount: Number(it.taxAmount) || 0,
+          totalAmount: Number(it.totalAmount) || 0,
+        })),
+      };
+    }
+  }
+
+  // 2. Try Quotation lookup
+  const quo = await prisma.quotation.findFirst({
+    where: {
+      OR: [
+        { quotationNumber: { equals: targetCode, mode: 'insensitive' } },
+        { quotationNumber: { contains: targetCode, mode: 'insensitive' } },
+      ],
+    },
+    include: { items: true },
+  });
+
+  if (quo && Array.isArray(quo.items) && quo.items.length > 0) {
+    return {
+      sourceType: 'quotation',
+      referenceNumber: quo.quotationNumber,
+      clientName: quo.contactName || quo.companyName || '',
+      totalAmount: quo.grandTotal || quo.totalAmount,
+      subtotal: quo.subtotal,
+      taxAmount: quo.taxAmount,
+      notes: quo.notes,
+      termsConditions: quo.termsConditions,
+      items: quo.items.map((it) => ({
+        itemName: it.itemName || it.description || 'Service',
+        itemType: it.itemType || 'Service',
+        description: it.description || '',
+        quantity: Number(it.quantity) || 1,
+        unitPrice: Number(it.unitPrice) || 0,
+        discount: Number(it.discount) || 0,
+        discountType: it.discountType || 'percentage',
+        taxRate: Number(it.taxRate) || 18,
+        taxAmount: Number(it.taxAmount) || 0,
+        totalAmount: Number(it.totalAmount) || 0,
+      })),
+    };
+  }
+
+  return null;
 }

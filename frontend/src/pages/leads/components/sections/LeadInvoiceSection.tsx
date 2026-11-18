@@ -33,6 +33,7 @@ import {
   IconArrowLeft,
   IconX,
   IconCash,
+  IconUpload,
 } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { Lead, LeadInvoiceItem, Contract } from '../../../../types/lead';
@@ -78,6 +79,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
   const [backendInvoices, setBackendInvoices] = useState<Invoice[]>([]);
 
   const [createModalOpened, setCreateModalOpened] = useState<boolean>(false);
+  const [isImportModal, setIsImportModal] = useState<boolean>(false);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [modalKey, setModalKey] = useState<number>(0);
   const [printingInvoice, setPrintingInvoice] = useState<Invoice | null>(null);
@@ -137,6 +139,9 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
 
       // Filter invoices belonging to this lead
       const matching = invoiceList.filter((inv: Invoice) => {
+        if ((inv as any).leadId && ((inv as any).leadId === lead.id || (inv as any).leadId === lead.leadId)) {
+          return true;
+        }
         if (inv.contactId && (inv.contactId === lead.id || inv.contactId === lead.leadId)) {
           return true;
         }
@@ -152,8 +157,10 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
       });
 
       setBackendInvoices(matching);
+      return matching;
     } catch (err: any) {
       console.error('Error fetching invoices:', err);
+      return [];
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -302,7 +309,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
   };
 
   const handleInvoiceSuccess = async () => {
-    await fetchInvoices();
+    const freshList = await fetchInvoices();
     setCreateModalOpened(false);
     setEditingInvoice(null);
     notifications.show({
@@ -310,8 +317,8 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
       message: 'Tax invoice updated and live synced with billing records.',
       color: 'teal',
     });
-    if (onUpdateInvoices) {
-      onUpdateInvoices(backendInvoices as any);
+    if (onUpdateInvoices && freshList) {
+      onUpdateInvoices(freshList as any);
     }
   };
 
@@ -329,6 +336,20 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         patchData.outstandingBalance = invoiceObj.grandTotal;
       }
 
+      // Optimistic update of local UI state
+      setBackendInvoices((prev) =>
+        prev.map((item) =>
+          item.id === invoiceObj.id || item.invoiceNumber === invoiceObj.invoiceNumber
+            ? {
+                ...item,
+                status: (patchData.status || newStatus) as any,
+                ...(patchData.amountPaid !== undefined ? { amountPaid: patchData.amountPaid } : {}),
+                ...(patchData.outstandingBalance !== undefined ? { outstandingBalance: patchData.outstandingBalance } : {}),
+              }
+            : item
+        )
+      );
+
       await billingService.updateInvoice(invoiceObj.id, patchData);
 
       notifications.show({
@@ -338,9 +359,9 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         icon: <IconCheck size={16} />,
       });
 
-      await fetchInvoices();
-      if (onUpdateInvoices) {
-        onUpdateInvoices(backendInvoices as any);
+      const freshList = await fetchInvoices();
+      if (onUpdateInvoices && freshList) {
+        onUpdateInvoices(freshList as any);
       }
     } catch (err: any) {
       notifications.show({
@@ -348,6 +369,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         message: err.message || 'Could not update invoice status.',
         color: 'red',
       });
+      await fetchInvoices();
     } finally {
       setLoading(false);
     }
@@ -362,6 +384,14 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
     try {
       setLoading(true);
       const invoiceObj = resolveInvoiceObject(inv);
+      // Optimistic update
+      setBackendInvoices((prev) =>
+        prev.map((item) =>
+          item.id === invoiceObj.id || item.invoiceNumber === invoiceObj.invoiceNumber
+            ? { ...item, status: 'Paid' as any, amountPaid: invoiceObj.grandTotal, outstandingBalance: 0 }
+            : item
+        )
+      );
       await billingService.updateInvoice(invoiceObj.id, {
         status: 'Paid',
       });
@@ -373,9 +403,9 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         icon: <IconCheck size={16} />,
       });
 
-      await fetchInvoices();
-      if (onUpdateInvoices) {
-        onUpdateInvoices(backendInvoices as any);
+      const freshList = await fetchInvoices();
+      if (onUpdateInvoices && freshList) {
+        onUpdateInvoices(freshList as any);
       }
     } catch (err: any) {
       notifications.show({
@@ -383,6 +413,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         message: err.message || 'Could not mark invoice as Paid.',
         color: 'red',
       });
+      await fetchInvoices();
     } finally {
       setLoading(false);
     }
@@ -392,6 +423,14 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
     try {
       setLoading(true);
       const invoiceObj = resolveInvoiceObject(inv);
+      // Optimistic update
+      setBackendInvoices((prev) =>
+        prev.map((item) =>
+          item.id === invoiceObj.id || item.invoiceNumber === invoiceObj.invoiceNumber
+            ? { ...item, status: 'Issued' as any, amountPaid: 0, outstandingBalance: invoiceObj.grandTotal }
+            : item
+        )
+      );
       await billingService.updateInvoice(invoiceObj.id, {
         status: 'Issued',
         amountPaid: 0,
@@ -402,9 +441,9 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         color: 'blue',
         icon: <IconClock size={16} />,
       });
-      await fetchInvoices();
-      if (onUpdateInvoices) {
-        onUpdateInvoices(backendInvoices as any);
+      const freshList = await fetchInvoices();
+      if (onUpdateInvoices && freshList) {
+        onUpdateInvoices(freshList as any);
       }
     } catch (err: any) {
       notifications.show({
@@ -412,6 +451,7 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         message: err.message || 'Could not update status.',
         color: 'red',
       });
+      await fetchInvoices();
     } finally {
       setLoading(false);
     }
@@ -464,6 +504,14 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
 
 
   const handleOpenCreateInvoice = () => {
+    setIsImportModal(false);
+    setEditingInvoice(null);
+    setModalKey((k) => k + 1);
+    setCreateModalOpened(true);
+  };
+
+  const handleOpenImportInvoice = () => {
+    setIsImportModal(true);
     setEditingInvoice(null);
     setModalKey((k) => k + 1);
     setCreateModalOpened(true);
@@ -475,8 +523,10 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         <InvoiceModal
           key={createModalOpened ? (editingInvoice ? `edit-${editingInvoice.id}-${modalKey}` : `fresh-${modalKey}`) : 'closed'}
           opened={createModalOpened}
+          isImport={isImportModal}
           onClose={() => {
             setCreateModalOpened(false);
+            setIsImportModal(false);
             setEditingInvoice(null);
           }}
           invoice={editingInvoice}
@@ -511,6 +561,20 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         </div>
 
         <Group gap="xs">
+          <Button
+            size="sm"
+            variant="light"
+            color="indigo"
+            leftSection={<IconUpload size={15} />}
+            onClick={handleOpenImportInvoice}
+            style={{
+              borderRadius: 10,
+              fontWeight: 700,
+            }}
+          >
+            Import Invoice
+          </Button>
+
           <Button
             size="sm"
             leftSection={<IconPlus size={15} />}
@@ -576,16 +640,26 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
               <Text size="xs" c="dimmed" style={{ maxWidth: 340, textAlign: 'center' }}>
                 No tax invoices have been generated for {lead.name}. Click below to build a GST invoice using the full invoice generator.
               </Text>
-              <Button
-                size="xs"
-                color="blue"
-                variant="light"
-                leftSection={<IconPlus size={13} />}
-                onClick={handleOpenCreateInvoice}
-                mt={4}
-              >
-                Create Tax Invoice
-              </Button>
+              <Group gap="xs" mt={4}>
+                <Button
+                  size="xs"
+                  color="indigo"
+                  variant="light"
+                  leftSection={<IconUpload size={13} />}
+                  onClick={handleOpenImportInvoice}
+                >
+                  Import Invoice
+                </Button>
+                <Button
+                  size="xs"
+                  color="blue"
+                  variant="filled"
+                  leftSection={<IconPlus size={13} />}
+                  onClick={handleOpenCreateInvoice}
+                >
+                  Create Tax Invoice
+                </Button>
+              </Group>
             </Stack>
           </Center>
         ) : (
@@ -876,8 +950,10 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         <InvoiceModal
           key={modalKey}
           opened={createModalOpened}
+          isImport={isImportModal}
           onClose={() => {
             setCreateModalOpened(false);
+            setIsImportModal(false);
             setEditingInvoice(null);
           }}
           onSuccess={handleInvoiceSuccess}
@@ -893,10 +969,10 @@ export const LeadInvoiceSection: React.FC<LeadInvoiceSectionProps> = ({
         invoice={payingInvoice}
         contractValue={leadContractValue}
         onSuccess={async () => {
-          await fetchInvoices();
+          const freshList = await fetchInvoices();
           setRecordPaymentOpened(false);
-          if (onUpdateInvoices) {
-            onUpdateInvoices(backendInvoices as any);
+          if (onUpdateInvoices && freshList) {
+            onUpdateInvoices(freshList as any);
           }
         }}
       />

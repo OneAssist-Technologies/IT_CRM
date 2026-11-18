@@ -388,3 +388,27 @@ export async function getBillingAuditLogs(req, res) {
     return sendError(res, error.message || 'Failed to fetch audit logs.', error.status || 500);
   }
 }
+
+// =============================================================================
+// 10. DOCUMENT LOOKUP FOR QUOTATION IMPORT
+// =============================================================================
+export async function getDocumentLookup(req, res) {
+  try {
+    const code = req.query.code || req.query.search;
+    if (!code) {
+      return sendError(res, 'Reference code or filename is required.', 400);
+    }
+    const result = await billingService.lookupDocumentItemsService(code);
+    if (!result) {
+      return sendError(res, `No invoice or quotation found matching "${code}".`, 404);
+    }
+    return sendSuccess(
+      res,
+      result,
+      `Found ${result.items.length} line items from ${result.sourceType} ${result.referenceNumber}.`
+    );
+  } catch (error) {
+    console.error('getDocumentLookup error:', error);
+    return sendError(res, error.message || 'Failed to lookup document items.', 500);
+  }
+}

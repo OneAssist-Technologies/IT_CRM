@@ -3,6 +3,7 @@ import { getCache, setCache, delCache } from '../config/redis.js';
 import { io } from '../utils/socket.js';
 import { recordActivity } from './activity.service.js';
 import { resolveLeadEmployeeFilter } from './lead.service.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 const CACHE_KEY_PREFIX = 'crm:meetings:';
 
@@ -147,6 +148,43 @@ export async function getMeetingsService(queryParams = {}, currentUser = null) {
   let where = 'WHERE 1=1';
   const params = [];
   let paramIdx = 1;
+
+  if (currentUser) {
+    const scope = await getDataScope(currentUser, 'scheduled_meetings');
+    const roleUpper = String(currentUser.role || '').toUpperCase();
+    const isSuperOrAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || scope === 'All';
+    if (!isSuperOrAdmin) {
+      const emp = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            ...(currentUser.email ? [{ email: { equals: currentUser.email, mode: 'insensitive' } }] : []),
+            ...(currentUser.name ? [{ name: { equals: currentUser.name, mode: 'insensitive' } }] : []),
+          ],
+        },
+      });
+
+      const userIdentifiers = [currentUser.id, emp?.id, emp?.empCode].filter(Boolean);
+      const userNames = [currentUser.name, emp?.name].filter(Boolean);
+      const userEmails = [currentUser.email, emp?.email].filter(Boolean);
+
+      const conditions = [];
+      for (const id of userIdentifiers) {
+        conditions.push(`m."employeeId" = $${paramIdx++}`);
+        params.push(id);
+      }
+      for (const name of userNames) {
+        conditions.push(`LOWER(m."employeeName") = LOWER($${paramIdx++})`);
+        params.push(name);
+      }
+      for (const email of userEmails) {
+        conditions.push(`LOWER(m."employeeEmail") = LOWER($${paramIdx++})`);
+        params.push(email);
+      }
+      if (conditions.length > 0) {
+        where += ` AND (${conditions.join(' OR ')})`;
+      }
+    }
+  }
 
   let matchedIds = [];
   if (leadId && leadId !== 'ALL') {
@@ -492,7 +530,7 @@ export async function createMeetingService(body) {
   const finalPurpose = (purpose || finalTitle).trim();
   const finalDate = meeting_date || meetingDate || date;
   const finalStartTime = (startTime || meeting_time || meetingTime || time || '10:00 AM').trim();
-  const finalEndTime = (endTime || finalStartTime).trim();
+  const finalEndTime = (endTime || '').trim();
   const finalType = meeting_type || meetingType || 'Virtual';
   const finalLocation = (location || meetingLocation || meeting_location || meetingLink || meeting_link || '').trim();
   const finalEmployeeName = (employeeName || assignedTo || assigned_to || 'Sandy').trim();

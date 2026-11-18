@@ -312,7 +312,7 @@ export async function updateLeadNegotiation(req, res) {
     });
   } catch (error) {
     console.error('updateLeadNegotiation error:', error);
-    return sendError(res, error.message || 'Failed to update negotiation', error.status || 400);
+    return sendError(res, error.message || 'Failed to update negotiation', error.status || 500);
   }
 }
 export const updateNegotiation = updateLeadNegotiation;

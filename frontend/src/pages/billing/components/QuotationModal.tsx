@@ -37,7 +37,10 @@ import {
   IconFile,
   IconArrowLeft,
   IconArrowRight,
+  IconCheck,
+  IconFileSpreadsheet,
 } from '@tabler/icons-react';
+import * as XLSX from 'xlsx';
 import { notifications } from '@mantine/notifications';
 import { Quotation, QuotationItem, ProductType } from '../../../types/billing';
 import { billingService } from '../../../services/billingService';
@@ -58,6 +61,7 @@ interface QuotationModalProps {
   onNavigateSection?: (section: any) => void;
   isRevision?: boolean;
   baseQuotation?: Quotation | null;
+  isImport?: boolean;
 }
 
 export const QuotationModal: React.FC<QuotationModalProps> = ({
@@ -70,6 +74,7 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
   onNavigateSection,
   isRevision = false,
   baseQuotation = null,
+  isImport = false,
 }) => {
   const isDark = useComputedColorScheme('light') === 'dark';
   const [submitting, setSubmitting] = useState(false);
@@ -133,6 +138,387 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
       totalAmount: 0,
     },
   ]);
+
+  // File upload & parsing state for Quotation Import
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [uploadedFileSize, setUploadedFileSize] = useState<string>('');
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
+  const [isParsingFile, setIsParsingFile] = useState<boolean>(false);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [referenceLookupInput, setReferenceLookupInput] = useState<string>('');
+  const [isLookingUpRef, setIsLookingUpRef] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Helper to download a ready-to-use sample CSV template for line items
+  const downloadSampleTemplate = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const csvContent =
+      'Item Name,Item Type,Description,Quantity,Unit Rate,Discount,GST Rate\n' +
+      'Custom CRM Web Application,Service,End-to-end CRM portal with lead tracking and client portal,1,250000,0,18\n' +
+      'Mobile App Development (Android & iOS),Service,React Native cross-platform mobile app,1,180000,0,18\n' +
+      'WhatsApp Business API Integration,Service,Official Meta Cloud API webhook & template automation,1,45000,0,18\n' +
+      'Cloud Server Setup & CI/CD Deployment,Service,AWS EC2 RDS Postgres setup with Docker & SSL,1,30000,0,18\n' +
+      'Annual Maintenance & Technical Support,Service,12 months bug fixes and performance monitoring,1,25000,0,18\n';
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Quotation_Import_Template_${initialLead?.name?.replace(/\s+/g, '_') || 'Sample'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper to map and apply extracted line items into state
+  const applyLoadedItems = (rawItems: any[], sourceLabel: string, terms?: string) => {
+    if (!Array.isArray(rawItems) || rawItems.length === 0) return false;
+
+    const mappedItems: QuotationItem[] = rawItems.map((it: any) => {
+      const qty = Number(it.quantity) || 1;
+      const price = Number(it.unitPrice) || 0;
+      const disc = Number(it.discount) || 0;
+      const discType = it.discountType || 'percentage';
+      const gross = qty * price;
+      const discAmt = discType === 'percentage' ? (gross * disc) / 100 : Math.min(gross, disc);
+      const base = Math.max(0, gross - discAmt);
+      const taxRate = it.taxRate !== undefined ? Number(it.taxRate) : 18;
+      const taxAmount = Number(((base * taxRate) / 100).toFixed(2));
+      const totalAmount = Number((base + taxAmount).toFixed(2));
+
+      return {
+        itemName: it.itemName || it.description || 'Service',
+        itemType: (it.itemType as any) || 'Service',
+        description: it.description || '',
+        quantity: qty,
+        unitPrice: price,
+        discount: disc,
+        discountType: discType,
+        taxRate,
+        taxAmount,
+        totalAmount,
+      };
+    });
+
+    setItems(mappedItems);
+    if (terms && !termsConditions) {
+      setTermsConditions(terms);
+    }
+
+    notifications.show({
+      title: 'Line Items Loaded Successfully',
+      message: `Extracted ${mappedItems.length} line items from ${sourceLabel}.`,
+      color: 'teal',
+      icon: <IconCheck size={16} />,
+    });
+
+    return true;
+  };
+
+  // Helper to parse uploaded file and auto-populate line items table
+  const parseQuotationFile = async (file: File) => {
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      notifications.show({
+        title: 'File Too Large',
+        message: 'Please upload a quotation document smaller than 10MB.',
+        color: 'red',
+      });
+      return;
+    }
+
+    const formattedSize =
+      file.size > 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(file.size / 1024)} KB`;
+
+    setUploadedFileName(file.name);
+    setUploadedFileSize(formattedSize);
+    setIsParsingFile(true);
+
+    // Save as Data URL for attachment
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setUploadedFileUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      // 1. SMART CHECK: If the file name references an Invoice or Quotation generated by the CRM
+      // e.g. "Invoice_INV-2026-000001_OneAssist.pdf" or "QUO-2026-1001"
+      const invMatch = file.name.match(/(INV-\d{4}-\d+|INV-\d+|QUO-\d{4}-\d+|QUO-\d+)/i);
+      if (invMatch) {
+        const docCode = invMatch[0].toUpperCase();
+        try {
+          const docRes = await billingService.lookupDocumentItems(docCode);
+          if (docRes && Array.isArray(docRes.items) && docRes.items.length > 0) {
+            applyLoadedItems(
+              docRes.items,
+              `${docRes.sourceType === 'invoice' ? 'Invoice' : 'Quotation'} #${docRes.referenceNumber}`,
+              docRes.termsConditions
+            );
+            setIsParsingFile(false);
+            return;
+          }
+        } catch (matchErr) {
+          console.warn('Smart document lookup skipped:', matchErr);
+        }
+      }
+
+      // 2. CHECK FILE FORMAT - NEVER pass binary PDF/DOC to XLSX.read (prevents browser freezing)
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+
+      // If it is a PDF file, check content streams for embedded reference codes
+      if (ext === 'pdf') {
+        try {
+          const sampleBuffer = await file.slice(0, 262144).arrayBuffer();
+          const rawSampleText = new TextDecoder('utf-8', { fatal: false }).decode(sampleBuffer);
+          const contentDocMatch = rawSampleText.match(/(INV-\d{4}-\d+|INV-\d+|QUO-\d{4}-\d+|QUO-\d+)/i);
+          if (contentDocMatch) {
+            const detectedCode = contentDocMatch[0].toUpperCase();
+            try {
+              const docRes = await billingService.lookupDocumentItems(detectedCode);
+              if (docRes && Array.isArray(docRes.items) && docRes.items.length > 0) {
+                applyLoadedItems(
+                  docRes.items,
+                  `${docRes.sourceType === 'invoice' ? 'Invoice' : 'Quotation'} #${docRes.referenceNumber} (detected in PDF)`,
+                  docRes.termsConditions
+                );
+                setIsParsingFile(false);
+                return;
+              }
+            } catch {}
+          }
+        } catch (pdfReadErr) {
+          console.warn('PDF stream inspection skipped:', pdfReadErr);
+        }
+      }
+
+      const isSpreadsheet = ['xlsx', 'xls', 'csv', 'tsv'].includes(ext);
+      if (!isSpreadsheet) {
+        // For PDF, Word, images, etc.: file is cleanly attached without heavy CPU scanning
+        notifications.show({
+          title: 'Quotation Document Attached',
+          message: `"${file.name}" attached successfully. You can review or enter line items in the table below, or enter reference code directly.`,
+          color: 'teal',
+          icon: <IconCheck size={16} />,
+        });
+        setIsParsingFile(false);
+        return;
+      }
+
+      // 3. SPREADSHEET PARSING (Only for .xlsx, .xls, .csv files)
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array', dense: true, cellDates: false });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error('Workbook contains no sheets.');
+      }
+      const worksheet = workbook.Sheets[firstSheetName];
+      const grid: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+      if (!grid || grid.length < 1) {
+        throw new Error('No readable data rows found in the uploaded file.');
+      }
+
+      // Try finding a header row (limit search to top 15 rows)
+      let headerRowIdx = -1;
+      let colName = -1;
+      let colType = -1;
+      let colDesc = -1;
+      let colQty = -1;
+      let colRate = -1;
+      let colDisc = -1;
+      let colTax = -1;
+
+      for (let r = 0; r < Math.min(15, grid.length); r++) {
+        const row = grid[r] || [];
+        const normRow = row.map((c) => String(c ?? '').toLowerCase().replace(/[^a-z0-9]/g, ''));
+
+        const findCol = (keys: string[]) => normRow.findIndex((c) => keys.some((k) => c === k || c.includes(k)));
+
+        const cName = findCol(['itemname', 'item', 'particulars', 'product', 'service', 'module', 'deliverable', 'description']);
+        const cRate = findCol(['unitrate', 'unitprice', 'rate', 'price', 'cost', 'amount']);
+
+        if (cName !== -1 && (cRate !== -1 || normRow.some((c) => ['qty', 'quantity'].includes(c)))) {
+          headerRowIdx = r;
+          colName = cName;
+          colType = findCol(['itemtype', 'type', 'category']);
+          colDesc = findCol(['description', 'desc', 'scope', 'details', 'specifications']);
+          colQty = findCol(['qty', 'quantity', 'units', 'count', 'nos']);
+          colRate = cRate;
+          colDisc = findCol(['discount', 'disc', 'itemdiscount']);
+          colTax = findCol(['taxrate', 'tax', 'gstrate', 'gst', 'gstpercent', 'vat']);
+          break;
+        }
+      }
+
+      const extractedItems: QuotationItem[] = [];
+
+      const parseNumber = (val: any, fallback = 0): number => {
+        if (val === undefined || val === null) return fallback;
+        if (typeof val === 'number') return isNaN(val) ? fallback : val;
+        const cleaned = String(val).replace(/[^0-9.-]/g, '');
+        const n = parseFloat(cleaned);
+        return isNaN(n) ? fallback : n;
+      };
+
+      const startRow = headerRowIdx !== -1 ? headerRowIdx + 1 : 0;
+      const maxRows = Math.min(grid.length, startRow + 100);
+
+      for (let i = startRow; i < maxRows; i++) {
+        const row = grid[i] || [];
+        if (!row || row.every((c: any) => String(c ?? '').trim() === '')) {
+          continue;
+        }
+
+        const firstCell = String(row[0] || '').trim().toLowerCase();
+        // Skip summary or footer rows
+        if (
+          firstCell.includes('subtotal') ||
+          firstCell.includes('grand total') ||
+          firstCell.includes('total:') ||
+          firstCell.includes('terms & conditions') ||
+          firstCell.includes('note:')
+        ) {
+          continue;
+        }
+
+        let name = '';
+        let desc = '';
+        let qty = 1;
+        let rate = 0;
+        let disc = 0;
+        let tax = 18;
+        let type: ProductType = 'Service';
+
+        if (headerRowIdx !== -1) {
+          name = colName !== -1 && row[colName] !== undefined ? String(row[colName]).trim() : '';
+          desc = colDesc !== -1 && colDesc !== colName && row[colDesc] !== undefined ? String(row[colDesc]).trim() : '';
+          qty = colQty !== -1 && row[colQty] !== undefined ? parseNumber(row[colQty], 1) : 1;
+          rate = colRate !== -1 && row[colRate] !== undefined ? parseNumber(row[colRate], 0) : 0;
+          disc = colDisc !== -1 && row[colDisc] !== undefined ? parseNumber(row[colDisc], 0) : 0;
+          tax = colTax !== -1 && row[colTax] !== undefined ? parseNumber(row[colTax], 18) : 18;
+          if (colType !== -1 && row[colType] !== undefined) {
+            type = String(row[colType]).toLowerCase().includes('prod') ? 'Product' : 'Service';
+          }
+        } else {
+          // Heuristic extraction for files without explicit headers:
+          const textCols = row.map((c: any, idx: number) => ({ idx, val: String(c ?? '').trim() })).filter((c) => c.val && isNaN(Number(c.val)));
+          const numCols = row.map((c: any, idx: number) => ({ idx, val: parseNumber(c, -1) })).filter((c) => c.val >= 0);
+
+          if (textCols.length > 0) {
+            name = textCols[0].val;
+            if (textCols.length > 1) desc = textCols[1].val;
+          }
+          if (numCols.length === 1) {
+            rate = numCols[0].val;
+          } else if (numCols.length >= 2) {
+            if (numCols[0].val <= 50 && numCols[1].val > 50) {
+              qty = numCols[0].val;
+              rate = numCols[1].val;
+            } else {
+              qty = 1;
+              rate = numCols[0].val;
+            }
+          }
+        }
+
+        if (!name && rate > 0) {
+          name = `Line Item ${extractedItems.length + 1}`;
+        }
+
+        if (name) {
+          if (qty <= 0) qty = 1;
+          const gross = qty * rate;
+          const discAmt = disc;
+          const base = Math.max(0, gross - discAmt);
+          const taxAmt = Number(((base * tax) / 100).toFixed(2));
+          const totalAmt = Number((base + taxAmt).toFixed(2));
+
+          extractedItems.push({
+            itemName: name,
+            itemType: type,
+            description: desc || undefined,
+            quantity: qty,
+            unitPrice: rate,
+            discount: disc,
+            discountType: 'fixed',
+            taxRate: tax,
+            taxAmount: taxAmt,
+            totalAmount: totalAmt,
+          });
+        }
+      }
+
+      if (extractedItems.length > 0) {
+        setItems(extractedItems);
+        notifications.show({
+          title: 'Quotation Parsed Successfully',
+          message: `Extracted ${extractedItems.length} line items from "${file.name}". You can review, adjust rates, or add items below.`,
+          color: 'teal',
+          icon: <IconCheck size={16} />,
+        });
+      } else {
+        notifications.show({
+          title: 'File Attached',
+          message: `Attached "${file.name}". Could not auto-detect line item table rows. You can specify line items manually below.`,
+          color: 'blue',
+        });
+      }
+    } catch (err: any) {
+      console.warn('Error reading quotation spreadsheet:', err);
+      notifications.show({
+        title: 'Parsing Notice',
+        message: 'Could not auto-parse tabular line items from this file format. The file has been attached, and you can enter items manually below.',
+        color: 'blue',
+      });
+    } finally {
+      setIsParsingFile(false);
+    }
+  };
+
+  // Helper to manually lookup and import line items from Invoice or Quotation code
+  const handleManualCodeLookup = async (codeToLookup?: string) => {
+    const code = (codeToLookup || referenceLookupInput).trim();
+    if (!code) {
+      notifications.show({
+        color: 'yellow',
+        message: 'Please enter a CRM Invoice or Quotation # (e.g. INV-2026-000001, QUO-2026-1007)',
+      });
+      return;
+    }
+    try {
+      setIsLookingUpRef(true);
+      const res = await billingService.lookupDocumentItems(code);
+      if (res && Array.isArray(res.items) && res.items.length > 0) {
+        applyLoadedItems(
+          res.items,
+          `${res.sourceType === 'invoice' ? 'Invoice' : 'Quotation'} #${res.referenceNumber}`,
+          res.termsConditions
+        );
+        if (!uploadedFileName) {
+          setUploadedFileName(`${res.sourceType === 'invoice' ? 'Invoice' : 'Quotation'}_${res.referenceNumber}.pdf`);
+          setUploadedFileSize('CRM Ref');
+        }
+      } else {
+        notifications.show({
+          color: 'orange',
+          message: `No line items found for reference "${code}".`,
+        });
+      }
+    } catch (err: any) {
+      notifications.show({
+        color: 'red',
+        message: err.message || `Could not find invoice or quotation "${code}".`,
+      });
+    } finally {
+      setIsLookingUpRef(false);
+    }
+  };
 
   // Load Contacts & Products on open
   useEffect(() => {
@@ -309,6 +695,10 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
       setTermsConditions('');
       setSelectedProjectId(null);
       setCustomRowIndices([]);
+      setUploadedFileName('');
+      setUploadedFileSize('');
+      setUploadedFileUrl('');
+      setReferenceLookupInput('');
       setItems([
         {
           itemName: '',
@@ -342,6 +732,10 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
       setTermsConditions('');
       setSelectedProjectId(null);
       setCustomRowIndices([]);
+      setUploadedFileName('');
+      setUploadedFileSize('');
+      setUploadedFileUrl('');
+      setReferenceLookupInput('');
       setItems([
         {
           itemName: '',
@@ -654,6 +1048,10 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
 
     try {
       setSubmitting(true);
+      const notesWithDoc = uploadedFileName && !notes.includes(uploadedFileName)
+        ? `${notes ? `${notes}\n\n` : ''}[Attached Quotation File: ${uploadedFileName} (${uploadedFileSize})]`
+        : notes;
+
       const payload: Partial<Quotation> = {
         contactId: contactId || null,
         leadId: initialLead?.id || quotation?.leadId || null,
@@ -671,10 +1069,13 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
         discountAmount: Number(overallDiscount.toFixed(2)),
         taxAmount: Number(totalTax.toFixed(2)),
         paymentTerms,
-        notes,
+        notes: notesWithDoc,
         termsConditions,
         grandTotal,
         subtotal: Number(netSubtotal.toFixed(2)),
+        documentName: uploadedFileName || quotation?.documentName || null,
+        documentSize: uploadedFileSize || quotation?.documentSize || null,
+        documentUrl: uploadedFileUrl || quotation?.documentUrl || null,
         items,
       };
 
@@ -699,7 +1100,7 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
         savedQuote = await billingService.createQuotation(payload);
         notifications.show({
           color: 'green',
-          message: 'Quotation created and saved in CRM database',
+          message: isImport ? 'Quotation imported and saved in CRM database' : 'Quotation created and saved in CRM database',
         });
       }
 
@@ -744,18 +1145,28 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
               width: 42,
               height: 42,
               borderRadius: 12,
-              background: isDark ? 'rgba(79, 70, 229, 0.2)' : '#EEF2FF',
+              background: isDark
+                ? isImport
+                  ? 'rgba(99, 102, 241, 0.25)'
+                  : 'rgba(79, 70, 229, 0.2)'
+                : isImport
+                ? '#EEF2FF'
+                : '#EEF2FF',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: isDark ? '#818CF8' : '#4F46E5',
             }}
           >
-            <IconCalculator size={22} stroke={1.8} />
+            {isImport ? <IconUpload size={22} stroke={1.8} /> : <IconCalculator size={22} stroke={1.8} />}
           </Box>
           <div>
             <Text fw={800} size="19px" style={{ color: isDark ? '#F8FAFC' : '#0F172A', lineHeight: 1.2 }}>
-              {isRevision && effectiveBase
+              {isImport
+                ? initialLead
+                  ? `Import Quotation • ${initialLead.name}`
+                  : 'Import Quotation Document'
+                : isRevision && effectiveBase
                 ? `Create Revision ${nextRevisionName} (${baseQuotationNumber}-${nextRevisionName})`
                 : quotation
                 ? `Edit Quotation (${quotation.quotationNumber})`
@@ -764,7 +1175,11 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
                 : 'Quotation Maker • New Quotation'}
             </Text>
             <Text size="xs" c="dimmed" mt={2}>
-              {isRevision && effectiveBase
+              {isImport
+                ? initialLead
+                  ? `Upload quotation document to automatically extract line items and save directly in CRM database for ${initialLead.name}`
+                  : 'Upload and extract line items directly from quotation spreadsheet'
+                : isRevision && effectiveBase
                 ? `Cloning line items and terms from ${effectiveBase.quotationNumber}. Historical version is preserved.`
                 : initialLead
                 ? `Build and save quotation for ${initialLead.name} (${initialLead.companyName || 'Lead'}) directly in CRM database`
@@ -972,6 +1387,218 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
               />
             </Grid.Col>
           </Grid>
+
+          {/* Quotation Document Upload & Line Items Extraction Section (ONLY visible in Import Quotation mode) */}
+          {isImport && (
+            <Paper
+              p="md"
+              withBorder
+              radius="lg"
+              style={{
+                background: isDark ? 'rgba(79, 70, 229, 0.08)' : '#F5F7FF',
+                border: isDark ? '1px dashed #6366F1' : '1px dashed #4F46E5',
+              }}
+            >
+              <Group justify="space-between" align="center" mb="xs" wrap="wrap">
+                <Group gap="xs">
+                  <ThemeIcon
+                    size="sm"
+                    radius="md"
+                    variant="light"
+                    color="indigo"
+                  >
+                    <IconUpload size={14} />
+                  </ThemeIcon>
+                  <Text fw={700} size="xs" tt="uppercase" style={{ letterSpacing: '0.05em', color: isDark ? '#A5B4FC' : '#4338CA' }}>
+                    Upload Quotation Document / Spreadsheet (Auto-Extracts Line Items)
+                  </Text>
+                  <Badge size="xs" variant="filled" color="indigo" radius="sm">
+                    Required for Auto-Extraction
+                  </Badge>
+                </Group>
+
+                <Group gap="xs">
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    color="indigo"
+                    leftSection={<IconDownload size={13} />}
+                    onClick={downloadSampleTemplate}
+                  >
+                    Download Sample CSV Template
+                  </Button>
+                </Group>
+              </Group>
+
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".xlsx,.xls,.csv,.txt,.pdf,.doc,.docx"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) parseQuotationFile(f);
+                }}
+              />
+
+              {!uploadedFileName ? (
+                <Box
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(true);
+                  }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragOver(false);
+                    const f = e.dataTransfer.files?.[0];
+                    if (f) parseQuotationFile(f);
+                  }}
+                  style={{
+                    border: isDark
+                      ? `2px dashed ${isDragOver ? '#818CF8' : '#334155'}`
+                      : `2px dashed ${isDragOver ? '#4F46E5' : '#CBD5E1'}`,
+                    borderRadius: 12,
+                    padding: '1.25rem 1rem',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    backgroundColor: isDark
+                      ? isDragOver
+                        ? 'rgba(99, 102, 241, 0.12)'
+                        : 'rgba(30, 41, 59, 0.5)'
+                      : isDragOver
+                      ? '#EEF2FF'
+                      : '#FFFFFF',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <Group justify="center" gap="sm">
+                    <ThemeIcon size={40} radius="xl" color="indigo" variant="light">
+                      <IconFileSpreadsheet size={22} />
+                    </ThemeIcon>
+                    <div style={{ textAlign: 'left' }}>
+                      <Text size="sm" fw={700} style={{ color: isDark ? '#F1F5F9' : '#1E293B' }}>
+                        Click to upload or drag & drop Quotation Document / Spreadsheet
+                      </Text>
+                      <Text size="xs" c="dimmed">
+                        Supports Excel (.xlsx, .xls), CSV (.csv), Word or PDF — auto-extracts Item Name, Quantity, Rates & GST
+                      </Text>
+                    </div>
+                  </Group>
+                </Box>
+              ) : (
+                <Paper
+                  p="xs"
+                  radius="md"
+                  style={{
+                    backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                    border: isDark ? '1px solid #334155' : '1px solid #E2E8F0',
+                  }}
+                >
+                  <Group justify="space-between" align="center" wrap="wrap">
+                    <Group gap="sm">
+                      <ThemeIcon size="md" radius="md" color="teal" variant="light">
+                        <IconFileDescription size={18} />
+                      </ThemeIcon>
+                      <div>
+                        <Group gap="xs">
+                          <Text size="sm" fw={700}>
+                            {uploadedFileName}
+                          </Text>
+                          <Badge size="xs" variant="light" color="teal">
+                            {uploadedFileSize}
+                          </Badge>
+                          <Badge
+                            size="xs"
+                            variant="filled"
+                            color={items.some((it) => it.itemName.trim()) ? 'teal' : 'gray'}
+                          >
+                            {items.some((it) => it.itemName.trim())
+                              ? `${items.filter((it) => it.itemName.trim()).length} Line ${
+                                  items.filter((it) => it.itemName.trim()).length === 1 ? 'Item' : 'Items'
+                                } Loaded`
+                              : 'File Attached'}
+                          </Badge>
+                        </Group>
+                        <Text size="11px" c="dimmed">
+                          Quotation file attached. Line items extracted and populated in the table below.
+                        </Text>
+                      </div>
+                    </Group>
+
+                    <Group gap="xs">
+                      <Button
+                        size="xs"
+                        variant="light"
+                        color="blue"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        Change File
+                      </Button>
+                      <ActionIcon
+                        size="sm"
+                        variant="subtle"
+                        color="red"
+                        onClick={() => {
+                          setUploadedFileName('');
+                          setUploadedFileSize('');
+                          setUploadedFileUrl('');
+                          if (fileInputRef.current) fileInputRef.current.value = '';
+                        }}
+                      >
+                        <IconTrash size={14} />
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                </Paper>
+              )}
+
+              {/* Quick Reference Code Lookup Bar */}
+              <Box
+                mt="xs"
+                p="xs"
+                style={{
+                  borderRadius: 8,
+                  backgroundColor: isDark ? 'rgba(30, 41, 59, 0.45)' : '#F1F5F9',
+                  border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                }}
+              >
+                <Group gap="xs" align="center" wrap="wrap">
+                  <Text size="xs" fw={700} style={{ color: isDark ? '#A5B4FC' : '#4338CA' }}>
+                    Quick Import:
+                  </Text>
+                  <TextInput
+                    placeholder="Enter Invoice or Quotation # (e.g. INV-2026-000001, QUO-2026-1007)..."
+                    value={referenceLookupInput}
+                    onChange={(e) => setReferenceLookupInput(e.currentTarget.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleManualCodeLookup();
+                      }
+                    }}
+                    size="xs"
+                    styles={{
+                      input: {
+                        minWidth: 260,
+                        backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+                      },
+                    }}
+                  />
+                  <Button
+                    size="xs"
+                    variant="filled"
+                    color="indigo"
+                    onClick={() => handleManualCodeLookup()}
+                    loading={isLookingUpRef}
+                  >
+                    Load Line Items
+                  </Button>
+                </Group>
+              </Box>
+            </Paper>
+          )}
 
           {/* Line Items Table */}
           <Paper
@@ -1314,6 +1941,7 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
               type="submit"
               radius="md"
               loading={submitting}
+              leftSection={isImport ? <IconUpload size={16} /> : <IconDeviceFloppy size={16} />}
               style={{
                 background: 'linear-gradient(135deg, #4F46E5 0%, #2563EB 100%)',
                 color: '#FFFFFF',
@@ -1323,7 +1951,13 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
                 boxShadow: '0 4px 12px rgba(79, 70, 229, 0.25)',
               }}
             >
-              {isRevision ? `Create Revision ${nextRevisionName}` : (quotation ? 'Update Quotation' : 'Create Quotation')}
+              {isRevision
+                ? `Create Revision ${nextRevisionName}`
+                : quotation
+                ? 'Update Quotation'
+                : isImport
+                ? 'Import & Save Quotation'
+                : 'Create Quotation'}
             </Button>
 
             {/* Conditional Navigation Buttons based on quotation status */}

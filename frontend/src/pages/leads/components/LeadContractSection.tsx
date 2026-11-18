@@ -988,13 +988,13 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
     if (!formClientName.trim()) newErrors.clientName = 'Client Name is required';
     if (!formContractDate) newErrors.contractDate = 'Contract Date is required';
     if (!formStartDate) newErrors.startDate = 'Start Date is required';
-    if (!formEndDate) newErrors.endDate = 'End Date is required';
+    if (!formEndDate) newErrors.endDate = 'Expected End Date is required';
 
     if (formStartDate && formEndDate) {
       const s = new Date(formStartDate).getTime();
       const e = new Date(formEndDate).getTime();
       if (!isNaN(s) && !isNaN(e) && e <= s) {
-        newErrors.endDate = 'End Date must be later than Start Date';
+        newErrors.endDate = 'Expected End Date must be later than Start Date';
       }
     }
 
@@ -2029,7 +2029,7 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
 
                 <Box>
                   <MeetingDatePicker
-                    label="End Date *"
+                    label="Expected End Date *"
                     value={formEndDate}
                     onChange={(d) => {
                       setFormEndDate(d);

@@ -43,28 +43,65 @@ async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}):
   }
 }
 
+// Helper to sanitize query parameters and strip out null/undefined values
+function buildCleanQueryString(params?: Record<string, any>): string {
+  if (!params) return '';
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, val]) => {
+    if (
+      val !== undefined &&
+      val !== null &&
+      val !== 'undefined' &&
+      val !== 'null' &&
+      String(val).trim() !== ''
+    ) {
+      searchParams.append(key, String(val).trim());
+    }
+  });
+  return searchParams.toString();
+}
+
 export const contactService = {
   // Get contacts list with search, filters, pagination, and sorting
   getContacts: async (
     params: ContactFilter = {}
   ): Promise<{ success: boolean; data: Contact[]; pagination: ContactPagination }> => {
     const query = new URLSearchParams();
-    if (params.tab) query.append('tab', params.tab);
-    if (params.search) query.append('search', params.search);
-    if (params.companyName && params.companyName !== 'All') query.append('companyName', params.companyName);
-    if (params.contactType && params.contactType !== 'All') query.append('contactType', params.contactType);
-    if (params.category && params.category !== 'All') query.append('category', params.category);
-    if (params.source && params.source !== 'All') query.append('source', params.source);
-    if (params.status && params.status !== 'All') query.append('status', params.status);
-    if (params.stage && params.stage !== 'All') query.append('stage', params.stage);
-    if (params.qualificationStatus && params.qualificationStatus !== 'All') query.append('qualificationStatus', params.qualificationStatus);
-    if (params.priority && params.priority !== 'All') query.append('priority', params.priority);
-    if (params.assignedTo && params.assignedTo !== 'All') query.append('assignedTo', params.assignedTo);
-    if (params.assignmentStatus && params.assignmentStatus !== 'All') query.append('assignmentStatus', params.assignmentStatus);
-    if (params.sortBy) query.append('sortBy', params.sortBy);
-    if (params.sortOrder) query.append('sortOrder', params.sortOrder);
-    if (params.page) query.append('page', params.page.toString());
-    if (params.limit) query.append('limit', params.limit.toString());
+    const isValid = (v: any) =>
+      v !== undefined &&
+      v !== null &&
+      v !== 'undefined' &&
+      v !== 'null' &&
+      v !== 'All' &&
+      v !== 'ALL' &&
+      String(v).trim() !== '';
+
+    if (params.tab && params.tab !== 'undefined' && params.tab !== 'null') {
+      query.append('tab', params.tab);
+    }
+    if (isValid(params.search)) query.append('search', String(params.search).trim());
+    if (isValid(params.companyName)) query.append('companyName', String(params.companyName).trim());
+    if (isValid(params.contactType)) query.append('contactType', String(params.contactType).trim());
+    if (isValid(params.category)) query.append('category', String(params.category).trim());
+    if (isValid(params.source)) query.append('source', String(params.source).trim());
+    if (isValid(params.status)) query.append('status', String(params.status).trim());
+    if (isValid(params.stage)) query.append('stage', String(params.stage).trim());
+    if (isValid(params.qualificationStatus)) query.append('qualificationStatus', String(params.qualificationStatus).trim());
+    if (isValid(params.priority)) query.append('priority', String(params.priority).trim());
+    if (isValid(params.assignedTo)) query.append('assignedTo', String(params.assignedTo).trim());
+    if (isValid(params.assignmentStatus)) query.append('assignmentStatus', String(params.assignmentStatus).trim());
+    if (params.sortBy && String(params.sortBy) !== 'undefined' && String(params.sortBy) !== 'null') {
+      query.append('sortBy', params.sortBy);
+    }
+    if (params.sortOrder && (params.sortOrder === 'asc' || params.sortOrder === 'desc')) {
+      query.append('sortOrder', params.sortOrder);
+    }
+    if (params.page !== undefined && params.page !== null && !isNaN(Number(params.page))) {
+      query.append('page', params.page.toString());
+    }
+    if (params.limit !== undefined && params.limit !== null && !isNaN(Number(params.limit))) {
+      query.append('limit', params.limit.toString());
+    }
 
     const qs = query.toString();
     const endpoint = `/contacts${qs ? `?${qs}` : ''}`;
@@ -154,7 +191,7 @@ export const contactService = {
     data: any[];
     pagination: { total: number; page: number; limit: number; totalPages: number };
   }> => {
-    const q = new URLSearchParams(params || {}).toString();
+    const q = buildCleanQueryString(params);
     return fetchWithCookies<{
       success: boolean;
       data: any[];
@@ -196,7 +233,7 @@ export const contactService = {
     data: ImportBatch[];
     pagination: ContactPagination;
   }> => {
-    const q = new URLSearchParams(params || {}).toString();
+    const q = buildCleanQueryString(params);
     return fetchWithCookies<{
       success: boolean;
       data: ImportBatch[];
@@ -225,7 +262,7 @@ export const contactService = {
     data: Contact[];
     pagination: ContactPagination;
   }> => {
-    const q = new URLSearchParams(params || {}).toString();
+    const q = buildCleanQueryString(params);
     return fetchWithCookies<{
       success: boolean;
       batch: ImportBatch;

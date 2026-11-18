@@ -24,6 +24,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconAlertCircle } from '@tabler/icons-react';
 import { useCRM } from './CRMContext';
+import { usePermissions } from './AccessControlContext';
 
 interface SupportTicketContextType {
   tickets: SupportTicket[];
@@ -69,7 +70,8 @@ const initialFilters: TicketFilters = {
 };
 
 export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isAuthChecking } = useCRM();
+  const { isAuthenticated, isAuthChecking, activeNav } = useCRM();
+  const { can, permissionsLoaded, isSuperAdmin } = usePermissions();
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [totalTickets, setTotalTickets] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -81,12 +83,16 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
   const [filters, setFilters] = useState<TicketFilters>(initialFilters);
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
 
+  const isPublicPage = activeNav === 'signup' || activeNav === 'login' || activeNav === 'reset-password';
+  const hasTicketPermission = Boolean(isSuperAdmin || (permissionsLoaded && (can('support_tickets', 'view') || can('tickets', 'view'))));
+
   const fetchStats = useCallback(async () => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasTicketPermission) return;
     try {
       const s = await fetchTicketStatsApi();
       setStats(s);
     } catch (_) {}
-  }, []);
+  }, [isAuthenticated, isAuthChecking, isPublicPage, hasTicketPermission]);
 
   // Synchronize activeTab with filters.viewTab
   const setActiveTab = (tab: 'all' | 'my' | 'unassigned') => {
@@ -102,7 +108,7 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
 
   // Load dropdown metadata and stats once
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasTicketPermission) return;
     let isMounted = true;
     fetchTicketMetadataApi()
       .then((data) => {
@@ -113,12 +119,12 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
     return () => {
       isMounted = false;
     };
-  }, [fetchStats, isAuthenticated, isAuthChecking]);
+  }, [fetchStats, isAuthenticated, isAuthChecking, isPublicPage, hasTicketPermission]);
 
   // Fetch tickets function
   const fetchTickets = useCallback(
     async (customFilters?: TicketFilters, targetPage?: number) => {
-      if (!isAuthenticated || isAuthChecking) return;
+      if (!isAuthenticated || isAuthChecking || isPublicPage || !hasTicketPermission) return;
       setLoading(true);
       try {
         const queryFilters = customFilters || filters;
@@ -141,13 +147,13 @@ export const SupportTicketProvider: React.FC<{ children: ReactNode }> = ({ child
         setLoading(false);
       }
     },
-    [filters, page, limit, isAuthenticated, isAuthChecking]
+    [filters, page, limit, isAuthenticated, isAuthChecking, isPublicPage]
   );
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage) return;
     fetchTickets();
-  }, [fetchTickets, isAuthenticated, isAuthChecking]);
+  }, [fetchTickets, isAuthenticated, isAuthChecking, isPublicPage]);
 
   // Single ticket fetcher
   const fetchTicketById = async (id: string): Promise<SupportTicket | null> => {

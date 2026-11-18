@@ -30,6 +30,28 @@ export async function signup(req, res) {
       });
     }
 
+    if (!phone || !String(phone).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mobile number is required.',
+      });
+    }
+
+    const cleanPhoneDigits = String(phone).replace(/\D/g, '');
+    let indianPhone = cleanPhoneDigits;
+    if (cleanPhoneDigits.length === 12 && cleanPhoneDigits.startsWith('91')) {
+      indianPhone = cleanPhoneDigits.slice(2);
+    } else if (cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('0')) {
+      indianPhone = cleanPhoneDigits.slice(1);
+    }
+
+    if (!/^[6-9]\d{9}$/.test(indianPhone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.',
+      });
+    }
+
     if (confirmPassword && password !== confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -78,7 +100,7 @@ export async function signup(req, res) {
       data: {
         name: name.trim(),
         email: cleanEmail,
-        phone: phone ? String(phone).trim() : null,
+        phone: indianPhone,
         passwordHash,
         role: 'SUPER_ADMIN',
         roleId: adminRole?.id || null,

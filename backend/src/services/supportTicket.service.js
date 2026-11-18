@@ -8,6 +8,7 @@ import {
   VALID_ISSUE_TYPES,
 } from '../utils/ticket.util.js';
 import { io } from '../utils/socket.js';
+import { getDataScope } from '../middlewares/permission.middleware.js';
 
 export class SupportTicketService {
   /**
@@ -107,6 +108,16 @@ export class SupportTicketService {
    * 2. Query tickets with filters and pagination
    */
   static async getTickets(filters, options, user) {
+    if (user) {
+      const scope = await getDataScope(user, 'support_tickets');
+      const roleUpper = String(user.role || '').toUpperCase();
+      const isSuperOrAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || scope === 'All';
+      if (!isSuperOrAdmin && !filters.userId) {
+        filters.userId = user?.id;
+        filters.employeeId = user?.employeeId || user?.id;
+      }
+    }
+
     // If user requested 'my' tickets and did not pass explicit userId, fallback to user.id
     if (filters.viewTab === 'my') {
       filters.userId = user?.id;

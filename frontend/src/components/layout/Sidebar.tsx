@@ -498,7 +498,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
           </Stack>
 
           {/* Administration & Security Section */}
-          {(can('access_control', 'view') || can('settings', 'view') || isSuperAdmin) && (
+          {(can('access_control', 'view') || can('settings', 'view') || can('myprofile', 'view') || can('company_profile', 'view') || can('calendar', 'view') || can('project_catalog', 'view') || isSuperAdmin) && (
             <>
               {isCollapsed ? (
                 <Divider color={isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'} my={4} />
@@ -525,7 +525,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onSelectNav, isMobile = false 
                     activeNav === 'access-control' || activeNav === 'rbac'
                   )}
 
-                {(can('settings', 'view') || isSuperAdmin) &&
+                {(can('settings', 'view') || can('myprofile', 'view') || can('company_profile', 'view') || can('calendar', 'view') || can('project_catalog', 'view') || isSuperAdmin) &&
                   renderNavItem(
                     'settings',
                     'Settings',

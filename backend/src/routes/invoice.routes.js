@@ -38,6 +38,7 @@ import {
   getBillingSettings,
   updateBillingSettings,
   getBillingAuditLogs,
+  getDocumentLookup,
 } from '../controllers/invoice.controller.js';
 
 const router = Router();
@@ -58,15 +59,15 @@ router.delete('/products-services/:id', requireAuth, authorizePermission('billin
 // =============================================================================
 // 3. QUOTATIONS & REVISIONS
 // =============================================================================
-router.get('/quotations', requireAuth, authorizePermission('billing', 'view'), getQuotations);
-router.get('/quotations/:id', requireAuth, authorizePermission('billing', 'view'), getQuotationById);
-router.get('/quotations/:id/revisions', requireAuth, authorizePermission('billing', 'view'), getQuotationRevisions);
-router.post('/quotations', requireAuth, authorizePermission('billing', 'create'), createQuotation);
-router.put('/quotations/:id', requireAuth, authorizePermission('billing', 'edit'), updateQuotation);
-router.patch('/quotations/:id/status', requireAuth, authorizePermission('billing', 'edit'), updateQuotationStatus);
-router.post('/quotations/:id/revise', requireAuth, authorizePermission('billing', 'create'), createQuotationRevision);
-router.delete('/quotations/:id', requireAuth, authorizePermission('billing', 'delete'), deleteQuotation);
-router.post('/quotations/:id/convert', requireAuth, authorizePermission('billing', 'create'), convertQuotationToOrder);
+router.get('/quotations', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'view'), getQuotations);
+router.get('/quotations/:id', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'view'), getQuotationById);
+router.get('/quotations/:id/revisions', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'view'), getQuotationRevisions);
+router.post('/quotations', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'create'), createQuotation);
+router.put('/quotations/:id', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'edit'), updateQuotation);
+router.patch('/quotations/:id/status', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'edit'), updateQuotationStatus);
+router.post('/quotations/:id/revise', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'create'), createQuotationRevision);
+router.delete('/quotations/:id', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'delete'), deleteQuotation);
+router.post('/quotations/:id/convert', requireAuth, authorizePermission(['quotations', 'billing', 'leads'], 'create'), convertQuotationToOrder);
 
 // =============================================================================
 // 4. SALES ORDERS & CONTRACTS
@@ -88,12 +89,12 @@ router.post('/milestones/:id/approve', requireAuth, authorizePermission('billing
 // =============================================================================
 // 6. INVOICES
 // =============================================================================
-router.get('/invoices', requireAuth, authorizePermission('billing', 'view'), getInvoices);
-router.get('/invoices/:id', requireAuth, authorizePermission('billing', 'view'), getInvoiceById);
-router.post('/invoices', requireAuth, authorizePermission('billing', 'create'), createInvoice);
-router.put('/invoices/:id', requireAuth, authorizePermission('billing', 'edit'), updateInvoice);
-router.post('/invoices/:id/cancel', requireAuth, authorizePermission('billing', 'delete'), cancelInvoice);
-router.post('/invoices/:id/send', requireAuth, authorizePermission('billing', 'edit'), sendInvoice);
+router.get('/invoices', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'view'), getInvoices);
+router.get('/invoices/:id', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'view'), getInvoiceById);
+router.post('/invoices', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'create'), createInvoice);
+router.put('/invoices/:id', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'edit'), updateInvoice);
+router.post('/invoices/:id/cancel', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'delete'), cancelInvoice);
+router.post('/invoices/:id/send', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'edit'), sendInvoice);
 
 // =============================================================================
 // 7. PAYMENTS
@@ -114,14 +115,20 @@ router.get('/settings', requireAuth, authorizePermission('billing', 'view'), get
 router.put('/settings', requireAuth, authorizePermission('billing', 'edit'), updateBillingSettings);
 router.get('/audit-logs', requireAuth, authorizePermission('billing', 'view'), getBillingAuditLogs);
 
+// =============================================================================
+// 10. DOCUMENT LOOKUP FOR QUOTATION IMPORT
+// =============================================================================
+router.get('/document-lookup', requireAuth, getDocumentLookup);
+
 // Dedicated Invoice Router for /api/invoices
 export const invoiceRouter = Router();
-invoiceRouter.get('/', requireAuth, authorizePermission('invoices', 'view'), getInvoices);
-invoiceRouter.get('/:id', requireAuth, authorizePermission('invoices', 'view'), getInvoiceById);
-invoiceRouter.post('/', requireAuth, authorizePermission('invoices', 'create'), createInvoice);
-invoiceRouter.put('/:id', requireAuth, authorizePermission('invoices', 'edit'), updateInvoice);
-invoiceRouter.post('/:id/cancel', requireAuth, authorizePermission('invoices', 'delete'), cancelInvoice);
-invoiceRouter.post('/:id/send', requireAuth, authorizePermission('invoices', 'edit'), sendInvoice);
+invoiceRouter.get('/document-lookup', requireAuth, getDocumentLookup);
+invoiceRouter.get('/', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'view'), getInvoices);
+invoiceRouter.get('/:id', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'view'), getInvoiceById);
+invoiceRouter.post('/', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'create'), createInvoice);
+invoiceRouter.put('/:id', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'edit'), updateInvoice);
+invoiceRouter.post('/:id/cancel', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'delete'), cancelInvoice);
+invoiceRouter.post('/:id/send', requireAuth, authorizePermission(['invoices', 'billing', 'leads'], 'edit'), sendInvoice);
 
 export { router as billingRouter };
 export default router;

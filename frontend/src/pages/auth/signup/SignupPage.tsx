@@ -48,6 +48,46 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
 
   // Error State
   const [errorMsg, setErrorMsg] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [phoneTouched, setPhoneTouched] = useState(false);
+
+  // Indian Mobile Number Validator & Input Formatter
+  const handlePhoneChange = (raw: string) => {
+    let val = raw.trim();
+    // Clean if user pasted with +91 or +
+    if (val.startsWith('+91')) {
+      val = val.slice(3);
+    } else if (val.startsWith('+')) {
+      val = val.slice(1);
+    }
+    // Extract only digits
+    let digits = val.replace(/\D/g, '');
+    // If pasted without + but has 91 country code (12 digits)
+    if (digits.length === 12 && digits.startsWith('91')) {
+      digits = digits.slice(2);
+    }
+    // If pasted with leading 0 (11 digits)
+    if (digits.length === 11 && digits.startsWith('0')) {
+      digits = digits.slice(1);
+    }
+    // Restrict strictly to 10 digits
+    if (digits.length > 10) {
+      digits = digits.slice(0, 10);
+    }
+
+    setPhone(digits);
+
+    // Live validation feedback
+    if (!digits) {
+      setPhoneError('');
+    } else if (!/^[6-9]/.test(digits)) {
+      setPhoneError('Indian mobile number must start with 6, 7, 8, or 9');
+    } else if (digits.length < 10) {
+      setPhoneError(`10 digits required (${digits.length}/10)`);
+    } else {
+      setPhoneError('');
+    }
+  };
 
   const handleReturnToDashboard = () => {
     if (onSuccess) {
@@ -82,7 +122,18 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
       return;
     }
     if (!phone.trim()) {
-      setErrorMsg('Please enter your Phone Number.');
+      setErrorMsg('Please enter your Mobile Number.');
+      setPhoneTouched(true);
+      setPhoneError('Mobile number is required');
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(phone.trim())) {
+      const msg = !/^[6-9]/.test(phone.trim())
+        ? 'Indian mobile number must start with 6, 7, 8, or 9.'
+        : 'Please enter a valid 10-digit Indian mobile number.';
+      setErrorMsg(msg);
+      setPhoneTouched(true);
+      setPhoneError(msg);
       return;
     }
     if (!password || password.length < 4) {
@@ -228,19 +279,45 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
               />
 
               <TextInput
-                placeholder="Phone Number *"
+                placeholder="Mobile Number (10 digits) *"
                 value={phone}
-                onChange={(e) => setPhone(e.currentTarget.value)}
-                leftSection={<IconPhone size={16} color="#9CA3AF" />}
+                onChange={(e) => handlePhoneChange(e.currentTarget.value)}
+                onBlur={() => {
+                  setPhoneTouched(true);
+                  if (!phone) {
+                    setPhoneError('Mobile number is required');
+                  } else if (!/^[6-9]\d{9}$/.test(phone)) {
+                    setPhoneError(
+                      !/^[6-9]/.test(phone)
+                        ? 'Must start with 6, 7, 8, or 9'
+                        : 'Must be exactly 10 digits'
+                    );
+                  }
+                }}
+                leftSection={
+                  <Box style={{ display: 'flex', alignItems: 'center', gap: 3, paddingLeft: 2 }}>
+                    <IconPhone size={15} color="#9CA3AF" />
+                    <Text size="11px" fw={700} style={{ color: '#64748B' }}>
+                      +91
+                    </Text>
+                  </Box>
+                }
+                leftSectionWidth={60}
+                maxLength={10}
                 radius="12px"
                 size="sm"
+                error={phoneTouched && phoneError ? phoneError : undefined}
                 styles={{
                   input: {
                     background: '#F9FAFB',
-                    borderColor: '#E5E7EB',
+                    borderColor: phoneTouched && phoneError ? '#EF4444' : '#E5E7EB',
                     color: '#111827',
                     fontSize: 13,
                     height: 42,
+                  },
+                  error: {
+                    fontSize: 11,
+                    marginTop: 3,
                   },
                 }}
                 required

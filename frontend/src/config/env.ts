@@ -31,7 +31,7 @@ export const DOMAIN = {
 
 export const PATHS = {
   // Frontend Base Path (Common prefix for all IT CRM modules)
-  FRONTEND_BASE: '/it-crm',
+  FRONTEND_BASE: (isBrowser && window.location.pathname.startsWith('/it-crm')) ? '/it-crm' : '/itcrm',
   
   // Backend API Base Path on live server
   BACKEND_BASE: IS_LOCAL ? 'http://localhost:5000/api' : 'https://oneassist.net.in/itcrmapi/api',
@@ -53,6 +53,8 @@ export const BASE_PATH: string =
 export const BACKEND_ROOT_URL: string =
   (import.meta.env.VITE_BACKEND_ROOT as string) ||
   PATHS.BACKEND_ROOT;
+
+export const APP_LOGO_URL: string = `${(import.meta.env.BASE_URL || '/').replace(/\/+$/, '')}/oneassist-logo.png`;
 
 // 4. Utility Helper Functions
 /**
@@ -92,6 +94,8 @@ export function stripAppBasePath(fullPathname: string): string {
     clean = clean.slice(cleanBase.length);
   } else if (clean.startsWith('/it-crm')) {
     clean = clean.slice('/it-crm'.length);
+  } else if (clean.startsWith('/itcrm')) {
+    clean = clean.slice('/itcrm'.length);
   }
   return clean.replace(/^\/+/, '');
 }

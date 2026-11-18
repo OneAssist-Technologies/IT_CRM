@@ -136,8 +136,21 @@ const calculateEndTime = (startTimeStr: string, durationStr: string): string => 
 const shouldShowEndTime = (statusVal?: string): boolean => {
   if (!statusVal) return false;
   const s = statusVal.toLowerCase().trim();
-  const excluded = ['not interested', 'not-interested', 'cancelled', 'rescheduled', 'scheduled', 'schedule', 'pending'];
+  const excluded = ['not interested', 'not-interested', 'cancelled', 'rescheduled'];
   return !excluded.includes(s);
+};
+
+const isDurationStatus = (statusVal?: string): boolean => {
+  if (!statusVal) return false;
+  const s = statusVal.toLowerCase().trim();
+  return [
+    'requirements gathered',
+    'demo completed',
+    'completed',
+    'interested / progressing',
+    'proposal requested',
+    'under consideration',
+  ].includes(s);
 };
 
 interface MeetingDetailsModalProps {
@@ -169,7 +182,7 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
   const [endTime, setEndTime] = useState<string>('');
   const [newMeetingDate, setNewMeetingDate] = useState<string>('');
   const [newMeetingTime, setNewMeetingTime] = useState<string>('');
-  const [duration, setDuration] = useState<string>('30 Minutes');
+  const [duration, setDuration] = useState<string>('');
   const [meetingType, setMeetingType] = useState<string>('Virtual');
   const [location, setLocation] = useState<string>('');
   const [status, setStatus] = useState<string>('Scheduled');
@@ -278,26 +291,37 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
       const cName = meeting.companyName && !lName.includes(meeting.companyName) ? ` (${meeting.companyName})` : '';
       setClientName(lName ? `${lName}${cName}` : 'Lead Contact');
       setHostName(meeting.employeeName || meeting.hostName || meeting.assignedTo || 'Kavin');
-      const initEndTime = meeting.endTime || '';
+
+      const currentStatus = meeting.status || meeting.meetingStatus || 'Scheduled';
+      setStatus(currentStatus);
+
+      let initEndTime = meeting.endTime || '';
+      // If endTime was equal to startTime, or if it is Scheduled and has no distinct end time, treat as placeholder (empty)
+      if (initEndTime && initTime && initEndTime.trim().toLowerCase() === initTime.trim().toLowerCase()) {
+        initEndTime = '';
+      }
+      if (currentStatus.toLowerCase() === 'scheduled' && (!meeting.endTime || meeting.endTime === meeting.startTime)) {
+        initEndTime = '';
+      }
+
       setMeetingDate(initDate);
       setStartTime(initTime);
       setEndTime(initEndTime);
       setNewMeetingDate('');
       setNewMeetingTime('');
-      let currentDur = meeting.duration || '30 Minutes';
-      if (shouldShowEndTime(meeting.status || meeting.meetingStatus)) {
-        if (initEndTime && initTime) {
-          const calc = calculateMeetingDurationStr(initTime, initEndTime);
-          if (calc) currentDur = calc;
-        } else if (initTime && !initEndTime) {
-          const computed = calculateEndTime(initTime, currentDur);
-          setEndTime(computed);
+
+      let currentDur = '';
+      if (initEndTime && initTime) {
+        const calc = calculateMeetingDurationStr(initTime, initEndTime);
+        if (calc && calc !== '0 Minutes') {
+          currentDur = calc;
         }
+      } else if (meeting.duration && meeting.duration !== '0 Minutes' && currentStatus.toLowerCase() !== 'scheduled') {
+        currentDur = meeting.duration;
       }
       setDuration(currentDur);
       setMeetingType(meeting.meetingType?.toLowerCase().includes('in-person') ? 'In-person' : 'Virtual');
       setLocation(meeting.location || meeting.meetingLocation || meeting.meetingLink || '');
-      setStatus(meeting.status || meeting.meetingStatus || 'Scheduled');
       setRescheduleReason(meeting.rescheduleReason || '');
       setRescheduleHistory(meeting.rescheduleHistory || []);
       setRequirements(meeting.requirements || '');
@@ -311,9 +335,13 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
 
   const handleStartTimeChange = (val: string) => {
     setStartTime(val);
-    if (shouldShowEndTime(status) && val && endTime) {
+    if (val && endTime) {
       const calcDur = calculateMeetingDurationStr(val, endTime);
-      if (calcDur) setDuration(calcDur);
+      if (calcDur && calcDur !== '0 Minutes') {
+        setDuration(calcDur);
+      } else {
+        setDuration('');
+      }
     }
   };
 
@@ -321,7 +349,13 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
     setEndTime(val);
     if (startTime && val) {
       const calcDur = calculateMeetingDurationStr(startTime, val);
-      if (calcDur) setDuration(calcDur);
+      if (calcDur && calcDur !== '0 Minutes') {
+        setDuration(calcDur);
+      } else {
+        setDuration('');
+      }
+    } else {
+      setDuration('');
     }
   };
 
@@ -370,6 +404,26 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
   const handleSave = async () => {
     if (!meeting) return;
 
+    // Validate meeting date and start time when not Rescheduled
+    if (status !== 'Rescheduled') {
+      if (!meetingDate || !meetingDate.trim()) {
+        notifications.show({
+          title: 'Validation Error',
+          message: 'Meeting Date is mandatory. Please select a valid date.',
+          color: 'red',
+        });
+        return;
+      }
+      if (!startTime || !startTime.trim()) {
+        notifications.show({
+          title: 'Validation Error',
+          message: 'Meeting Time is mandatory. Please specify the meeting start time.',
+          color: 'red',
+        });
+        return;
+      }
+    }
+
     // Validate new date and time when status is Rescheduled
     if (status === 'Rescheduled') {
       if (!newMeetingDate || !newMeetingDate.trim()) {
@@ -384,6 +438,28 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
         notifications.show({
           title: 'Validation Error',
           message: 'Please provide a new meeting time.',
+          color: 'red',
+        });
+        return;
+      }
+    }
+
+    // Meeting End Time is strictly mandatory when status represents a conducted/progressed meeting with duration
+    if (isDurationStatus(status)) {
+      if (!endTime || !endTime.trim()) {
+        notifications.show({
+          title: 'Validation Error',
+          message: `Meeting End Time is mandatory when status is "${status}". Please specify when the meeting concluded.`,
+          color: 'red',
+        });
+        return;
+      }
+      const effectiveTime = status === 'Rescheduled' && newMeetingTime ? newMeetingTime.trim() : startTime.trim();
+      const durCalc = calculateMeetingDurationStr(effectiveTime, endTime.trim());
+      if (!durCalc || durCalc === '0 Minutes') {
+        notifications.show({
+          title: 'Validation Error',
+          message: 'Meeting End Time must be later than Meeting Time (Duration cannot be 0 minutes).',
           color: 'red',
         });
         return;
@@ -416,6 +492,10 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
         }
       }
 
+      const computedFinalDuration = (shouldShowEndTime(status) && endTime && effectiveTime)
+        ? calculateMeetingDurationStr(effectiveTime, endTime)
+        : duration;
+
       const payload: Partial<ScheduledMeeting> & { rescheduleReason?: string; rescheduleHistory?: RescheduleRecord[] } = {
         title: title.trim(),
         meetingTitle: title.trim(),
@@ -425,8 +505,8 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
         startTime: effectiveTime,
         time: effectiveTime,
         meetingTime: effectiveTime,
-        endTime: shouldShowEndTime(status) && endTime ? endTime.trim() : (meeting.endTime || undefined),
-        duration: duration.trim(),
+        endTime: shouldShowEndTime(status) && endTime ? endTime.trim() : (status.toLowerCase() === 'scheduled' ? '' : (meeting.endTime || '')),
+        duration: computedFinalDuration && computedFinalDuration !== '0 Minutes' ? computedFinalDuration.trim() : '',
         meetingType: meetingType,
         location: location.trim(),
         meetingLocation: location.trim(),
@@ -593,6 +673,7 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
             <SimpleGrid cols={{ base: 1, sm: 4 }} spacing="sm">
               <MeetingDatePicker
                 label="Meeting Date"
+                required
                 value={meetingDate}
                 onChange={(val) => setMeetingDate(val)}
                 placeholder="dd-mm-yyyy"
@@ -600,6 +681,7 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               />
               <MeetingTimePicker
                 label="Meeting Time"
+                required
                 value={startTime}
                 onChange={handleStartTimeChange}
                 placeholder="hh:mm A"
@@ -607,16 +689,17 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
               />
               <MeetingTimePicker
                 label="Meeting End Time"
+                required={isDurationStatus(status)}
                 value={endTime}
                 onChange={handleEndTimeChange}
-                placeholder="hh:mm A"
+                placeholder={status.toLowerCase() === 'scheduled' ? 'hh:mm A (Optional)' : 'hh:mm A'}
                 zIndex={3000}
               />
               <TextInput
                 label="Duration"
                 value={duration}
-                onChange={(e) => setDuration(e.currentTarget.value)}
-                placeholder="Auto-calculated (e.g. 45 Minutes)"
+                readOnly
+                placeholder={status.toLowerCase() === 'scheduled' ? 'Auto-calculated after meeting' : 'Auto-calculated (e.g. 45 Minutes)'}
                 radius="md"
                 leftSection={<IconClock size={16} />}
               />
@@ -767,16 +850,15 @@ export const MeetingDetailsModal: React.FC<MeetingDetailsModalProps> = ({
                 setNewMeetingDate('');
                 setNewMeetingTime('');
               }
-              if (shouldShowEndTime(next)) {
-                if (!endTime && startTime) {
-                  const computedEnd = calculateEndTime(startTime, duration || '30 Minutes');
-                  setEndTime(computedEnd);
-                  const calc = calculateMeetingDurationStr(startTime, computedEnd);
-                  if (calc) setDuration(calc);
-                } else if (endTime && startTime) {
-                  const calc = calculateMeetingDurationStr(startTime, endTime);
-                  if (calc) setDuration(calc);
-                }
+              // If endTime equals startTime, reset it so it doesn't show 0 minutes
+              if (endTime && startTime && endTime.trim().toLowerCase() === startTime.trim().toLowerCase()) {
+                setEndTime('');
+                setDuration('');
+              } else if (endTime && startTime) {
+                const calc = calculateMeetingDurationStr(startTime, endTime);
+                setDuration(calc && calc !== '0 Minutes' ? calc : '');
+              } else {
+                setDuration('');
               }
             }}
             allowDeselect={false}

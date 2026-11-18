@@ -1,8 +1,17 @@
 import { ScheduledMeeting, MeetingStats, MeetingFilters } from '../types/meeting';
 import { API_BASE_URL } from '../config/env';
-import { getAuthHeaders } from './api';
 
 const API_BASE = `${API_BASE_URL}/meetings`;
+
+function getAuthHeaders(): HeadersInit {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  return {
+    'Content-Type': 'application/json',
+    ...(token && token.trim() && token !== 'null' && token !== 'undefined'
+      ? { Authorization: `Bearer ${token}` }
+      : {}),
+  };
+}
 
 export async function fetchMeetingsApi(filters?: MeetingFilters): Promise<{
   meetings: ScheduledMeeting[];
@@ -52,7 +61,7 @@ export async function fetchMeetingStatsApi(): Promise<MeetingStats> {
 export async function createMeetingApi(meetingData: Partial<ScheduledMeeting>): Promise<ScheduledMeeting> {
   const res = await fetch(API_BASE, {
     method: 'POST',
-    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(meetingData),
   });
@@ -67,7 +76,7 @@ export async function createMeetingApi(meetingData: Partial<ScheduledMeeting>): 
 export async function updateMeetingApi(id: string, meetingData: Partial<ScheduledMeeting>): Promise<ScheduledMeeting> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'PUT',
-    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(meetingData),
   });
@@ -82,7 +91,6 @@ export async function updateMeetingApi(id: string, meetingData: Partial<Schedule
 export async function deleteMeetingApi(id: string): Promise<boolean> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'DELETE',
-    headers: getAuthHeaders(),
     credentials: 'include',
   });
 

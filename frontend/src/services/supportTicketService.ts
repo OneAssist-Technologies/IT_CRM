@@ -10,14 +10,14 @@ import { API_BASE_URL } from '../config/env';
 
 const API_BASE = `${API_BASE_URL}/support-tickets`;
 
-function getTicketAuthHeaders(headers: HeadersInit = {}): HeadersInit {
+const getAuthHeaders = (extraHeaders: Record<string, string> = {}): Record<string, string> => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
-  const h = new Headers(headers);
+  const headers: Record<string, string> = { ...extraHeaders };
   if (token && token.trim() && token !== 'null' && token !== 'undefined') {
-    h.set('Authorization', `Bearer ${token.trim()}`);
+    headers['Authorization'] = `Bearer ${token.trim()}`;
   }
-  return h;
-}
+  return headers;
+};
 
 /**
  * Fetch paginated tickets with filters
@@ -35,6 +35,10 @@ export async function fetchTicketsApi(
   limit: number;
   totalPages: number;
 }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+    return { tickets: [], total: 0, page: 1, limit, totalPages: 1 };
+  }
   const params = new URLSearchParams();
   params.append('page', String(page));
   params.append('limit', String(limit));
@@ -55,7 +59,7 @@ export async function fetchTicketsApi(
 
   const res = await fetch(`${API_BASE}?${params.toString()}`, {
     credentials: 'include',
-    headers: getTicketAuthHeaders(),
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -77,7 +81,7 @@ export async function fetchTicketsApi(
 export async function fetchTicketByIdApi(id: string): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}`, {
     credentials: 'include',
-    headers: getTicketAuthHeaders(),
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -91,9 +95,13 @@ export async function fetchTicketByIdApi(id: string): Promise<SupportTicket> {
  * Fetch dropdown metadata
  */
 export async function fetchTicketMetadataApi(): Promise<TicketDropdownMetadata> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+    return { customers: [], projects: [], contacts: [], leads: [], employees: [], contracts: [], teams: [] };
+  }
   const res = await fetch(`${API_BASE}/metadata`, {
     credentials: 'include',
-    headers: getTicketAuthHeaders(),
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -107,9 +115,13 @@ export async function fetchTicketMetadataApi(): Promise<TicketDropdownMetadata> 
  * Fetch ticket stats summary (all, my, unassigned)
  */
 export async function fetchTicketStatsApi(): Promise<{ all: number; my: number; unassigned: number }> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
+  if (!token || !token.trim() || token === 'null' || token === 'undefined') {
+    return { all: 0, my: 0, unassigned: 0 };
+  }
   const res = await fetch(`${API_BASE}/stats`, {
     credentials: 'include',
-    headers: getTicketAuthHeaders(),
+    headers: getAuthHeaders(),
   });
   if (!res.ok) {
     return { all: 0, my: 0, unassigned: 0 };
@@ -124,7 +136,7 @@ export async function fetchTicketStatsApi(): Promise<{ all: number; my: number; 
 export async function createTicketApi(data: Partial<SupportTicket>): Promise<SupportTicket> {
   const res = await fetch(API_BASE, {
     method: 'POST',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
     credentials: 'include',
   });
@@ -142,7 +154,7 @@ export async function createTicketApi(data: Partial<SupportTicket>): Promise<Sup
 export async function updateTicketApi(id: string, data: Partial<SupportTicket>): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'PUT',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
     credentials: 'include',
   });
@@ -160,7 +172,6 @@ export async function updateTicketApi(id: string, data: Partial<SupportTicket>):
 export async function deleteTicketApi(id: string): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}`, {
     method: 'DELETE',
-    headers: getTicketAuthHeaders(),
     credentials: 'include',
   });
   if (!res.ok) {
@@ -181,7 +192,7 @@ export async function changeTicketStatusApi(
 ): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}/status`, {
     method: 'PATCH',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status, ...extra }),
     credentials: 'include',
   });
@@ -208,7 +219,7 @@ export async function reassignTicketApi(
 ): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}/assignment`, {
     method: 'PATCH',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     credentials: 'include',
   });
@@ -229,7 +240,7 @@ export async function addTicketCommentApi(
 ): Promise<TicketComment> {
   const res = await fetch(`${API_BASE}/${id}/comments`, {
     method: 'POST',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     credentials: 'include',
   });
@@ -247,7 +258,6 @@ export async function addTicketCommentApi(
 export async function uploadTicketAttachmentsApi(id: string, formData: FormData): Promise<TicketAttachment[]> {
   const res = await fetch(`${API_BASE}/${id}/attachments`, {
     method: 'POST',
-    headers: getTicketAuthHeaders(),
     body: formData,
     credentials: 'include',
   });
@@ -268,7 +278,7 @@ export async function resolveTicketApi(
 ): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}/resolve`, {
     method: 'POST',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     credentials: 'include',
   });
@@ -286,7 +296,7 @@ export async function resolveTicketApi(
 export async function reopenTicketApi(id: string, payload: { reason: string }): Promise<SupportTicket> {
   const res = await fetch(`${API_BASE}/${id}/reopen`, {
     method: 'POST',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     credentials: 'include',
   });
@@ -302,10 +312,7 @@ export async function reopenTicketApi(id: string, payload: { reason: string }): 
  * Tasks API for Support Ticket (stored in DB table support_ticket_tasks)
  */
 export async function fetchTicketTasksApi(ticketId: string): Promise<any[]> {
-  const res = await fetch(`${API_BASE}/${ticketId}/tasks`, {
-    credentials: 'include',
-    headers: getTicketAuthHeaders(),
-  });
+  const res = await fetch(`${API_BASE}/${ticketId}/tasks`, { credentials: 'include' });
   if (!res.ok) {
     return [];
   }
@@ -316,7 +323,7 @@ export async function fetchTicketTasksApi(ticketId: string): Promise<any[]> {
 export async function createTicketTaskApi(ticketId: string, taskData: any): Promise<any> {
   const res = await fetch(`${API_BASE}/${ticketId}/tasks`, {
     method: 'POST',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(taskData),
     credentials: 'include',
   });
@@ -331,7 +338,7 @@ export async function createTicketTaskApi(ticketId: string, taskData: any): Prom
 export async function updateTicketTaskApi(ticketId: string, taskId: string, taskData: any): Promise<any> {
   const res = await fetch(`${API_BASE}/${ticketId}/tasks/${taskId}`, {
     method: 'PUT',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(taskData),
     credentials: 'include',
   });
@@ -346,7 +353,6 @@ export async function updateTicketTaskApi(ticketId: string, taskId: string, task
 export async function deleteTicketTaskApi(ticketId: string, taskId: string): Promise<any> {
   const res = await fetch(`${API_BASE}/${ticketId}/tasks/${taskId}`, {
     method: 'DELETE',
-    headers: getTicketAuthHeaders(),
     credentials: 'include',
   });
   if (!res.ok) {
@@ -360,7 +366,7 @@ export async function deleteTicketTaskApi(ticketId: string, taskId: string): Pro
 export async function syncTicketTasksApi(ticketId: string, tasks: any[]): Promise<any[]> {
   const res = await fetch(`${API_BASE}/${ticketId}/tasks/sync`, {
     method: 'PUT',
-    headers: getTicketAuthHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(tasks),
     credentials: 'include',
   });

@@ -534,7 +534,7 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         if (otherStatus === 'Follow up') finalFollowDate = nextFollowDate?.trim() || null;
       } else if (formData.contactMode === 'Meeting') {
         finalStatus = meetingStatus === 'Completed'
-          ? 'Qualified'
+          ? (isEditing && contact?.status === 'Qualified' ? 'Qualified' : 'In Progress')
           : (meetingStatus === 'Cancelled' ? 'Disqualified' : (meetingStatus === 'Follow-up' ? 'Follow-up Required' : 'In Progress'));
         if (meetingStatus === 'Follow-up') finalFollowDate = nextFollowDate?.trim() || null;
       } else {
@@ -571,11 +571,13 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         status: finalStatus,
         stage: (finalStatus === 'Not Interested' || finalStatus === 'Not-Interested')
           ? 'Initialization'
-          : ((finalStatus === 'Qualified' || finalStatus === 'Follow-up Required' || finalStatus === 'Pending' || formData.contactMode === 'Meeting') ? 'Qualification' : (contact?.stage || 'Initialization')),
-        assignmentStatus: (finalStatus === 'Qualified' || finalStatus === 'Follow-up Required' || finalStatus === 'Pending' || formData.contactMode === 'Meeting' || formData.assignedTo) ? 'Assigned' : (contact?.assignmentStatus || 'Unassigned'),
+          : (isEditing ? (contact?.stage || 'Initialization') : 'Initialization'),
+        assignmentStatus: (formData.assignedTo && formData.assignedTo !== 'none' && formData.assignedTo !== 'Unassigned')
+          ? 'Assigned'
+          : (isEditing ? (contact?.assignmentStatus || 'Unassigned') : 'Unassigned'),
         qualificationStatus: (finalStatus === 'Not Interested' || finalStatus === 'Not-Interested')
           ? 'New'
-          : (finalStatus === 'Qualified' ? 'Qualified' : (finalStatus === 'Follow-up Required' ? 'Follow-up Required' : (finalStatus === 'Disqualified' ? 'Disqualified' : (finalStatus === 'Interested' ? 'New' : (contact?.qualificationStatus || 'New'))))),
+          : (isEditing ? (contact?.qualificationStatus || 'New') : 'New'),
         // Dynamic Call
         callType: formData.contactMode === 'Call' ? callType : undefined,
         callDate: formData.contactMode === 'Call' ? callDate : undefined,
@@ -891,13 +893,6 @@ export const ContactModal: React.FC<ContactModalProps> = ({
       };
 
       if (res?.success || leadUpdatedDirectly || explicitLeadId || formData.contactMode === 'Meeting' || true) {
-        const isNotInterested = finalStatus === 'Not Interested' || finalStatus === 'Not-Interested';
-        if (!isNotInterested && (finalStatus === 'Qualified' || finalStatus === 'Follow-up Required' || finalStatus === 'Pending' || formData.contactMode === 'Meeting')) {
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('crm_contacts_tab', 'ASSIGNED');
-            sessionStorage.setItem('crm_contacts_tab', 'ASSIGNED');
-          }
-        }
         window.dispatchEvent(new CustomEvent('crm_leads_updated'));
         onSuccess?.(loggedInfo);
         onClose();

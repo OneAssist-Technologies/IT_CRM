@@ -31,10 +31,14 @@ const allowedOrigins = [
 export const io = new SocketIOServer(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
         return callback(null, true);
       }
-      return callback(new Error('Origin not allowed by Socket.IO CORS'));
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
@@ -51,7 +55,7 @@ io.on('connection', (socket) => {
 // 5. Start Server Listener
 const PORT = env.PORT || 5000;
 
-server.listen(PORT, '127.0.0.1', async () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`⚡ Redis: Active | 🗄️ PostgreSQL: Connected | 🔌 Socket.IO: Ready`);
   await autoSyncDatabase();

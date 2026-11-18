@@ -90,6 +90,7 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
   const isDark = computedColorScheme === 'dark';
   const isMobile = useMediaQuery('(max-width: 820px)');
   const { setActiveNav, currentUser } = useCRM();
+  const { isSuperAdmin: contextIsSuperAdmin, can } = usePermissions();
   const { setSelectedContact, metadata, assignContact, updateContact } = useContact();
   const [updatingPriorityId, setUpdatingPriorityId] = useState<string | null>(null);
 
@@ -227,9 +228,21 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
       : (metadata?.employees || []);
 
   const roleUpper = (currentUser?.role || '').toUpperCase().trim();
-  const emailLower = (currentUser?.email || '').toLowerCase().trim();
-  const isSuperAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || emailLower === 'sandy@gmail.com';
-  const isAdmin = isSuperAdmin || roleUpper === 'ADMIN' || roleUpper === 'MANAGEMENT';
+  const isExplicitEmployee = Boolean(
+    roleUpper &&
+      roleUpper !== 'SUPER_ADMIN' &&
+      roleUpper !== 'SUPER ADMIN' &&
+      roleUpper !== 'ADMIN' &&
+      roleUpper !== 'MANAGEMENT'
+  );
+  const isSuperAdmin = !isExplicitEmployee && (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || Boolean(contextIsSuperAdmin));
+  const isAdmin = !isExplicitEmployee && Boolean(
+    isSuperAdmin ||
+    roleUpper === 'ADMIN' ||
+    roleUpper === 'MANAGEMENT' ||
+    can('dashboard', 'view') ||
+    can('employees', 'view')
+  );
 
   const handleAssignOwner = async (contact: Contact, targetId: string | null) => {
     try {
@@ -823,24 +836,29 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                     >
                       <Text size="12px" fw={600}>Assigned for Me</Text>
                     </Menu.Item>
-                    <Menu.Divider />
-                    <Menu.Label>EMPLOYEES LIST</Menu.Label>
-                    <ScrollArea.Autosize mah={180} type="scroll">
-                      {availableEmployees && availableEmployees.length > 0 ? (
-                        availableEmployees.map((emp) => (
-                          <Menu.Item
-                            key={emp.id}
-                            leftSection={<IconUserCheck size={13} color={contact.assignedTo === emp.id ? '#10B981' : undefined} />}
-                            onClick={() => handleAssignOwner(contact, emp.id)}
-                          >
-                            <Text size="12px" fw={contact.assignedTo === emp.id ? 700 : 500}>{emp.name}</Text>
-                          </Menu.Item>
-                        ))
-                      ) : (
-                        <Menu.Item disabled>No employees available</Menu.Item>
-                      )}
-                    </ScrollArea.Autosize>
-                    {contact.assignedToName && (
+                    {/* EMPLOYEES LIST: Only shown in Admin login */}
+                    {isAdmin && (
+                      <>
+                        <Menu.Divider />
+                        <Menu.Label>EMPLOYEES LIST</Menu.Label>
+                        <ScrollArea.Autosize mah={180} type="scroll">
+                          {availableEmployees && availableEmployees.length > 0 ? (
+                            availableEmployees.map((emp) => (
+                              <Menu.Item
+                                key={emp.id}
+                                leftSection={<IconUserCheck size={13} color={contact.assignedTo === emp.id ? '#10B981' : undefined} />}
+                                onClick={() => handleAssignOwner(contact, emp.id)}
+                              >
+                                <Text size="12px" fw={contact.assignedTo === emp.id ? 700 : 500}>{emp.name}</Text>
+                              </Menu.Item>
+                            ))
+                          ) : (
+                            <Menu.Item disabled>No employees available</Menu.Item>
+                          )}
+                        </ScrollArea.Autosize>
+                      </>
+                    )}
+                    {contact.assignedToName && (isAdmin || ((currentUser?.name && contact.assignedToName && contact.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) || (currentUser?.id && contact.assignedTo === currentUser.id))) && (
                       <>
                         <Menu.Divider />
                         <Menu.Item color="red" leftSection={<IconUserX size={13} />} onClick={() => handleAssignOwner(contact, null)}>
@@ -1065,46 +1083,18 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                       </Text>
                     </Table.Td>
 
-                    {/* 6. ASSIGNED OWNER: Quick Assign dropdown matching bulk import batches (Super Admin Only) */}
+                    {/* 6. ASSIGNED OWNER: Quick Assign dropdown */}
                     <Table.Td
                       style={{ width: 115, whiteSpace: 'nowrap', padding: '8px 8px', verticalAlign: 'middle' }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {!isSuperAdmin ? (
-                        <Tooltip
-                          label={`Assigned to ${contact.assignedToName || (contact as any).createdBy || 'Assigned'}`}
-                          withArrow
-                          position="top"
-                        >
-                          <Badge
-                            radius="xl"
-                            styles={{
-                              root: {
-                                backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
-                                color: isDark ? '#93C5FD' : '#1D4ED8',
-                                border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid #BFDBFE',
-                                fontWeight: 600,
-                                fontSize: 11.5,
-                                textTransform: 'none',
-                                padding: '4px 10px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 5,
-                              },
-                            }}
-                          >
-                            <IconUserCheck size={12} stroke={2.2} />
-                            <span>{contact.assignedToName || (contact as any).createdBy || 'Assigned'}</span>
-                          </Badge>
-                        </Tooltip>
-                      ) : (
-                        <Menu
-                          shadow="lg"
-                          width={230}
-                          position="bottom-start"
-                          radius="md"
-                          withinPortal
-                        >
+                      <Menu
+                        shadow="lg"
+                        width={230}
+                        position="bottom-start"
+                        radius="md"
+                        withinPortal
+                      >
                         <Menu.Target>
                           <Tooltip
                             label={
@@ -1227,56 +1217,61 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                             </Box>
                           </Menu.Item>
 
-                          <Menu.Divider />
-                          <Menu.Label>EMPLOYEES LIST</Menu.Label>
+                          {/* EMPLOYEES LIST: Only shown in Admin login */}
+                          {isAdmin && (
+                            <>
+                              <Menu.Divider />
+                              <Menu.Label>EMPLOYEES LIST</Menu.Label>
 
-                          <ScrollArea.Autosize mah={200} type="scroll">
-                            {availableEmployees && availableEmployees.length > 0 ? (
-                              availableEmployees.map((emp) => {
-                                const isCurrent =
-                                  contact.assignedTo === emp.id ||
-                                  contact.assignedTo === emp.empCode ||
-                                  (contact.assignedToName &&
-                                    contact.assignedToName.toLowerCase() === emp.name.toLowerCase());
-                                return (
-                                  <Menu.Item
-                                    key={emp.id}
-                                    leftSection={
-                                      <IconUserCheck
-                                        size={14}
-                                        color={isCurrent ? '#10B981' : undefined}
-                                      />
-                                    }
-                                    rightSection={
-                                      isCurrent ? (
-                                        <Badge size="xs" color="teal" variant="light">
-                                          Current
-                                        </Badge>
-                                      ) : undefined
-                                    }
-                                    onClick={() => handleAssignOwner(contact, emp.id)}
-                                  >
-                                    <Box>
-                                      <Text size="13px" fw={isCurrent ? 700 : 500}>
-                                        {emp.name}
-                                      </Text>
-                                      {(emp.designation || emp.department || emp.empCode) && (
-                                        <Text size="10.5px" c="dimmed">
-                                          {[emp.designation, emp.empCode ? `(${emp.empCode})` : '']
-                                            .filter(Boolean)
-                                            .join(' ')}
-                                        </Text>
-                                      )}
-                                    </Box>
-                                  </Menu.Item>
-                                );
-                              })
-                            ) : (
-                              <Menu.Item disabled>No employees available</Menu.Item>
-                            )}
-                          </ScrollArea.Autosize>
+                              <ScrollArea.Autosize mah={200} type="scroll">
+                                {availableEmployees && availableEmployees.length > 0 ? (
+                                  availableEmployees.map((emp) => {
+                                    const isCurrent =
+                                      contact.assignedTo === emp.id ||
+                                      contact.assignedTo === emp.empCode ||
+                                      (contact.assignedToName &&
+                                        contact.assignedToName.toLowerCase() === emp.name.toLowerCase());
+                                    return (
+                                      <Menu.Item
+                                        key={emp.id}
+                                        leftSection={
+                                          <IconUserCheck
+                                            size={14}
+                                            color={isCurrent ? '#10B981' : undefined}
+                                          />
+                                        }
+                                        rightSection={
+                                          isCurrent ? (
+                                            <Badge size="xs" color="teal" variant="light">
+                                              Current
+                                            </Badge>
+                                          ) : undefined
+                                        }
+                                        onClick={() => handleAssignOwner(contact, emp.id)}
+                                      >
+                                        <Box>
+                                          <Text size="13px" fw={isCurrent ? 700 : 500}>
+                                            {emp.name}
+                                          </Text>
+                                          {(emp.designation || emp.department || emp.empCode) && (
+                                            <Text size="10.5px" c="dimmed">
+                                              {[emp.designation, emp.empCode ? `(${emp.empCode})` : '']
+                                                .filter(Boolean)
+                                                .join(' ')}
+                                            </Text>
+                                          )}
+                                        </Box>
+                                      </Menu.Item>
+                                    );
+                                  })
+                                ) : (
+                                  <Menu.Item disabled>No employees available</Menu.Item>
+                                )}
+                              </ScrollArea.Autosize>
+                            </>
+                          )}
 
-                          {contact.assignedToName && (
+                          {contact.assignedToName && (isAdmin || ((currentUser?.name && contact.assignedToName && contact.assignedToName.toLowerCase() === currentUser.name.toLowerCase()) || (currentUser?.id && contact.assignedTo === currentUser.id))) && (
                             <>
                               <Menu.Divider />
                               <Menu.Item
@@ -1292,7 +1287,6 @@ export const ContactTableView: React.FC<ContactTableViewProps> = ({
                           )}
                         </Menu.Dropdown>
                       </Menu>
-                      )}
                     </Table.Td>
 
 
