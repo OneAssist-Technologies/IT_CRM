@@ -54,9 +54,10 @@ io.on('connection', (socket) => {
 
 // 5. Start Server Listener
 const PORT = env.PORT || 5000;
+const HOST = process.env.HOST || '127.0.0.1';
 
-server.listen(PORT, '0.0.0.0', async () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+server.listen(PORT, HOST, async () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
   console.log(`⚡ Redis: Active | 🗄️ PostgreSQL: Connected | 🔌 Socket.IO: Ready`);
   await autoSyncDatabase();
   await initTicketDatabase().catch((e) => console.error('[Server] Ticket DB init error:', e));
