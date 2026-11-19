@@ -60,7 +60,7 @@ interface EmployeeDashboardProps {
 
 export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate }) => {
   const { currentUser } = useCRM();
-  const { can, isSuperAdmin } = usePermissions();
+  const { can, permissionsLoaded, isSuperAdmin } = usePermissions();
   const { leads } = useLead();
   const { customers } = useCustomer();
   const { projects } = useProject();
@@ -108,8 +108,12 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     return 'Good Evening';
   }, []);
 
-  const canViewBilling = Boolean(isSuperAdmin || can('invoices', 'view') || can('billing', 'view'));
-  const canViewMeetings = Boolean(isSuperAdmin || can('scheduled_meetings', 'view') || can('meetings', 'view'));
+  const canViewBilling = Boolean(
+    permissionsLoaded && (isSuperAdmin || can('invoices', 'view') || can('billing', 'view'))
+  );
+  const canViewMeetings = Boolean(
+    permissionsLoaded && (isSuperAdmin || can('scheduled_meetings', 'view') || can('meetings', 'view'))
+  );
 
   useEffect(() => {
     if (canViewBilling) {

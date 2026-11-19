@@ -39,6 +39,7 @@ import { Contact } from '../../types/contact';
 import { ReminderItem } from '../../types/settings';
 import { useCRM } from '../../context/CRMContext';
 import { useContact } from '../../context/ContactContext';
+import { usePermissions } from '../../context/AccessControlContext';
 
 interface NotificationItem {
   id: string;
@@ -64,6 +65,11 @@ export const NotificationBell: React.FC = () => {
   const isDark = computedColorScheme === 'dark';
   const { currentUser, setActiveNav, isAuthenticated, isAuthChecking, activeNav } = useCRM();
   const { setSelectedContact, fetchContacts: refreshContactsList } = useContact();
+  const { can, permissionsLoaded, isSuperAdmin } = usePermissions();
+
+  const canViewContacts = Boolean(isSuperAdmin || (permissionsLoaded && can('contacts', 'view')));
+  const canViewContactsRef = React.useRef(canViewContacts);
+  canViewContactsRef.current = canViewContacts;
 
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -261,8 +267,11 @@ export const NotificationBell: React.FC = () => {
       isFetchingRef.current = true;
       lastFetchTimeRef.current = now;
       setLoading(true);
+      const hasContactsAccess = canViewContactsRef.current;
       const [contactsRes, remindersRes] = await Promise.allSettled([
-        contactService.getContacts({ limit: 150 }),
+        hasContactsAccess
+          ? contactService.getContacts({ limit: 150 })
+          : Promise.resolve({ success: true, data: [], pagination: { total: 0, page: 1, limit: 150, totalPages: 1 } }),
         settingsService.getReminders(),
       ]);
 
@@ -371,6 +380,12 @@ export const NotificationBell: React.FC = () => {
       }
     };
   }, [isAuthenticated, isAuthChecking, activeNav, fetchAllNotifications, scheduleFetchNotifications]);
+
+  useEffect(() => {
+    if (canViewContacts && isAuthenticated && !isAuthChecking) {
+      scheduleFetchNotifications();
+    }
+  }, [canViewContacts, isAuthenticated, isAuthChecking, scheduleFetchNotifications]);
 
   // Transform contacts & reminders into clean notifications
   const notificationItems = useMemo<NotificationItem[]>(() => {
