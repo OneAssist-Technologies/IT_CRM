@@ -137,7 +137,15 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
   const [permissionsLoaded, setPermissionsLoaded] = useState<boolean>(() => {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
-      return Boolean(token && localStorage.getItem('crm_my_permissions'));
+      if (!token) return false;
+      const saved = localStorage.getItem('crm_my_permissions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const userSaved = localStorage.getItem('crm_user');
+        const parsedUser = userSaved ? JSON.parse(userSaved) : null;
+        return Boolean(parsed && parsedUser && parsed.user?.id === parsedUser.id);
+      }
+      return false;
     } catch {
       return false;
     }
@@ -404,9 +412,9 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
         return true;
       }
 
-      // If permissions are not yet loaded and no cache exists, do not block or flip screen during initial render
+      // If permissions are not yet loaded and no cache exists, do not grant arbitrary access during initial render
       if (!permissionsLoaded) {
-        return true;
+        return false;
       }
 
       return false;

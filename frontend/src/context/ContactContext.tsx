@@ -155,12 +155,16 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
       }
     } catch (err: any) {
-      console.error('Error fetching contacts:', err);
-      notifications.show({
-        title: 'Error Fetching Contacts',
-        message: err.message || 'Unable to retrieve contacts list.',
-        color: 'red',
-      });
+      if (err?.message?.includes('403') || err?.status === 403) {
+        console.warn('Contacts access restricted for this user role.');
+      } else {
+        console.error('Error fetching contacts:', err);
+        notifications.show({
+          title: 'Error Fetching Contacts',
+          message: err.message || 'Unable to retrieve contacts list.',
+          color: 'red',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -174,7 +178,9 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
         setStats(res.stats);
       }
     } catch (err: any) {
-      console.error('Error fetching contact stats:', err);
+      if (!err?.message?.includes('403') && err?.status !== 403) {
+        console.error('Error fetching contact stats:', err);
+      }
     }
   }, [isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
@@ -187,20 +193,30 @@ export const ContactProvider: React.FC<{ children: ReactNode }> = ({ children })
         setMetadata(meta);
       }
     } catch (err: any) {
-      console.error('Error fetching contact metadata:', err);
+      if (!err?.message?.includes('403') && err?.status !== 403) {
+        console.error('Error fetching contact metadata:', err);
+      }
     }
   }, [isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
 
-  useEffect(() => {
-    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
-    fetchContacts();
-  }, [fetchContacts, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
+  const isContactsRelatedPage =
+    activeNav === 'contacts' ||
+    activeNav === 'contact' ||
+    activeNav === 'add-contact' ||
+    activeNav === 'contact-details' ||
+    activeNav === 'contact-qualification' ||
+    activeNav === 'qualification';
 
   useEffect(() => {
-    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission) return;
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission || !isContactsRelatedPage) return;
+    fetchContacts();
+  }, [fetchContacts, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission, isContactsRelatedPage]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isAuthChecking || isPublicPage || !hasContactPermission || !isContactsRelatedPage) return;
     fetchStats();
     fetchMetadata();
-  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission]);
+  }, [fetchStats, fetchMetadata, isAuthenticated, isAuthChecking, isPublicPage, hasContactPermission, isContactsRelatedPage]);
 
   const setFilters = (newFilters: Partial<ContactFilter>) => {
     setFiltersState((prev) => ({ ...prev, ...newFilters }));
