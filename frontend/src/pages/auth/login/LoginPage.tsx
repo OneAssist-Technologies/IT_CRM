@@ -31,7 +31,7 @@ import { crmApi } from '../../../services/api';
 import { FuturisticAuthLayout } from '../components/FuturisticAuthLayout';
 
 interface LoginPageProps {
-  onSuccess?: () => void;
+  onSuccess?: (user?: any) => void;
   onSwitchToSignup?: () => void;
   defaultEmail?: string;
 }
@@ -49,9 +49,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [identifier, setIdentifier] = useState(() => {
     if (defaultEmail) return defaultEmail;
     try {
-      return localStorage.getItem('crm_remembered_email') || 'jaga00627@gmail.com';
+      const isRemembered = localStorage.getItem('crm_remember_me') === 'true';
+      const stored = localStorage.getItem('crm_remembered_email') || '';
+      if (stored === 'jaga00627@gmail.com') {
+        localStorage.removeItem('crm_remembered_email');
+        return '';
+      }
+      return isRemembered ? stored : '';
     } catch {
-      return 'jaga00627@gmail.com';
+      return '';
     }
   });
 
@@ -60,30 +66,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [rememberMe, setRememberMe] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem('crm_remember_me');
-      return saved !== 'false';
+      return saved === 'true';
     } catch {
-      return true;
+      return false;
     }
   });
 
   // Error State
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleReturnToDashboard = (loggedInRole?: string) => {
+  const handleReturnToDashboard = (loggedUser?: any) => {
     if (onSuccess) {
-      onSuccess();
+      onSuccess(loggedUser || currentUser);
     } else {
-      const roleUpper = String(loggedInRole || currentUser?.role || '').toUpperCase();
-      const isAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN';
+      const roleUpper = String(loggedUser?.role || currentUser?.role || '').toUpperCase();
+      const isAdmin = roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN' || roleUpper === 'ADMIN';
       setActiveNav(isAdmin ? 'dashboard' : 'employee-dashboard');
-    }
-  };
-
-  const handleGoToSignup = () => {
-    if (onSwitchToSignup) {
-      onSwitchToSignup();
-    } else {
-      setActiveNav('signup');
     }
   };
 
@@ -183,7 +181,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           color: 'teal',
           icon: <IconShieldCheck size={18} />,
         });
-        handleReturnToDashboard(res.user?.role);
+        handleReturnToDashboard(res.user);
       } else {
         setErrorMsg(res.message || 'Invalid email or password.');
       }
@@ -198,13 +196,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     <FuturisticAuthLayout onReturnToDashboard={handleReturnToDashboard}>
       <Paper
         radius="28px"
+        p={{ base: '26px 20px', sm: '38px 36px 32px' }}
         style={{
           width: '100%',
           maxWidth: 430,
           background: '#FFFFFF',
           border: '1px solid rgba(226, 232, 240, 0.85)',
           boxShadow: '0 20px 50px -10px rgba(0, 102, 255, 0.08), 0 10px 30px -5px rgba(15, 23, 42, 0.04), 0 0 1px rgba(0, 0, 0, 0.08)',
-          padding: '38px 36px 32px',
           position: 'relative',
           transition: 'all 0.3s ease',
         }}
@@ -259,7 +257,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 Work Email
               </Text>
               <TextInput
-                placeholder="jaga00627@gmail.com"
+                placeholder="Enter your registered email"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.currentTarget.value)}
                 leftSection={<IconMail size={17} color="#2563EB" stroke={2} />}
@@ -369,21 +367,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </Button>
           </Stack>
         </form>
-
-        {/* Card Footer Switch to Signup */}
-        <Box mt={26} pt={16} style={{ borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>
-          <Text size="13px" style={{ color: '#64748B' }}>
-            Don't have an account?{' '}
-            <Anchor
-              size="13px"
-              fw={700}
-              style={{ color: '#0066FF', cursor: 'pointer' }}
-              onClick={handleGoToSignup}
-            >
-              Register Super Admin →
-            </Anchor>
-          </Text>
-        </Box>
       </Paper>
 
       {/* Dynamic Forgot Password Email Link Modal */}
@@ -456,7 +439,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     Work Email
                   </Text>
                   <TextInput
-                    placeholder="name@company.com"
+                    placeholder="Enter your registered email"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.currentTarget.value)}
                     leftSection={<IconMail size={16} color="#9CA3AF" />}

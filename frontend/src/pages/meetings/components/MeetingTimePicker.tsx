@@ -128,10 +128,46 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
   const [inputText, setInputText] = useState<string>(value || '');
   const [hours, setHours] = useState('10');
   const [minutes, setMinutes] = useState('00');
+  const [customMinuteInput, setCustomMinuteInput] = useState<string>('00');
   const [period, setPeriod] = useState<'AM' | 'PM'>(() => (new Date().getHours() >= 12 ? 'PM' : 'AM'));
 
   const hourListRef = useRef<HTMLDivElement>(null);
   const minuteListRef = useRef<HTMLDivElement>(null);
+
+  // Sync internal custom minute when minutes change
+  useEffect(() => {
+    setCustomMinuteInput(minutes);
+  }, [minutes]);
+
+  const handleApplyCustomMinute = () => {
+    const trimmed = customMinuteInput.trim();
+    if (!trimmed) return;
+    const num = parseInt(trimmed, 10);
+    if (!isNaN(num) && num >= 0 && num <= 59) {
+      const formattedM = String(num).padStart(2, '0');
+      setMinutes(formattedM);
+      setCustomMinuteInput(formattedM);
+      updateFromParts(hours, formattedM, period);
+    }
+  };
+
+  const handleCustomMinuteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+    setCustomMinuteInput(val);
+    const num = parseInt(val, 10);
+    if (!isNaN(num) && num >= 0 && num <= 59 && val.length === 2) {
+      const formattedM = String(num).padStart(2, '0');
+      setMinutes(formattedM);
+      updateFromParts(hours, formattedM, period);
+    }
+  };
+
+  const handleCustomMinuteKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleApplyCustomMinute();
+    }
+  };
 
   // Sync internal state when external value changes
   useEffect(() => {
@@ -284,8 +320,9 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
         position="bottom-start"
         shadow="xl"
         radius="lg"
-        width={270}
-        withArrow
+        width={295}
+        offset={8}
+        withArrow={false}
         withinPortal
         zIndex={zIndex}
       >
@@ -326,11 +363,13 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
         </Popover.Target>
 
         <Popover.Dropdown
-          p="sm"
+          p={14}
           style={{
-            backgroundColor: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF',
-            borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+            boxShadow: isDark
+              ? '0 16px 40px rgba(0, 0, 0, 0.7)'
+              : '0 12px 32px -4px rgba(15, 23, 42, 0.18), 0 4px 12px -2px rgba(15, 23, 42, 0.08)',
             borderRadius: 14,
           }}
         >
@@ -438,7 +477,7 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
             style={{
               display: 'flex',
               gap: 8,
-              height: 170,
+              height: 155,
               position: 'relative',
             }}
           >
@@ -449,6 +488,7 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
                 flex: 1,
                 overflowY: 'auto',
                 scrollbarWidth: 'thin',
+                scrollbarColor: isDark ? 'rgba(255,255,255,0.15) transparent' : 'rgba(0,0,0,0.15) transparent',
                 paddingRight: 2,
               }}
             >
@@ -508,6 +548,7 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
                 flex: 1,
                 overflowY: 'auto',
                 scrollbarWidth: 'thin',
+                scrollbarColor: isDark ? 'rgba(255,255,255,0.15) transparent' : 'rgba(0,0,0,0.15) transparent',
                 paddingRight: 2,
               }}
             >
@@ -552,19 +593,75 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
             </Box>
           </Box>
 
-          <Divider my={8} style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9' }} />
+          {/* Exact Minute Entry Option */}
+          <Box
+            mt="xs"
+            pt={8}
+            pb={4}
+            style={{
+              borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'}`,
+            }}
+          >
+            <Group justify="space-between" align="center">
+              <Group gap={6} align="center">
+                <IconClock size={14} color="#64748B" />
+                <Text size="11px" fw={700} c="dimmed" style={{ letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                  Exact Minute
+                </Text>
+              </Group>
+
+              <Group gap={6} align="center">
+                <TextInput
+                  placeholder="00-59"
+                  value={customMinuteInput}
+                  onChange={handleCustomMinuteChange}
+                  onKeyDown={handleCustomMinuteKeyDown}
+                  maxLength={2}
+                  styles={{
+                    input: {
+                      width: 58,
+                      height: 30,
+                      textAlign: 'center',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      padding: '0 4px',
+                      borderRadius: 8,
+                      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F8FAFC',
+                      borderColor: isDark ? 'rgba(255, 255, 255, 0.14)' : '#CBD5E1',
+                      color: isDark ? '#F8FAFC' : '#0F172A',
+                    },
+                  }}
+                />
+                <Button
+                  size="xs"
+                  variant="light"
+                  color="blue"
+                  h={30}
+                  px={10}
+                  radius="md"
+                  onClick={handleApplyCustomMinute}
+                  style={{ fontSize: 11.5, fontWeight: 700 }}
+                >
+                  Set
+                </Button>
+              </Group>
+            </Group>
+          </Box>
+
+          <Divider my={8} style={{ borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9' }} />
 
           {/* Footer: Now, Clear, Done */}
-          <Group justify="space-between" align="center">
+          <Group justify="space-between" align="center" pt={2} pb={2}>
             <Group gap={6}>
               <Button
                 variant="subtle"
                 size="xs"
                 color="blue"
-                p="xs"
-                h={28}
+                px={10}
+                h={30}
+                radius="md"
                 onClick={handleSetNow}
-                style={{ fontSize: 11.5, fontWeight: 600 }}
+                style={{ fontSize: 12, fontWeight: 600 }}
               >
                 Now
               </Button>
@@ -572,10 +669,11 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
                 variant="subtle"
                 size="xs"
                 color="gray"
-                p="xs"
-                h={28}
+                px={10}
+                h={30}
+                radius="md"
                 onClick={handleClearTime}
-                style={{ fontSize: 11.5, fontWeight: 500 }}
+                style={{ fontSize: 12, fontWeight: 500 }}
               >
                 Clear
               </Button>
@@ -584,14 +682,15 @@ export const MeetingTimePicker: React.FC<MeetingTimePickerProps> = ({
             <Button
               size="xs"
               radius="md"
-              h={28}
+              h={30}
               onClick={() => setOpened(false)}
               style={{
                 backgroundColor: '#2563EB',
                 color: '#FFFFFF',
                 fontWeight: 600,
-                fontSize: 12,
-                padding: '0 14px',
+                fontSize: 12.5,
+                padding: '0 16px',
+                boxShadow: '0 2px 6px rgba(37, 99, 235, 0.3)',
               }}
             >
               Done

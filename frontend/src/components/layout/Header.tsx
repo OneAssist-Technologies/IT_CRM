@@ -51,6 +51,7 @@ export const Header: React.FC<HeaderProps> = () => {
 
   return (
     <Box
+      px={{ base: 10, xs: 14, sm: 20, md: 24 }}
       style={{
         height: 64,
         background: headerBg,
@@ -61,7 +62,6 @@ export const Header: React.FC<HeaderProps> = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 24px',
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -69,8 +69,8 @@ export const Header: React.FC<HeaderProps> = () => {
         boxSizing: 'border-box',
       }}
     >
-      {/* 1. Left: Mobile Burger + Search Bar with fixed max-width */}
-      <Group gap="sm" style={{ flex: 1, maxWidth: 420 }} wrap="nowrap" align="center">
+      {/* 1. Left: Mobile Burger + Search Bar with fluid responsive max-width */}
+      <Group gap="xs" style={{ flex: 1, maxWidth: 420, minWidth: 0 }} wrap="nowrap" align="center">
         <Burger
           opened={sidebarMobileOpened}
           onClick={() => setSidebarMobileOpened(!sidebarMobileOpened)}

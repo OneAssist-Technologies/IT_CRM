@@ -120,24 +120,28 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
   };
 
   const contactOptions = useMemo(() => {
+    const seen = new Set<string>();
     const list: Array<{ value: string; label: string }> = [];
 
     // 1. CRM Contacts
-    contacts.forEach((c) => {
-      list.push({
-        value: c.id,
-        label: c.companyName ? `${c.name} (${c.companyName})` : c.name,
-      });
+    contacts.forEach((c, idx) => {
+      const val = c.id ? String(c.id) : `contact_${idx}`;
+      if (!seen.has(val)) {
+        seen.add(val);
+        list.push({
+          value: val,
+          label: c.companyName ? `${c.name} (${c.companyName})` : c.name,
+        });
+      }
     });
 
     // 2. Leads (if any)
     leads.forEach((l) => {
-      const already = list.some(
-        (item) => item.value === l.id || item.label.toLowerCase() === l.name.toLowerCase()
-      );
-      if (!already) {
+      const val = `lead_${l.id}`;
+      if (!seen.has(val)) {
+        seen.add(val);
         list.push({
-          value: `lead_${l.id}`,
+          value: val,
           label: l.companyName ? `${l.name} (${l.companyName}) [Lead]` : `${l.name} [Lead]`,
         });
       }
@@ -145,12 +149,11 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
 
     // 3. If initialLead is passed and not in list
     if (initialLead && initialLead.id) {
-      const already = list.some(
-        (item) => item.value === initialLead.id || item.value === `lead_${initialLead.id}`
-      );
-      if (!already) {
+      const val = `lead_${initialLead.id}`;
+      if (!seen.has(val)) {
+        seen.add(val);
         list.unshift({
-          value: `lead_${initialLead.id}`,
+          value: val,
           label: initialLead.companyName
             ? `${initialLead.name} (${initialLead.companyName})`
             : `${initialLead.name}`,
@@ -258,10 +261,19 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
   }, [opened, editingCall, initialLead, employees, contacts]);
 
   const employeeOptions = useMemo(() => {
-    return employees.map((e) => ({
-      value: e.id || e.empCode,
-      label: e.name,
-    }));
+    const seen = new Set<string>();
+    const list: Array<{ value: string; label: string }> = [];
+    (employees || []).forEach((e, idx) => {
+      const val = e.id ? String(e.id) : e.empCode ? String(e.empCode) : `emp_${idx}`;
+      if (!seen.has(val)) {
+        seen.add(val);
+        list.push({
+          value: val,
+          label: e.name || val,
+        });
+      }
+    });
+    return list;
   }, [employees]);
 
   // When contact is selected: auto-fill contactName AND phone number!

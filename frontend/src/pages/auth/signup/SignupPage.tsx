@@ -182,13 +182,13 @@ export const SignupPage: React.FC<SignupPageProps> = ({ onSuccess, onSwitchToLog
     <FuturisticAuthLayout onReturnToDashboard={handleReturnToDashboard}>
       <Paper
         radius="28px"
+        p={{ base: '26px 18px 24px', sm: '36px 32px 28px' }}
         style={{
           width: '100%',
-          maxWidth: 480,
+          maxWidth: 490,
           background: '#FFFFFF',
           border: '1px solid rgba(226, 232, 240, 0.85)',
           boxShadow: '0 20px 50px -10px rgba(0, 102, 255, 0.08), 0 10px 30px -5px rgba(15, 23, 42, 0.04), 0 0 1px rgba(0, 0, 0, 0.08)',
-          padding: '36px 32px 28px',
           position: 'relative',
           transition: 'all 0.3s ease',
         }}

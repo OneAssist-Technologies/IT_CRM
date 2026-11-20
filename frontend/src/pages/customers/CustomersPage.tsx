@@ -784,9 +784,10 @@ export const CustomersPage: React.FC = () => {
           </Group>
         </Box>
 
-        {/* The Table View */}
-        <Box style={{ overflowX: 'auto' }}>
-          <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover style={{ minWidth: 1180, userSelect: 'none' }}>
+        {/* The Desktop Table View */}
+        <Box visibleFrom="sm" style={{ width: '100%' }}>
+          <Table.ScrollContainer minWidth={1080}>
+            <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover style={{ minWidth: 1080, userSelect: 'none' }}>
             <Table.Thead
               style={{
                 background: isDark ? '#0F172A' : '#F8FAFC',
@@ -1297,7 +1298,120 @@ export const CustomersPage: React.FC = () => {
               )}
             </Table.Tbody>
           </Table>
-        </Box>
+        </Table.ScrollContainer>
+      </Box>
+
+      {/* MOBILE RESPONSIVE CARD VIEW (Clean Touch Cards for Small Screens) */}
+      <Stack hiddenFrom="sm" gap="sm" p="sm">
+        {paginatedCustomers.length === 0 ? (
+          <Box py="xl" style={{ textAlign: 'center' }}>
+            <Text size="sm" c="dimmed">No customers found</Text>
+          </Box>
+        ) : (
+          paginatedCustomers.map((c) => {
+            const projects = Array.isArray((c as any).purchasedProjects) ? (c as any).purchasedProjects : [];
+            const displayName = c.contactPerson || (c as any).clientName || c.companyName || 'Customer';
+            const companyDisplay = c.companyName || (c as any).profession || 'Organization';
+            return (
+              <Paper
+                key={c.id}
+                p="sm"
+                radius="14px"
+                style={{
+                  background: isDark ? '#111827' : '#FFFFFF',
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+                  boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.03)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => handleViewCustomerDetails(c)}
+              >
+                <Group justify="space-between" align="flex-start" wrap="nowrap" mb="xs">
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Text fw={700} size="sm" truncate style={{ color: isDark ? '#F8FAFC' : '#0F172A' }}>
+                      {displayName}
+                    </Text>
+                    <Text size="11px" c="dimmed" truncate>
+                      {companyDisplay} • ID: {c.customerId}
+                    </Text>
+                  </Box>
+                  <Box style={{ flexShrink: 0 }}>
+                    {renderStatusBadge(c.status)}
+                  </Box>
+                </Group>
+
+                <Stack gap={4} mb="xs">
+                  {c.phone && (
+                    <Group gap={6} wrap="nowrap">
+                      <IconPhone size={13} color="#64748B" style={{ flexShrink: 0 }} />
+                      <Text size="xs" c="dimmed">{c.phone}</Text>
+                    </Group>
+                  )}
+                  {c.email && (
+                    <Group gap={6} wrap="nowrap">
+                      <IconMail size={13} color="#3B82F6" style={{ flexShrink: 0 }} />
+                      <Text size="xs" style={{ color: '#3B82F6' }} truncate>{c.email}</Text>
+                    </Group>
+                  )}
+                  <Group justify="space-between" align="center" mt={2}>
+                    <Text size="xs" fw={700} style={{ color: c.contractValue ? (isDark ? '#34D399' : '#059669') : '#94A3B8' }}>
+                      {c.contractValue ? `₹${Number(c.contractValue).toLocaleString('en-IN')}` : '₹0'}
+                    </Text>
+                    {c.accountManager && c.accountManager !== 'Unassigned' && (
+                      <Badge size="xs" variant="light" color="indigo" radius="sm">
+                        Mgr: {c.accountManager}
+                      </Badge>
+                    )}
+                  </Group>
+                  {projects.length > 0 && (
+                    <Text size="11px" c="dimmed">
+                      Projects: {projects.map((p: any) => p.name || p.projectNumber).join(', ')}
+                    </Text>
+                  )}
+                </Stack>
+
+                <Group justify="flex-end" gap={6} pt="xs" style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9' }} onClick={(e) => e.stopPropagation()}>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="blue"
+                    radius="md"
+                    onClick={() => handleViewCustomerDetails(c)}
+                  >
+                    <IconEye size={14} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="teal"
+                    radius="md"
+                    onClick={() => handleOpenSecondProject(c)}
+                  >
+                    <IconRocket size={14} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="gray"
+                    radius="md"
+                    onClick={() => handleOpenEdit(c)}
+                  >
+                    <IconEdit size={14} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="red"
+                    radius="md"
+                    onClick={() => setDeleteTarget(c)}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Group>
+              </Paper>
+            );
+          })
+        )}
+      </Stack>
 
         {/* Unified Bottom Pagination Footer */}
         <Box

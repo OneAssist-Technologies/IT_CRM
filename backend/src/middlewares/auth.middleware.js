@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma.js';
 import { getCache, setCache } from '../config/redis.js';
 import { env } from '../config/env.js';
 import { verifyToken, COOKIE_NAME } from '../utils/jwt.js';
+import { isEmployeeInactive } from '../utils/employee.util.js';
 
 /**
  * Middleware: Verify Authentication from HttpOnly Cookie (UUID Session / JWT) or Bearer Header
@@ -32,57 +33,98 @@ export async function requireAuth(req, res, next) {
   try {
     req.sessionToken = token;
 
+    let candidateUser = null;
+
     // 1. JWT verify (stateless, immediate)
     if (token.includes('.')) {
       try {
         const decoded = verifyToken(token);
         if (decoded && (decoded.id || decoded.email)) {
-          req.user = {
+          candidateUser = {
             id: decoded.id,
             email: decoded.email,
             name: decoded.name || 'User',
             role: decoded.role || 'STAFF',
           };
-          return next();
         }
       } catch (_) {}
     }
 
     // 2. Redis Session Cache lookup (<1ms response)
-    const cachedSession = await getCache(`crm:session:${token}`);
-    if (cachedSession && (cachedSession.id || cachedSession.email)) {
-      req.user = {
-        id: cachedSession.id,
-        email: cachedSession.email,
-        name: cachedSession.name,
-        role: cachedSession.role || 'SUPER_ADMIN',
-      };
-      return next();
+    if (!candidateUser) {
+      const cachedSession = await getCache(`crm:session:${token}`);
+      if (cachedSession && (cachedSession.id || cachedSession.email)) {
+        candidateUser = {
+          id: cachedSession.id,
+          email: cachedSession.email,
+          name: cachedSession.name,
+          role: cachedSession.role || 'SUPER_ADMIN',
+        };
+      }
     }
 
     // 3. Direct User lookup in Database (supports direct user id or email)
-    const dbUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { id: token },
-          { email: { equals: token, mode: 'insensitive' } },
-        ],
-      },
-      select: { id: true, email: true, name: true, role: true },
-    });
+    if (!candidateUser) {
+      const dbUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: token },
+            { email: { equals: token, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true, email: true, name: true, role: true },
+      });
 
-    if (dbUser) {
-      req.user = {
-        id: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        role: dbUser.role,
-      };
-      await setCache(`crm:session:${token}`, dbUser, 86400 * 7);
-      return next();
+      if (dbUser) {
+        candidateUser = {
+          id: dbUser.id,
+          email: dbUser.email,
+          name: dbUser.name,
+          role: dbUser.role,
+        };
+        await setCache(`crm:session:${token}`, dbUser, 86400 * 7);
+      }
     }
 
-    return res.status(401).json({ success: false, message: 'Invalid or expired session. Please log in again.' });
+    if (!candidateUser) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired session. Please log in again.' });
+    }
+
+    // 4. Employee Active / Inactive Status Access Control
+    const userEmail = candidateUser.email ? candidateUser.email.toLowerCase().trim() : null;
+    const userId = candidateUser.id;
+
+    if (userEmail) {
+      // Fast check in Redis session cache for revoked / deactivated status
+      const isCachedInactive =
+        (await getCache(`crm:inactive:email:${userEmail}`)) ||
+        (userId && (await getCache(`crm:inactive:user:${userId}`)));
+
+      if (isCachedInactive) {
+        return res.status(401).json({
+          success: false,
+          message: 'Your account is inactive. Please contact your administrator.',
+        });
+      }
+
+      // Check database to ensure real-time synchronization
+      const empRecord = await prisma.employee.findFirst({
+        where: { email: { equals: userEmail, mode: 'insensitive' } },
+        select: { id: true, status: true },
+      });
+
+      if (empRecord && isEmployeeInactive(empRecord.status)) {
+        await setCache(`crm:inactive:email:${userEmail}`, true, 86400 * 30);
+        if (userId) await setCache(`crm:inactive:user:${userId}`, true, 86400 * 30);
+        return res.status(401).json({
+          success: false,
+          message: 'Your account is inactive. Please contact your administrator.',
+        });
+      }
+    }
+
+    req.user = candidateUser;
+    return next();
   } catch (err) {
     return res.status(401).json({ success: false, message: 'Invalid or expired session. Please log in again.' });
   }

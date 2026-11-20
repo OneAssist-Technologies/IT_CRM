@@ -409,8 +409,8 @@ export const BillingDashboardView: React.FC<BillingDashboardViewProps> = ({
             </Button>
           </Group>
 
-          <Box style={{ overflowX: 'auto' }}>
-            <Table striped highlightOnHover verticalSpacing="xs">
+          <Table.ScrollContainer minWidth={520}>
+            <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: 520 }}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Invoice #</Table.Th>
@@ -479,7 +479,7 @@ export const BillingDashboardView: React.FC<BillingDashboardViewProps> = ({
                 )}
               </Table.Tbody>
             </Table>
-          </Box>
+          </Table.ScrollContainer>
         </Paper>
 
         {/* Recent Payments */}
@@ -499,8 +499,8 @@ export const BillingDashboardView: React.FC<BillingDashboardViewProps> = ({
             </Button>
           </Group>
 
-          <Box style={{ overflowX: 'auto' }}>
-            <Table striped highlightOnHover verticalSpacing="xs">
+          <Table.ScrollContainer minWidth={520}>
+            <Table striped highlightOnHover verticalSpacing="xs" style={{ minWidth: 520 }}>
               <Table.Thead>
                 <Table.Tr>
                   <Table.Th>Payment #</Table.Th>
@@ -544,7 +544,7 @@ export const BillingDashboardView: React.FC<BillingDashboardViewProps> = ({
                 )}
               </Table.Tbody>
             </Table>
-          </Box>
+          </Table.ScrollContainer>
         </Paper>
       </SimpleGrid>
 

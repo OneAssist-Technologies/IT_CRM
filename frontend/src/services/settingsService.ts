@@ -19,18 +19,26 @@ async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}):
     headers['Authorization'] = `Bearer ${token.trim()}`;
   }
 
-  const response = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers,
-  });
+  try {
+    const response = await fetch(url, {
+      ...options,
+      credentials: 'include',
+      headers,
+    });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(errorData.message || `API Error: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (err: any) {
+    if (!options.method || options.method === 'GET') {
+      console.warn(`[settingsService] ${endpoint} request failed:`, err?.message || err);
+      return { success: false, data: [] } as unknown as T;
+    }
+    throw err;
   }
-
-  return response.json();
 }
 
 export const settingsService = {

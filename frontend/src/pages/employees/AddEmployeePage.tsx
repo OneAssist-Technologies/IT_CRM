@@ -87,7 +87,7 @@ export const AddEmployeePage: React.FC<AddEmployeePageProps> = ({
   };
 
   const { employees, fetchEmployees, addEmployee, updateEmployee } = useEmployee();
-  const { roles, users, fetchRoles, fetchUsers } = useAccessControl();
+  const { roles, users, fetchRoles, fetchUsers, createRole } = useAccessControl();
   const isEditing = Boolean(
     initialData &&
     initialData.id &&
@@ -99,6 +99,12 @@ export const AddEmployeePage: React.FC<AddEmployeePageProps> = ({
     fetchRoles();
     fetchUsers();
     fetchEmployees();
+    // Clean up any legacy custom roles cached in localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('crm_admin_roles');
+      } catch (_) {}
+    }
   }, [fetchRoles, fetchUsers, fetchEmployees]);
 
   useEffect(() => {
@@ -191,9 +197,25 @@ export const AddEmployeePage: React.FC<AddEmployeePageProps> = ({
     }
   };
 
-  const handleSaveCustomItem = () => {
+  const handleSaveCustomItem = async () => {
     const val = customModalInput.trim();
     if (!val) return;
+
+    if (customModal.field === 'role') {
+      try {
+        await createRole({
+          name: val,
+          appType: 'custom',
+        });
+        await fetchRoles();
+      } catch (err) {
+        console.error('Failed to create role in Access Control:', err);
+      }
+      setFormData((prev) => ({ ...prev, role: val }));
+      handleCloseCustomModal();
+      return;
+    }
+
     const { setter, storageKey, formProp } = getCustomListInfo(customModal.field);
     setter((prev) => {
       const updated = prev.includes(val) ? prev : [...prev, val];
@@ -324,19 +346,17 @@ export const AddEmployeePage: React.FC<AddEmployeePageProps> = ({
     return combined;
   }, [employees, customDesignations, formData.designation]);
 
+  // Dynamic Role options fetched strictly from Access Control roles in DB
   const dynamicRoles = useMemo(() => {
     const fromAccessControl = roles.map((r) => r.name?.trim()).filter(Boolean) as string[];
-    const fromDb = employees.map((e) => e.role?.trim()).filter(Boolean) as string[];
     const combined = Array.from(
       new Set([
         ...fromAccessControl,
-        ...fromDb,
-        ...customRoles,
         ...(formData.role ? [formData.role.trim()] : []),
       ])
     ).filter(Boolean).sort((a, b) => a.localeCompare(b));
     return combined;
-  }, [roles, employees, customRoles, formData.role]);
+  }, [roles, formData.role]);
 
   // Dynamic Reporting Manager options fetched from active employees and system managers
   const reportingManagerOptions = useMemo(() => {

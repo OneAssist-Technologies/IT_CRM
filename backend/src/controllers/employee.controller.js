@@ -401,10 +401,21 @@ export async function updateEmployee(req, res) {
       }
     }
 
+    if (status !== undefined) {
+      await employeeService.syncEmployeeStatusWithSessions(updated.email, updated.status);
+    }
+
     await delCache('crm:employees:*');
 
     if (io) {
       io.emit('employee_updated', updated);
+      if (status !== undefined) {
+        io.emit('employee_status_changed', {
+          employeeId: updated.id,
+          email: updated.email,
+          status: updated.status,
+        });
+      }
     }
 
     try {

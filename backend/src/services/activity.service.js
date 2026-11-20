@@ -8,6 +8,22 @@ import { getDataScope } from '../middlewares/permission.middleware.js';
  */
 export function formatActivityResponse(activity) {
   if (!activity) return null;
+  let activityTime = activity.activityTime;
+  if (
+    (activity.title === 'Lead Reassigned' || activity.entityType === 'LeadAssignment') &&
+    activityTime === '09:00 AM' &&
+    activity.createdAt
+  ) {
+    try {
+      activityTime = new Date(activity.createdAt).toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch (_) {}
+  }
+
   return {
     id: activity.id,
     activityNumber: activity.activityNumber,
@@ -29,7 +45,7 @@ export function formatActivityResponse(activity) {
     performedBy: activity.performedBy,
     performedById: activity.performedById,
     activityDate: activity.activityDate,
-    activityTime: activity.activityTime,
+    activityTime,
     metadata: activity.metadata,
     createdAt: activity.createdAt,
     updatedAt: activity.updatedAt,
@@ -385,8 +401,13 @@ export async function syncExistingActivities() {
         existingSet.add(`BANTQualification:${a.leadId}`);
       }
       if (a.type === 'contact' && a.entityId) {
-        existingSet.add(`ContactRegistered:${a.entityId}`);
-        existingSet.add(`ContactAssigned:${a.entityId}`);
+        if (a.entityType === 'Contact') {
+          existingSet.add(`ContactRegistered:${a.entityId}`);
+        } else if (a.entityType === 'ContactAssignment') {
+          existingSet.add(`ContactAssigned:${a.entityId}`);
+        } else {
+          existingSet.add(`ContactRegistered:${a.entityId}`);
+        }
       }
       if (a.type === 'call' && a.entityId) {
         existingSet.add(`CallLog:${a.entityId}`);
@@ -1484,14 +1505,15 @@ export async function reconcileActivityStatuses({ leadId, leadName, leadCode } =
           });
         }
 
-        // 2. Contact Assigned
-        const assignee = matchedContact.assignedToName || resolvedLead.assignedToName;
+        // 2. Contact / Lead Assigned
+        const assignee = resolvedLead.assignedToName || matchedContact.assignedToName;
         if (assignee) {
           const existingAssign = await prisma.activity.findFirst({
             where: {
               OR: [
                 { entityId: matchedContact.id, entityType: 'ContactAssignment' },
                 { leadId: resolvedLead.id, type: 'contact', title: 'Contact Assigned to Sales Rep' },
+                { leadId: resolvedLead.id, type: 'contact', title: 'Lead Assigned to Sales Rep' },
               ],
             },
           });
@@ -1499,7 +1521,7 @@ export async function reconcileActivityStatuses({ leadId, leadName, leadCode } =
             await recordActivity({
               type: 'contact',
               title: 'Contact Assigned to Sales Rep',
-              description: `Assigned to ${assignee}`,
+              description: `Contact assigned to ${assignee} for initial inquiry discovery and requirement qualification assessment.`,
               leadId: resolvedLead.id,
               leadCode: resolvedLead.leadId,
               leadName: resolvedLead.name,
@@ -1513,6 +1535,61 @@ export async function reconcileActivityStatuses({ leadId, leadName, leadCode } =
               activityDate: contactCreatedAt,
               activityTime: '08:15 AM',
             });
+          } else if (resolvedLead.assignedToName && existingAssign.description && !existingAssign.description.includes(resolvedLead.assignedToName)) {
+            // Check if there is already a Lead Reassigned activity for this lead
+            const existingReassign = await prisma.activity.findFirst({
+              where: {
+                leadId: resolvedLead.id,
+                title: 'Lead Reassigned',
+              },
+            });
+
+            const reassignDate = resolvedLead.updatedAt
+              ? new Date(resolvedLead.updatedAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+              : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+            const reassignTime = resolvedLead.updatedAt
+              ? new Date(resolvedLead.updatedAt).toLocaleTimeString('en-US', {
+                  timeZone: 'Asia/Kolkata',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                })
+              : new Date().toLocaleTimeString('en-US', {
+                  timeZone: 'Asia/Kolkata',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true,
+                });
+
+            if (!existingReassign) {
+              await recordActivity({
+                type: 'contact',
+                title: 'Lead Reassigned',
+                description: `Lead reassigned to ${resolvedLead.assignedToName} for active deal pipeline execution.`,
+                leadId: resolvedLead.id,
+                leadCode: resolvedLead.leadId,
+                leadName: resolvedLead.name,
+                customerName: matchedContact.companyName || resolvedLead.companyName || resolvedLead.name,
+                entityId: resolvedLead.id,
+                entityType: 'LeadAssignment',
+                entityNumber: resolvedLead.leadId,
+                status: 'Assigned',
+                performedBy: resolvedLead.assignedToName || 'Admin',
+                activityDate: reassignDate,
+                activityTime: reassignTime,
+              });
+            } else if (existingReassign.activityTime === '09:00 AM' && resolvedLead.updatedAt) {
+              // Self-heal stale placeholder 09:00 AM time to actual lead update timestamp
+              await prisma.activity.update({
+                where: { id: existingReassign.id },
+                data: {
+                  activityDate: reassignDate,
+                  activityTime: reassignTime,
+                  updatedAt: new Date(),
+                },
+              }).catch(() => {});
+            }
           }
         }
 
@@ -1595,6 +1672,37 @@ export async function reconcileActivityStatuses({ leadId, leadName, leadCode } =
             activityDate: matchedContact.qualificationDate || contactCreatedAt,
             activityTime: '08:45 AM',
           });
+        }
+      } else if (resolvedLead.assignedToName) {
+        // Direct Lead assignment if no separate Contact was matched
+        const existingLeadAssign = await prisma.activity.findFirst({
+          where: {
+            leadId: resolvedLead.id,
+            OR: [
+              { entityType: 'LeadAssignment' },
+              { entityType: 'ContactAssignment' },
+              { title: { contains: 'Assigned' } },
+            ],
+          },
+        });
+        if (!existingLeadAssign) {
+          const lCreatedAt = resolvedLead.createdAt ? new Date(resolvedLead.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+          await recordActivity({
+            type: 'contact',
+            title: 'Lead Assigned to Sales Rep',
+            description: `Lead assigned to ${resolvedLead.assignedToName} for active deal pipeline execution.`,
+            leadId: resolvedLead.id,
+            leadCode: resolvedLead.leadId,
+            leadName: resolvedLead.name,
+            customerName: resolvedLead.companyName || resolvedLead.name,
+            entityId: resolvedLead.id,
+            entityType: 'LeadAssignment',
+            entityNumber: resolvedLead.leadId,
+            status: 'Assigned',
+            performedBy: resolvedLead.createdByName || 'Admin',
+            activityDate: lCreatedAt,
+            activityTime: '08:15 AM',
+          }).catch(() => {});
         }
       }
 
@@ -1680,6 +1788,32 @@ export async function reconcileActivityStatuses({ leadId, leadName, leadCode } =
           },
         });
       }
+    }
+
+    // Auto-heal any stale 09:00 AM on Lead Reassigned activities for this lead
+    if (resolvedLead) {
+      try {
+        const staleReassign = await prisma.activity.findMany({
+          where: {
+            leadId: resolvedLead.id,
+            title: 'Lead Reassigned',
+            activityTime: '09:00 AM',
+          },
+        });
+        for (const st of staleReassign) {
+          const srcTime = st.createdAt || resolvedLead.updatedAt || new Date();
+          const fixedTime = new Date(srcTime).toLocaleTimeString('en-US', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+          await prisma.activity.update({
+            where: { id: st.id },
+            data: { activityTime: fixedTime },
+          }).catch(() => {});
+        }
+      } catch (_) {}
     }
   } catch (reconcileErr) {
     console.error('Error during reconcileActivityStatuses:', reconcileErr);

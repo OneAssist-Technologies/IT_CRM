@@ -44,18 +44,35 @@ export function buildEmployeeFilterQuery(queryParams = {}) {
 }
 
 /**
+ * Check if employee status represents an Inactive / Disabled state
+ */
+export function isEmployeeInactive(status) {
+  if (!status) return false;
+  const s = String(status).trim().toLowerCase();
+  return (
+    s === 'inactive' ||
+    s.startsWith('inact') ||
+    s === 'relieved' ||
+    s === 'terminated' ||
+    s === 'suspended' ||
+    s === 'disabled'
+  );
+}
+
+/**
  * Format single employee record
  */
 export function formatEmployeeResponse(employee) {
   if (!employee) return null;
   return {
     ...employee,
-    isActive: employee.status === 'Active' || employee.status === 'ACTIVE',
+    isActive: !isEmployeeInactive(employee.status),
   };
 }
 
 export default {
   generateEmpCode,
   buildEmployeeFilterQuery,
+  isEmployeeInactive,
   formatEmployeeResponse,
 };

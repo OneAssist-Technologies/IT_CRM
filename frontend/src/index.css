@@ -1495,3 +1495,137 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
   border-color: #38BDF8 !important;
   color: #38BDF8 !important;
 }
+
+/* =========================================================================
+ * UNIVERSAL RESPONSIVE ENGINE (Screen Size Adaptability for All Pages)
+ * ========================================================================= */
+
+/* 1. Fluid container & media handling */
+img,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.recharts-responsive-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+.recharts-wrapper {
+  max-width: 100% !important;
+}
+
+/* 2. Responsive Table Scroll Containers */
+.mantine-Table-scrollContainer {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mantine-Table-scrollContainer::-webkit-scrollbar {
+  height: 6px;
+}
+
+.mantine-Table-scrollContainer::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 999px;
+}
+
+/* 3. Global Modal & Drawer Responsiveness */
+@media (max-width: 768px) {
+  .mantine-Modal-content {
+    max-width: calc(100vw - 20px) !important;
+    margin: 10px auto !important;
+    border-radius: 16px !important;
+  }
+
+  .mantine-Modal-body {
+    padding: 16px !important;
+    max-height: calc(100vh - 120px) !important;
+    overflow-y: auto !important;
+  }
+
+  .mantine-Drawer-content {
+    max-width: 85vw !important;
+  }
+}
+
+/* 4. Tablet Screen Breakpoint Adjustments (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Tablet container padding */
+  #crm-main-scroll-container > .mantine-Container-root {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  /* Reduce dense headings slightly on tablets */
+  .crm-page-title,
+  h1, h2 {
+    font-size: clamp(20px, 2.5vw, 26px) !important;
+  }
+
+  /* Keep KPI cards grid 2 or 3 cols */
+  .superadmin-kpi-card,
+  .employee-kpi-card {
+    padding: 16px !important;
+  }
+}
+
+/* 5. Mobile Screen Breakpoint Adjustments (<= 768px) */
+@media (max-width: 768px) {
+  /* Root scroll container padding */
+  #crm-main-scroll-container {
+    height: calc(100vh - 64px) !important;
+  }
+
+  #crm-main-scroll-container > .mantine-Container-root {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-top: 10px !important;
+    padding-bottom: 32px !important;
+  }
+
+  /* Top headers & toolbars wrap neatly */
+  .mantine-Paper-root {
+    border-radius: 16px !important;
+  }
+
+  /* Form inputs & buttons sizing on mobile */
+  .mantine-TextInput-input,
+  .mantine-Select-input,
+  .mantine-PasswordInput-input {
+    font-size: 14px !important;
+  }
+
+  /* Horizontal swipeable tab bars on mobile */
+  .crm-swipeable-tabs {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+  }
+
+  .crm-swipeable-tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+}
+
+/* 6. Extra Small Mobile Breakpoint Adjustments (<= 480px) */
+@media (max-width: 480px) {
+  #crm-main-scroll-container > .mantine-Container-root {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  /* Very small screens: compact action buttons */
+  .mantine-ActionIcon-root {
+    min-width: 28px !important;
+  }
+
+  .mantine-Badge-root {
+    font-size: 10px !important;
+  }
+}
+

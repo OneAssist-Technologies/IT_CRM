@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { EXCLUDED_LEGACY_MODULES } from '../models/model.registry.js';
 
 /**
  * Generate a URL/DB safe slug from a role name
@@ -35,7 +36,10 @@ export function countActivePermissions(permissions = []) {
  */
 export function formatRoleResponse(role) {
   if (!role) return null;
-  const activePermissionsCount = countActivePermissions(role.permissions || []);
+  const filteredPermissions = (role.permissions || []).filter(
+    (p) => !EXCLUDED_LEGACY_MODULES.has(p.moduleId)
+  );
+  const activePermissionsCount = countActivePermissions(filteredPermissions);
   const users = role.users || [];
 
   return {
@@ -51,7 +55,7 @@ export function formatRoleResponse(role) {
     activePermissionsCount,
     parentRole: role.parentRole || null,
     childRoles: role.childRoles || [],
-    permissions: role.permissions || [],
+    permissions: filteredPermissions,
     createdAt: role.createdAt,
     updatedAt: role.updatedAt,
   };
