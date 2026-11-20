@@ -19,6 +19,7 @@ import {
   IconPhone,
   IconBuilding,
   IconCalendar,
+  IconMapPin,
 } from '@tabler/icons-react';
 import { ActivityLogItem, ActivityLogSection } from '../../../types/callLog';
 import { Contact } from '../../../types/contact';
@@ -54,6 +55,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [location, setLocation] = useState('');
   const [performedBy, setPerformedBy] = useState('');
   const [performedById, setPerformedById] = useState<string | null>(null);
   const [channelType, setChannelType] = useState('Outgoing');
@@ -73,6 +75,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       setCustomerName('');
       setPhone('');
       setEmail('');
+      setLocation('');
       setDescription('');
       setNextFollowDate('');
       setActivityDate(new Date().toISOString().slice(0, 10));
@@ -102,6 +105,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       setCustomerName('');
       setPhone('');
       setEmail('');
+      setLocation('');
       setLeadId(null);
       return;
     }
@@ -112,6 +116,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       setContactName(customName);
       setSearchQuery(customName);
       setLeadId(null);
+      setLocation('');
       return;
     }
 
@@ -124,6 +129,10 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       setPhone(found.phone || '');
       setEmail(found.email || '');
       setLeadId(found.internalReference || (found as any).leadId || null);
+      const loc = (found as any).location || (found as any).address || (found as any).city || '';
+      if (loc) {
+        setLocation(loc);
+      }
       if (found.assignedToName) {
         setPerformedBy(found.assignedToName);
         if (found.assignedTo) setPerformedById(found.assignedTo);
@@ -133,6 +142,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       setSearchQuery(val);
       setContactId(null);
       setLeadId(null);
+      setLocation('');
     }
   };
 
@@ -156,6 +166,7 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       phone: phone.trim() || undefined,
       phoneNumber: phone.trim() || undefined,
       email: email.trim() || undefined,
+      location: section === 'others' && channelType === 'Direct Visit' ? location.trim() || undefined : undefined,
       messageType: section === 'whatsapp' ? channelType : undefined,
       emailType: section === 'email' ? channelType : undefined,
       activityType: section === 'others' ? channelType : undefined,
@@ -445,6 +456,17 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
               leftSection={<IconUser size={16} stroke={1.5} />}
             />
           </SimpleGrid>
+
+          {section === 'others' && channelType === 'Direct Visit' && (
+            <TextInput
+              label="Location"
+              placeholder="Enter visit location or office address (e.g. Client Office, MG Road, Bangalore)"
+              value={location}
+              onChange={(e) => setLocation(e.currentTarget.value)}
+              styles={inputStyles}
+              leftSection={<IconMapPin size={16} stroke={1.5} />}
+            />
+          )}
 
           <Textarea
             label="Notes / Description"

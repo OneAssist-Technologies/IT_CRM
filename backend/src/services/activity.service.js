@@ -58,7 +58,7 @@ export function formatActivityResponse(activity) {
 let currentMaxNum = null;
 let activityNumberLock = Promise.resolve();
 
-async function generateActivityNumber() {
+export async function generateActivityNumber(prefix = 'ACT') {
   return new Promise((resolve, reject) => {
     activityNumberLock = activityNumberLock
       .then(async () => {
@@ -82,10 +82,10 @@ async function generateActivityNumber() {
         }
 
         currentMaxNum++;
-        let candidateId = `ACT-2026-${currentMaxNum}`;
+        let candidateId = `${prefix}-2026-${currentMaxNum}`;
         while (await prisma.activity.findUnique({ where: { activityNumber: candidateId } })) {
           currentMaxNum++;
-          candidateId = `ACT-2026-${currentMaxNum}`;
+          candidateId = `${prefix}-2026-${currentMaxNum}`;
         }
         resolve(candidateId);
       })

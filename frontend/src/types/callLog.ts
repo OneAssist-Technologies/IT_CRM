@@ -20,6 +20,8 @@ export interface CallLog {
   status: CallStatus;
   callDate: string;
   callTime: string;
+  fromTime?: string;
+  toTime?: string;
   description?: string | null;
   createdAt?: string;
   updatedAt?: string;
@@ -42,6 +44,7 @@ export interface ActivityLogItem {
   phone?: string;
   phoneNumber?: string;
   email?: string;
+  location?: string;
   messageType?: string;
   emailType?: string;
   activityType?: string;

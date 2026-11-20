@@ -22,6 +22,7 @@ import {
   IconNotes,
   IconBrandWhatsapp,
   IconActivity,
+  IconMapPin,
 } from '@tabler/icons-react';
 import { ActivityLogItem } from '../../../types/callLog';
 import { useEmployee } from '../../../context/EmployeeContext';
@@ -297,6 +298,21 @@ export const ActivityDetailsModal: React.FC<ActivityDetailsModalProps> = ({
                   </Text>
                   <Text size="sm" fw={700} style={{ color: isDark ? '#FDE68A' : '#B45309' }}>
                     {activity.nextFollowDate}
+                  </Text>
+                </div>
+              </Group>
+            )}
+
+            {/* Visit Location (if any) */}
+            {(activity.location || (activity.metadata as any)?.location) && (
+              <Group gap="sm" align="flex-start" wrap="nowrap" style={{ gridColumn: '1 / -1' }}>
+                <IconMapPin size={18} color={isDark ? '#F59E0B' : '#D97706'} style={{ marginTop: 2 }} />
+                <div>
+                  <Text size="11px" fw={600} style={{ color: isDark ? '#94A3B8' : '#64748B', textTransform: 'uppercase' }}>
+                    Location / Address
+                  </Text>
+                  <Text size="sm" fw={600} style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>
+                    {activity.location || (activity.metadata as any)?.location}
                   </Text>
                 </div>
               </Group>

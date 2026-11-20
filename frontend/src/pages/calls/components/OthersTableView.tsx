@@ -23,6 +23,7 @@ import {
   IconPhone,
   IconMail,
   IconPlus,
+  IconMapPin,
 } from '@tabler/icons-react';
 import { ActivityLogItem } from '../../../types/callLog';
 import { useEmployee } from '../../../context/EmployeeContext';
@@ -254,6 +255,14 @@ export const OthersTableView: React.FC<OthersTableViewProps> = ({
                           <IconBuilding size={12} color={isDark ? '#64748B' : '#94A3B8'} />
                           <Text size="11px" style={{ color: isDark ? '#94A3B8' : '#64748B' }}>
                             {company}
+                          </Text>
+                        </Group>
+                      )}
+                      {(item.location || (item.metadata as any)?.location) && (
+                        <Group gap={6} wrap="nowrap">
+                          <IconMapPin size={12} color={isDark ? '#FBBF24' : '#D97706'} />
+                          <Text size="11px" style={{ color: isDark ? '#FBBF24' : '#D97706' }} lineClamp={1}>
+                            {item.location || (item.metadata as any)?.location}
                           </Text>
                         </Group>
                       )}

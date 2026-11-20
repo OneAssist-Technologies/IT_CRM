@@ -21,6 +21,8 @@ interface CallDurationPickerProps {
   placeholder?: string;
   required?: boolean;
   zIndex?: number;
+  maxWidth?: number | string;
+  style?: React.CSSProperties;
 }
 
 const PRESET_DURATIONS = [
@@ -100,6 +102,8 @@ export const CallDurationPicker: React.FC<CallDurationPickerProps> = ({
   placeholder = 'MM:SS',
   required = true,
   zIndex = 1500,
+  maxWidth,
+  style,
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
@@ -187,7 +191,7 @@ export const CallDurationPicker: React.FC<CallDurationPickerProps> = ({
   const currentDurationValue = `${min}:${sec}`;
 
   return (
-    <Box>
+    <Box style={{ maxWidth, ...style }}>
       <Popover
         opened={opened}
         onChange={setOpened}
