@@ -144,6 +144,9 @@ export const EXCLUDED_LEGACY_MODULES = new Set([
   'billing', // standalone billing module excluded from sidebar/rbac
   'negotiations',
   'invoices',
+  'activity', // legacy alias of activity_timeline
+  'activities', // legacy alias of activity_timeline
+  'tickets', // legacy alias of support_tickets
 ]);
 
 /**
@@ -160,11 +163,17 @@ export async function getDynamicModules() {
   });
 
   const modulesMap = new Map();
-  SYSTEM_MODULES.forEach((m) => modulesMap.set(m.id, { ...m, isSystem: true }));
+  const seenNames = new Set();
+  SYSTEM_MODULES.forEach((m) => {
+    modulesMap.set(m.id, { ...m, isSystem: true });
+    if (m.name) seenNames.add(m.name.toLowerCase().trim());
+  });
 
   // Only include user-created custom modules, ignore obsolete legacy template modules
   dbPermissions.forEach((p) => {
-    if (!modulesMap.has(p.moduleId) && !EXCLUDED_LEGACY_MODULES.has(p.moduleId)) {
+    const cleanName = (p.moduleName || p.moduleId || '').toLowerCase().trim();
+    if (!modulesMap.has(p.moduleId) && !EXCLUDED_LEGACY_MODULES.has(p.moduleId) && !seenNames.has(cleanName)) {
+      seenNames.add(cleanName);
       modulesMap.set(p.moduleId, {
         id: p.moduleId,
         name: p.moduleName || p.moduleId,

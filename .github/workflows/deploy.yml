@@ -154,9 +154,7 @@ jobs:
                   break
                 fi
                 if [ "$i" -eq 15 ]; then
-                  echo "Backend health check failed. Showing PM2 status and logs:"
-                  pm2 status it-crm-backend || true
-                  pm2 logs it-crm-backend --lines 50 --nostream || true
+                  echo "Backend health check failed."
                   exit 1
                 fi
                 sleep 2

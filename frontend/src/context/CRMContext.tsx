@@ -40,7 +40,26 @@ interface CRMContextType {
   clearDatabase: () => Promise<void>;
 }
 
-const CRMContext = createContext<CRMContextType | undefined>(undefined);
+export const DEFAULT_CRM_CONTEXT_VALUE: CRMContextType = {
+  currentUser: defaultEmptyUser,
+  setCurrentUser: () => {},
+  setCurrentUserRole: () => {},
+  isAuthenticated: false,
+  setIsAuthenticated: () => {},
+  isAuthChecking: false,
+  logoutUser: async () => {},
+  activeNav: 'login',
+  setActiveNav: () => {},
+  globalSearch: '',
+  setGlobalSearch: () => {},
+  sidebarMobileOpened: false,
+  setSidebarMobileOpened: () => {},
+  sidebarCollapsed: false,
+  setSidebarCollapsed: () => {},
+  clearDatabase: async () => {},
+};
+
+const CRMContext = createContext<CRMContextType>(DEFAULT_CRM_CONTEXT_VALUE);
 
 export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<UserProfile>(() => {
@@ -75,14 +94,14 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   });
 
   const resolveNavFromPath = (rawPathname?: string): string => {
-    if (typeof window === 'undefined') return 'signup';
+    if (typeof window === 'undefined') return 'login';
     const pathname = rawPathname || window.location.pathname;
     const stripped = stripAppBasePath(pathname);
     const path = stripped.replace(/^\//, '').split('?')[0].replace(/\/+$/, '').toLowerCase();
 
     if (!path || path === 'it-crm' || path === 'itcrm') {
       const token = typeof window !== 'undefined' ? localStorage.getItem('crm_token') : null;
-      if (!token || token === 'null' || token === 'undefined') return 'signup';
+      if (!token || token === 'null' || token === 'undefined') return 'login';
       const saved = localStorage.getItem('crm_active_nav');
       if (saved && saved !== 'login' && saved !== 'signup') {
         return saved === 'onboard-employee' || saved === 'onboard' ? 'add-employee' : saved;
@@ -90,8 +109,18 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return 'dashboard';
     }
 
-    if (path === 'signup') return 'signup';
-    if (path === 'login' || path === 'signin' || path === 'auth') return 'login';
+    if (path === 'itcrmsignup' || path === 'it-crm-signup') {
+      return 'signup';
+    }
+    if (
+      path === 'signup' ||
+      path === 'register' ||
+      path === 'login' ||
+      path === 'signin' ||
+      path === 'auth'
+    ) {
+      return 'login';
+    }
     if (path === 'reset-password' || path === 'reset') return 'reset-password';
 
     if (path === 'dashboard') return 'dashboard';
@@ -319,7 +348,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         targetPath = '/login';
         break;
       case 'signup':
-        targetPath = '/signup';
+        targetPath = '/itcrmsignup';
         break;
       case 'reset-password':
       case 'reset':
@@ -355,9 +384,9 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const isPublicNav = resolved === 'signup' || resolved === 'login' || resolved === 'reset-password';
 
       if (!token && !isPublicNav) {
-        const target = getTargetPathForNav('signup');
-        setActiveNavState('signup');
-        window.history.replaceState({ nav: 'signup' }, '', target);
+        const target = getTargetPathForNav('login');
+        setActiveNavState('login');
+        window.history.replaceState({ nav: 'login' }, '', target);
         return;
       }
 
@@ -386,14 +415,26 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const pathname = window.location.pathname.replace(/\/+$/, '').toLowerCase();
       const stripped = stripAppBasePath(pathname).replace(/^\//, '').toLowerCase();
       const token = localStorage.getItem('crm_token');
-      const isPublicNav = stripped === 'login' || stripped === 'signup' || stripped === 'reset-password';
+      // If user accesses /signup or /register directly, redirect to /login
+      if (stripped === 'signup' || stripped === 'register' || pathname.endsWith('/signup') || pathname.endsWith('/register')) {
+        const target = getTargetPathForNav('login');
+        setActiveNavState('login');
+        window.history.replaceState({ nav: 'login' }, '', target);
+        return;
+      }
+
+      const isPublicNav =
+        stripped === 'login' ||
+        stripped === 'itcrmsignup' ||
+        stripped === 'it-crm-signup' ||
+        stripped === 'reset-password';
 
       // If root or bare base path
       if (pathname === '' || pathname === '/it-crm' || pathname === '/itcrm') {
         if (!token) {
-          const target = getTargetPathForNav('signup');
-          setActiveNavState('signup');
-          window.history.replaceState({ nav: 'signup' }, '', target);
+          const target = getTargetPathForNav('login');
+          setActiveNavState('login');
+          window.history.replaceState({ nav: 'login' }, '', target);
           return;
         }
         const roleUpper = String(currentUser?.role || '').toUpperCase();
@@ -418,9 +459,9 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       // If unauthenticated user visits protected page -> redirect to signup
       if (!token && !isPublicNav) {
-        const target = getTargetPathForNav('signup');
-        setActiveNavState('signup');
-        window.history.replaceState({ nav: 'signup' }, '', target);
+        const target = getTargetPathForNav('login');
+        setActiveNavState('login');
+        window.history.replaceState({ nav: 'login' }, '', target);
         return;
       }
 
@@ -428,7 +469,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!pathname.startsWith('/it-crm') && !pathname.startsWith('/itcrm')) {
         const resolved = resolveNavFromPath();
         const nav = (!token && resolved !== 'signup' && resolved !== 'login' && resolved !== 'reset-password')
-          ? 'signup'
+          ? 'login'
           : resolved;
         const target = getTargetPathForNav(nav);
         setActiveNavState(nav);
@@ -474,16 +515,41 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setCurrentUser(defaultEmptyUser);
         setIsAuthenticated(false);
         setIsAuthChecking(false);
-        const target = getTargetPathForNav('signup');
-        setActiveNavState('signup');
+        const target = getTargetPathForNav('login');
+        setActiveNavState('login');
         if (typeof window !== 'undefined') {
-          window.history.replaceState({ nav: 'signup' }, '', target);
+          window.history.replaceState({ nav: 'login' }, '', target);
         }
       });
 
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Listen for account deactivation while user is in active session
+  useEffect(() => {
+    const handleDeactivated = (e: any) => {
+      const msg = e.detail?.message || 'Your account is inactive. Please contact your administrator.';
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('crm_token');
+        localStorage.removeItem('crm_user');
+        localStorage.removeItem('crm_my_permissions');
+      }
+      setCurrentUser(defaultEmptyUser);
+      setIsAuthenticated(false);
+      setIsAuthChecking(false);
+      setActiveNav('login');
+      notifications.show({
+        title: 'Account Inactive',
+        message: msg,
+        color: 'red',
+        autoClose: 10000,
+      });
+    };
+
+    window.addEventListener('crm_account_deactivated', handleDeactivated);
+    return () => window.removeEventListener('crm_account_deactivated', handleDeactivated);
   }, []);
 
   const [globalSearch, setGlobalSearch] = useState<string>('');
@@ -560,7 +626,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCurrentUser(defaultEmptyUser);
       setIsAuthenticated(false);
       setIsAuthChecking(false);
-      setActiveNav('signup');
+      setActiveNav('login');
       notifications.show({
         title: 'Logged Out',
         message: 'Session closed successfully.',
@@ -606,8 +672,5 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useCRM = () => {
   const context = useContext(CRMContext);
-  if (!context) {
-    throw new Error('useCRM must be used within a CRMProvider');
-  }
-  return context;
+  return context || DEFAULT_CRM_CONTEXT_VALUE;
 };

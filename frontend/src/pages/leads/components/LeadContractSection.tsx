@@ -1504,7 +1504,8 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
             boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.25)' : '0 2px 10px rgba(0, 0, 0, 0.04)',
           }}
         >
-          <Table verticalSpacing="md" horizontalSpacing="lg" highlightOnHover>
+          <Table.ScrollContainer minWidth={850}>
+            <Table verticalSpacing="md" horizontalSpacing="lg" highlightOnHover style={{ minWidth: 850 }}>
             <Table.Thead
               style={{
                 background: isDark ? '#111827' : '#F8FAFC',
@@ -1760,6 +1761,7 @@ export const LeadContractSection: React.FC<LeadContractSectionProps> = ({
             )}
           </Table.Tbody>
         </Table>
+      </Table.ScrollContainer>
 
         {/* Pagination */}
         {totalPages > 1 && (

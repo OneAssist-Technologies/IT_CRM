@@ -374,7 +374,7 @@ export const InvoicesPage: React.FC<InvoicesPageProps> = ({
             />
           </Grid.Col>
 
-          <Grid.Col span={{ base: 12, sm: 'auto', md: 0.5 }}>
+          <Grid.Col span={{ base: 12, xs: 2, sm: 'auto', md: 1 }}>
             <Tooltip label="Reset all filters">
               <ActionIcon
                 variant="light"
@@ -396,8 +396,10 @@ export const InvoicesPage: React.FC<InvoicesPageProps> = ({
       <Paper radius="md" withBorder style={{ position: 'relative', overflow: 'hidden', background: isDark ? 'var(--mantine-color-dark-7)' : '#FFFFFF' }}>
         <LoadingOverlay visible={loading} overlayProps={{ blur: 1 }} />
 
-        <Box style={{ overflowX: 'auto' }}>
-          <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover style={{ minWidth: 1100, fontSize: 13 }}>
+        {/* Desktop / Tablet Scrollable Table */}
+        <Box visibleFrom="sm" style={{ width: '100%' }}>
+          <Table.ScrollContainer minWidth={1050}>
+            <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover style={{ minWidth: 1050, fontSize: 13 }}>
             <Table.Thead style={{ background: isDark ? 'var(--mantine-color-dark-6)' : '#F8FAFC' }}>
               <Table.Tr>
                 <Table.Th style={{ width: 140 }}>Invoice Number</Table.Th>
@@ -673,7 +675,116 @@ export const InvoicesPage: React.FC<InvoicesPageProps> = ({
               )}
             </Table.Tbody>
           </Table>
-        </Box>
+        </Table.ScrollContainer>
+      </Box>
+
+      {/* MOBILE RESPONSIVE CARD VIEW (Clean Touch Cards for Small Screens) */}
+      <Stack hiddenFrom="sm" gap="sm" p="sm">
+        {invoices.length > 0 ? (
+          invoices.map((inv) => {
+            const sym = inv.currency === 'USD' ? '$' : inv.currency === 'EUR' ? '€' : '₹';
+            const isOverdue = inv.dueDate < todayStr && inv.outstandingBalance > 0 && inv.status !== 'Cancelled' && inv.status !== 'Paid';
+
+            return (
+              <Paper
+                key={inv.id}
+                p="sm"
+                radius="14px"
+                style={{
+                  background: isDark ? 'var(--mantine-color-dark-6)' : '#FFFFFF',
+                  border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                  cursor: 'pointer',
+                }}
+                onClick={() => onViewInvoice(inv)}
+              >
+                <Group justify="space-between" align="flex-start" wrap="nowrap" mb="xs">
+                  <Box style={{ flex: 1, minWidth: 0 }}>
+                    <Text size="sm" fw={800} style={{ color: '#2563EB' }}>
+                      {inv.invoiceNumber}
+                    </Text>
+                    <Text size="xs" fw={600} truncate style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}>
+                      {inv.companyName || (inv as any).clientName || (inv as any).customerName || 'Client'}
+                    </Text>
+                  </Box>
+                  <InvoiceStatusBadge status={inv.status} size="xs" />
+                </Group>
+
+                <Stack gap={4} mb="xs">
+                  <Group justify="space-between">
+                    <Text size="11px" c="dimmed">Invoice Date: {inv.invoiceDate || '—'}</Text>
+                    <Text size="11px" c={isOverdue ? 'red' : 'dimmed'}>Due: {inv.dueDate || '—'}</Text>
+                  </Group>
+                  <Group justify="space-between" align="baseline">
+                    <Text size="xs" fw={700}>
+                      Total: {sym}{inv.grandTotal?.toLocaleString('en-IN') || 0}
+                    </Text>
+                    <Text size="xs" fw={600} style={{ color: inv.outstandingBalance > 0 ? '#EF4444' : '#10B981' }}>
+                      Bal: {sym}{inv.outstandingBalance?.toLocaleString('en-IN') || 0}
+                    </Text>
+                  </Group>
+                  <Group justify="flex-start">
+                    <PaymentStatusBadge status={inv.paymentStatus || (inv.outstandingBalance === 0 ? 'Paid' : 'Unpaid')} size="xs" />
+                  </Group>
+                </Stack>
+
+                <Group justify="flex-end" gap={6} pt="xs" style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9' }} onClick={(e) => e.stopPropagation()}>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="blue"
+                    radius="md"
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setAutoPrint(false);
+                      setPrintModalOpened(true);
+                    }}
+                  >
+                    <IconEye size={14} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="indigo"
+                    radius="md"
+                    onClick={() => triggerDownload(inv)}
+                  >
+                    <IconDownload size={14} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="light"
+                    size="sm"
+                    color="blue"
+                    radius="md"
+                    onClick={() => {
+                      setSelectedInvoice(inv);
+                      setAutoPrint(false);
+                      setPrintModalOpened(true);
+                    }}
+                  >
+                    <IconPrinter size={14} />
+                  </ActionIcon>
+                  {inv.status !== 'Cancelled' && (
+                    <ActionIcon
+                      variant="light"
+                      size="sm"
+                      color="teal"
+                      radius="md"
+                      onClick={() => onEditInvoice(inv)}
+                    >
+                      <IconEdit size={14} />
+                    </ActionIcon>
+                  )}
+                </Group>
+              </Paper>
+            );
+          })
+        ) : (
+          <Box py="xl" style={{ textAlign: 'center' }}>
+            <Text size="sm" c="dimmed">No invoices found</Text>
+          </Box>
+        )}
+      </Stack>
 
         {/* 5. Pagination Bar */}
         <Box p="md" style={{ borderTop: `1px solid ${isDark ? 'var(--mantine-color-dark-4)' : '#E2E8F0'}` }}>

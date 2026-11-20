@@ -238,6 +238,7 @@ export const ContactsPage: React.FC = () => {
 
       const contactStatus = (c.status || '').toLowerCase().trim();
       const qualStatus = (c.qualificationStatus || '').toLowerCase().trim();
+      const stage = (c.stage || '').toLowerCase().trim();
       const isNotInterested =
         contactStatus === 'not interested' ||
         contactStatus === 'not-interested' ||
@@ -248,6 +249,23 @@ export const ContactsPage: React.FC = () => {
       const isQualified =
         !isNotInterested &&
         (contactStatus === 'qualified' || qualStatus === 'qualified');
+
+      const isPending =
+        !isNotInterested &&
+        (contactStatus === 'pending' || qualStatus === 'pending' || (c as any).callStatus === 'Pending');
+
+      const isInQualification =
+        !isNotInterested &&
+        (
+          isQualified ||
+          isPending ||
+          contactStatus === 'qualification' ||
+          qualStatus === 'qualification' ||
+          stage === 'qualification' ||
+          qualStatus === 'in progress' ||
+          qualStatus.includes('follow') ||
+          (Boolean(qualStatus) && qualStatus !== 'new' && qualStatus !== 'not connected')
+        );
 
       const src = (c.source || '').toLowerCase().trim();
       const isBulk =
@@ -264,12 +282,12 @@ export const ContactsPage: React.FC = () => {
         // Bulk import contacts list: show all bulk contacts including Qualified!
         if (!isBulk) return false;
       } else if (activeTab === 'NEW') {
-        // New contacts list: direct/manual contacts that are NOT bulk and NOT qualified!
+        // New contacts list: direct/manual contacts that are NOT bulk and NOT in qualification!
         if (isBulk) return false;
-        if (isQualified) return false;
+        if (isInQualification) return false;
       } else if (activeTab === 'ASSIGNED') {
-        // Qualification section contact list: ONLY show contacts that have been Qualified!
-        if (!isQualified) return false;
+        // Qualification section contact list: show all contacts in qualification (Qualified, Pending, In Progress, etc.)
+        if (!isInQualification) return false;
       }
 
       // Status filter matching (checks both status and qualificationStatus)
@@ -353,7 +371,7 @@ export const ContactsPage: React.FC = () => {
       prevTabRef.current = activeTab;
       if (activeTab === 'ASSIGNED') {
         const assignedTarget = !isAdmin && currentUser?.name ? currentUser.name : 'All';
-        setFilters({ tab: 'ASSIGNED', assignmentStatus: 'All', status: 'Qualified', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
+        setFilters({ tab: 'ASSIGNED', assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
       } else if (activeTab === 'BULK_IMPORT') {
         setFilters({ tab: 'BULK_IMPORT', source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
       } else {
@@ -407,7 +425,7 @@ export const ContactsPage: React.FC = () => {
     }
     if (tab === 'ASSIGNED') {
       const assignedTarget = !isAdmin && currentUser?.name ? currentUser.name : 'All';
-      setFilters({ tab: 'ASSIGNED', assignmentStatus: 'All', status: 'Qualified', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
+      setFilters({ tab: 'ASSIGNED', assignmentStatus: 'All', status: 'All', source: 'All', assignedTo: assignedTarget, sortBy: 'updatedAt', sortOrder: 'desc' });
     } else if (tab === 'BULK_IMPORT') {
       setFilters({ tab: 'BULK_IMPORT', source: 'Bulk Import', assignmentStatus: 'All', status: 'All', assignedTo: 'All', sortBy: 'updatedAt', sortOrder: 'desc' });
       fetchImportBatches(1);
@@ -456,8 +474,12 @@ export const ContactsPage: React.FC = () => {
     const isQualSection = activeTab === 'ASSIGNED';
     if (isQualSection) {
       return [
-        { value: 'Qualified', label: 'All Qualified' },
-        { value: 'All', label: 'All Qualified' },
+        { value: 'All', label: 'All Statuses' },
+        { value: 'Qualified', label: 'Qualified' },
+        { value: 'Pending', label: 'Pending' },
+        { value: 'In Progress', label: 'In Progress' },
+        { value: 'Follow-up Required', label: 'Follow-up' },
+        { value: 'Disqualified', label: 'Disqualified' },
       ];
     }
     const rawOptions = [
@@ -543,7 +565,7 @@ export const ContactsPage: React.FC = () => {
 
   const hasLocalSearchOrFilter = Boolean(
     (filters.search && filters.search.trim()) ||
-    (filters.status && filters.status !== 'All' && filters.status !== 'Qualified') ||
+    (filters.status && filters.status !== 'All') ||
     (filters.source && filters.source !== 'All' && filters.source !== 'Bulk Import') ||
     (filters.assignedTo && filters.assignedTo !== 'All') ||
     (dateFilter.type && dateFilter.type !== 'ALL') ||

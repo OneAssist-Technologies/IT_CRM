@@ -181,8 +181,8 @@ export const OthersTableView: React.FC<OthersTableViewProps> = ({
         overflow: 'hidden',
       }}
     >
-      <Box style={{ overflowX: 'auto' }}>
-        <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover>
+      <Table.ScrollContainer minWidth={780}>
+        <Table verticalSpacing="sm" horizontalSpacing="md" highlightOnHover style={{ minWidth: 780 }}>
           <Table.Thead
             style={{
               backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
@@ -343,7 +343,7 @@ export const OthersTableView: React.FC<OthersTableViewProps> = ({
             })}
           </Table.Tbody>
         </Table>
-      </Box>
+      </Table.ScrollContainer>
     </Paper>
   );
 };

@@ -424,7 +424,7 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
         ...propHandover,
 
-        handoverModules: propHandover.handoverModules || (() => {
+        handoverModules: Array.isArray(propHandover.handoverModules) ? propHandover.handoverModules : (() => {
 
           try {
 
@@ -546,7 +546,7 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
       // Transferred deliverables & modules from Progress section
 
-      handoverModules: propHandover?.handoverModules || (() => {
+      handoverModules: Array.isArray(propHandover?.handoverModules) ? propHandover.handoverModules : (() => {
 
         try {
 
@@ -618,7 +618,7 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
         ...(propHandover || {}),
 
-        handoverModules: propHandover?.handoverModules || prev.handoverModules,
+        handoverModules: Array.isArray(propHandover?.handoverModules) ? propHandover.handoverModules : prev.handoverModules,
 
         projectName: linkedProject?.name || prev.projectName,
 
@@ -668,13 +668,13 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
   const handedOverModules: HandoverDeliverableItem[] = useMemo(() => {
 
-    if (data.handoverModules && data.handoverModules.length > 0) {
+    if (Array.isArray(data.handoverModules)) {
 
       return data.handoverModules;
 
     }
 
-    if (propHandover?.handoverModules && propHandover.handoverModules.length > 0) {
+    if (Array.isArray(propHandover?.handoverModules)) {
 
       return propHandover.handoverModules;
 
@@ -684,11 +684,11 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
       const stored = localStorage.getItem(`crm_lead_handover_modules_${lead.id}`);
 
-      if (stored) {
+      if (stored !== null) {
 
         const parsed = JSON.parse(stored);
 
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
 
       }
 
@@ -738,7 +738,7 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
 
 
-  // Remove a deliverable from handover
+  // Remove a deliverable from handover (frees it to be selectable in Progress)
 
   const handleRemoveHandoverItem = (itemId: string) => {
 
@@ -754,15 +754,103 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
       localStorage.setItem(`crm_lead_handover_modules_${lead.id}`, JSON.stringify(updatedModules));
 
+      const hStored = localStorage.getItem(`crm_lead_handover_${lead.id}`);
+
+      if (hStored) {
+
+        const parsed = JSON.parse(hStored);
+
+        parsed.handoverModules = updatedModules;
+
+        localStorage.setItem(`crm_lead_handover_${lead.id}`, JSON.stringify(parsed));
+
+      }
+
     } catch (_) {}
+
+    if (typeof window !== 'undefined') {
+
+      window.dispatchEvent(
+
+        new CustomEvent('crm_handover_modules_updated', {
+
+          detail: { leadId: lead.id, handoverModules: updatedModules }
+
+        })
+
+      );
+
+    }
 
     notifications.show({
 
       title: 'Deliverable Removed',
 
-      message: 'Deliverable removed from handover list',
+      message: 'Deliverable removed from Handover. It is now selectable again in Progress section.',
 
-      color: 'gray',
+      color: 'teal',
+
+      icon: <IconCheck size={16} />,
+
+    });
+
+  };
+
+
+
+  // Remove all deliverables / clear handover (frees all modules and project to be selectable in Progress)
+
+  const handleRemoveAllHandoverItems = () => {
+
+    const updatedModules: HandoverDeliverableItem[] = [];
+
+    const updatedData = { ...data, handoverModules: updatedModules };
+
+    setData(updatedData);
+
+    onUpdateHandover(updatedData);
+
+    try {
+
+      localStorage.setItem(`crm_lead_handover_modules_${lead.id}`, JSON.stringify([]));
+
+      const hStored = localStorage.getItem(`crm_lead_handover_${lead.id}`);
+
+      if (hStored) {
+
+        const parsed = JSON.parse(hStored);
+
+        parsed.handoverModules = [];
+
+        localStorage.setItem(`crm_lead_handover_${lead.id}`, JSON.stringify(parsed));
+
+      }
+
+    } catch (_) {}
+
+    if (typeof window !== 'undefined') {
+
+      window.dispatchEvent(
+
+        new CustomEvent('crm_handover_modules_updated', {
+
+          detail: { leadId: lead.id, handoverModules: [] }
+
+        })
+
+      );
+
+    }
+
+    notifications.show({
+
+      title: 'Handover Cleared',
+
+      message: 'All deliverables removed from Handover. Project and modules are now selectable in Progress section.',
+
+      color: 'blue',
+
+      icon: <IconCheck size={16} />,
 
     });
 
@@ -2397,6 +2485,19 @@ export const LeadHandoverSection: React.FC<LeadHandoverSectionProps> = ({
 
 
         <Group gap="sm" wrap="wrap">
+
+          {handedOverModules.length > 0 && (
+            <Button
+              size="sm"
+              variant="light"
+              color="red"
+              leftSection={<IconTrash size={14} />}
+              onClick={handleRemoveAllHandoverItems}
+              style={{ borderRadius: 10, fontWeight: 650 }}
+            >
+              Clear All from Handover
+            </Button>
+          )}
 
           <Button
 

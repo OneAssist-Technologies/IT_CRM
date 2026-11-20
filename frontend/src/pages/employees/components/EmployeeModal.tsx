@@ -16,6 +16,7 @@ import {
 import { IconUserPlus, IconEdit, IconCheck } from '@tabler/icons-react';
 import { Employee, EmployeeStatus, EmploymentType, UserRole } from '../../../types/employee';
 import { CRM_COLORS } from '../../../theme/colors';
+import { useAccessControl } from '../../../context/AccessControlContext';
 
 interface EmployeeModalProps {
   opened: boolean;
@@ -32,13 +33,15 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
 }) => {
   const isEditing = Boolean(editingEmployee);
 
+  const { roles } = useAccessControl();
+
   const [formData, setFormData] = useState<Partial<Employee>>({
     name: '',
     email: '',
     phone: '',
     designation: '',
-    department: 'Software Engineering',
-    role: 'DEVELOPER',
+    department: '',
+    role: '',
     employmentType: 'FULL_TIME',
     status: 'ACTIVE',
     workLocation: 'Chennai HQ',
@@ -54,6 +57,14 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
     linkedin: '',
     notes: '',
   });
+
+  const roleOptions = React.useMemo(() => {
+    const list = roles.map((r) => ({ value: r.name, label: r.name }));
+    if (formData.role && !list.some((o) => o.value === formData.role)) {
+      list.unshift({ value: formData.role, label: formData.role });
+    }
+    return list;
+  }, [roles, formData.role]);
 
   const [loading, setLoading] = useState(false);
 
@@ -87,8 +98,8 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
         email: '',
         phone: '',
         designation: '',
-        department: 'Software Engineering',
-        role: 'DEVELOPER',
+        department: '',
+        role: roles[0]?.name || '',
         employmentType: 'FULL_TIME',
         status: 'ACTIVE',
         workLocation: 'Chennai HQ',
@@ -227,16 +238,10 @@ export const EmployeeModal: React.FC<EmployeeModalProps> = ({
 
             <Select
               label="System Role"
-              value={formData.role || 'Employee'}
-              onChange={(val) => setFormData({ ...formData, role: (val as UserRole) || 'Employee' })}
+              value={formData.role || (roleOptions[0]?.value || '')}
+              onChange={(val) => setFormData({ ...formData, role: (val as UserRole) || '' })}
               radius="14px"
-              data={[
-                { value: 'SUPER_ADMIN', label: 'Super Admin / CEO' },
-                { value: 'Employee', label: 'Employee' },
-                { value: 'PROJECT_MANAGER', label: 'Project / Delivery Manager' },
-                { value: 'TECH_LEAD', label: 'Technical Lead' },
-                { value: 'DEVELOPER', label: 'Software Engineer' },
-              ]}
+              data={roleOptions}
               styles={{
                 input: { background: CRM_COLORS.backgroundLight },
               }}

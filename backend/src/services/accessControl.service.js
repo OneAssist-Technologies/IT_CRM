@@ -228,6 +228,25 @@ export async function ensureSystemRolesService() {
     }
   }
 
+  // Clean up legacy alias role permissions that cause duplicate UI module cards
+  await prisma.rolePermission.deleteMany({
+    where: {
+      moduleId: {
+        in: [
+          'activity',
+          'activities',
+          'tickets',
+          'calls',
+          'employees',
+          'meetings',
+          'projects_management',
+          'negotiations',
+          'invoices',
+        ],
+      },
+    },
+  }).catch(() => {});
+
   return { superAdminRole };
 }
 

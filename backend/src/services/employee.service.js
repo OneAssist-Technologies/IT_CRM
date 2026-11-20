@@ -3,7 +3,7 @@ import { prisma } from '../config/prisma.js';
 import { getCache, setCache, delCache } from '../config/redis.js';
 import { logAuditEvent } from './auditService.js';
 import { io } from '../utils/socket.js';
-import { generateEmpCode, buildEmployeeFilterQuery, formatEmployeeResponse } from '../utils/employee.util.js';
+import { generateEmpCode, buildEmployeeFilterQuery, formatEmployeeResponse, isEmployeeInactive } from '../utils/employee.util.js';
 
 /**
  * 1. Get all employees with optional filtering, search, and Redis caching
@@ -244,6 +244,41 @@ export async function createEmployeeService(body, user, ip = '127.0.0.1') {
 }
 
 /**
+ * Synchronize employee Active / Inactive status with active sessions & tokens
+ */
+export async function syncEmployeeStatusWithSessions(employeeEmail, status) {
+  if (!employeeEmail) return;
+  const cleanEmail = employeeEmail.toLowerCase().trim();
+  const isInactive = isEmployeeInactive(status);
+
+  try {
+    const targetUser = await prisma.user.findFirst({
+      where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+      select: { id: true, email: true },
+    });
+
+    if (isInactive) {
+      await setCache(`crm:inactive:email:${cleanEmail}`, true, 86400 * 30);
+      if (targetUser) {
+        await setCache(`crm:inactive:user:${targetUser.id}`, true, 86400 * 30);
+        await delCache(`crm:session:${targetUser.id}`);
+        await prisma.user.update({
+          where: { id: targetUser.id },
+          data: { refreshToken: null },
+        }).catch(() => {});
+      }
+    } else {
+      await delCache(`crm:inactive:email:${cleanEmail}`);
+      if (targetUser) {
+        await delCache(`crm:inactive:user:${targetUser.id}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Employee Status Session Sync Warning]', err.message);
+  }
+}
+
+/**
  * 5. Update Employee Details
  */
 export async function updateEmployeeService(id, body, user, ip = '127.0.0.1') {
@@ -311,6 +346,10 @@ export async function updateEmployeeService(id, body, user, ip = '127.0.0.1') {
     },
   });
 
+  if (status !== undefined) {
+    await syncEmployeeStatusWithSessions(updated.email, updated.status);
+  }
+
   await delCache('crm:employees:*');
 
   if (io) {
@@ -349,10 +388,18 @@ export async function updateEmployeeStatusService(id, status, user, ip = '127.0.
     data: { status },
   });
 
+  await syncEmployeeStatusWithSessions(updated.email, updated.status);
+
   await delCache('crm:employees:*');
 
   if (io) {
     io.emit('employee_updated', updated);
+    io.emit('employee_status_changed', {
+      employeeId: updated.id,
+      email: updated.email,
+      status: updated.status,
+      isInactive: isEmployeeInactive(updated.status),
+    });
   }
 
   await logAuditEvent({
@@ -419,5 +466,6 @@ export default {
   createEmployeeService,
   updateEmployeeService,
   updateEmployeeStatusService,
+  syncEmployeeStatusWithSessions,
   deleteEmployeeService,
 };

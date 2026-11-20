@@ -553,37 +553,9 @@ export async function createCallLogService(data) {
     },
   });
 
-  try {
-    const actCount = await prisma.activity.count();
-    await prisma.activity.create({
-      data: {
-        activityNumber: `CAL-2026-${1001 + actCount}`,
-        type: 'call',
-        title: `Call: ${callType} - ${normalizedStatus}`,
-        description: description.trim() || '',
-        leadId: leadId || null,
-        contactId: contactId || null,
-        contactName: contactName.trim() || 'Contact',
-        customerName: data.companyName || null,
-        status: normalizedStatus,
-        performedBy: employeeName.trim() || 'Staff',
-        performedById: employeeId ? String(employeeId) : null,
-        activityDate: callDate,
-        activityTime: callTime,
-        metadata: {
-          callType,
-          phoneNumber,
-          nextFollowDate: data.nextFollowDate || data.followUpDate || undefined,
-        },
-      },
-    });
-  } catch (actErr) {
-    console.warn('[createCallLogService] Activity log notice:', actErr.message);
-  }
-
   const enrichedCall = (await enrichCallLogsWithMetadata([newCall]))[0] || formatCallLogResponse(newCall);
 
-  // Record Call Log Activity for timeline
+  // Record Call Log Activity for timeline (Single canonical activity per call)
   try {
     await recordActivity({
       type: 'call',
