@@ -23,8 +23,11 @@ import { EXCLUDED_LEGACY_MODULES } from '../models/model.registry.js';
 export function mergeSystemAndDbModules(systemModules = [], dbPermissions = []) {
   const moduleMap = new Map();
 
+  const seenNames = new Set();
   for (const sysMod of systemModules) {
     if (EXCLUDED_LEGACY_MODULES && EXCLUDED_LEGACY_MODULES.has(sysMod.id)) continue;
+    const cleanName = (sysMod.name || '').toLowerCase().trim();
+    if (cleanName) seenNames.add(cleanName);
     moduleMap.set(sysMod.id, {
       id: sysMod.id,
       name: sysMod.name,
@@ -36,7 +39,11 @@ export function mergeSystemAndDbModules(systemModules = [], dbPermissions = []) 
 
   for (const p of dbPermissions) {
     if (EXCLUDED_LEGACY_MODULES && EXCLUDED_LEGACY_MODULES.has(p.moduleId)) continue;
+    const cleanName = (p.moduleName || '').toLowerCase().trim();
+    if (cleanName && seenNames.has(cleanName) && !moduleMap.has(p.moduleId)) continue;
+
     if (!moduleMap.has(p.moduleId)) {
+      if (cleanName) seenNames.add(cleanName);
       moduleMap.set(p.moduleId, {
         id: p.moduleId,
         name: p.moduleName,

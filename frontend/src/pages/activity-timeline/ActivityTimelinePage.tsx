@@ -149,7 +149,9 @@ export const cleanActivityDescription = (desc?: string | null, status?: string |
   cleaned = cleaned.replace(/Commercial terms,\s*license volume,\s*and GST breakdown agreed at\s*/gi, 'Agreed deal value: ');
   cleaned = cleaned.replace(/\.?\s*Approved for contract execution\.?/gi, '');
   cleaned = cleaned.replace(/Handover completed\s*-\s*Assigned to\s*/gi, 'Project assigned to ');
-  cleaned = cleaned.replace(/Contact assigned to ([^ ]+) for initial inquiry discovery and requirement qualification assessment\.?/gi, 'Assigned to $1');
+  cleaned = cleaned.replace(/Contact assigned to ([^.]+) for initial inquiry discovery and requirement qualification assessment\.?/gi, 'Assigned to $1');
+  cleaned = cleaned.replace(/Lead assigned to ([^.]+) for active deal pipeline execution\.?/gi, 'Assigned to $1');
+  cleaned = cleaned.replace(/Lead reassigned to ([^ ]+) \(previously ([^)]+)\) for active deal pipeline execution\.?/gi, 'Reassigned to $1 (previously $2)');
   cleaned = cleaned.replace(/Contact #?([A-Za-z0-9_-]+)(?: \([^)]+\))? was successfully qualified and converted to Lead pipeline\. Deal pipeline initialized\.?/gi, 'Qualified from Contact #$1');
   cleaned = cleaned.replace(/was successfully qualified and converted to Lead pipeline\. Deal pipeline initialized\.?/gi, 'Qualified from Contact to Lead pipeline');
   cleaned = cleaned.replace(/Contact #?([A-Za-z0-9_-]+)(?: \([^)]+\))? registered via /gi, 'Registered via ');
@@ -253,13 +255,26 @@ export const ActivityTimelinePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-clear stale selected lead if it no longer exists in database
+  // Keep selectedLead synchronized with the latest data from leads context
   useEffect(() => {
-    if (!leadsLoading && selectedLead) {
-      const exists = leads.some(
+    if (!leadsLoading && selectedLead && leads.length > 0) {
+      const fresh = leads.find(
         (l) => l.id === selectedLead.id || (l.leadId && l.leadId === selectedLead.leadId)
       );
-      if (!exists) {
+      if (fresh) {
+        if (
+          fresh.assignedTo !== selectedLead.assignedTo ||
+          fresh.assignedToName !== selectedLead.assignedToName ||
+          fresh.status !== selectedLead.status ||
+          fresh.stage !== selectedLead.stage ||
+          fresh.priority !== selectedLead.priority
+        ) {
+          setSelectedLead(fresh);
+          try {
+            sessionStorage.setItem('crm_activity_timeline_selected_lead', JSON.stringify(fresh));
+          } catch (_) {}
+        }
+      } else {
         setSelectedLead(null);
         try {
           sessionStorage.removeItem('crm_activity_timeline_selected_lead');
@@ -553,6 +568,21 @@ export const ActivityTimelinePage: React.FC = () => {
     return h * 60 + m;
   };
 
+  // Helper to resolve effective activity display time (recovers real creation time if stale 09:00 AM placeholder was stored)
+  const getItemEffectiveTime = (item: ActivityItem): string => {
+    if (
+      (item.title?.toLowerCase().includes('reassign') || item.title?.toLowerCase().includes('lead assign')) &&
+      item.activityTime === '09:00 AM' &&
+      item.createdAt
+    ) {
+      try {
+        const d = dayjs(item.createdAt);
+        if (d.isValid()) return d.format('hh:mm A');
+      } catch (_) {}
+    }
+    return item.activityTime || (item.createdAt ? dayjs(item.createdAt).format('hh:mm A') : '10:00 AM');
+  };
+
   // Sort activities: latest/newest first or chronological pipeline flow (oldest first)
   const sortedActivities = useMemo(() => {
     const list = [...activities];
@@ -564,7 +594,7 @@ export const ActivityTimelinePage: React.FC = () => {
           return dateB.localeCompare(dateA);
         }
 
-        const timeDiff = parseTimeMinutes(b.activityTime) - parseTimeMinutes(a.activityTime);
+        const timeDiff = parseTimeMinutes(getItemEffectiveTime(b)) - parseTimeMinutes(getItemEffectiveTime(a));
         if (timeDiff !== 0) return timeDiff;
 
         return (b.createdAt || '').localeCompare(a.createdAt || '');
@@ -577,7 +607,7 @@ export const ActivityTimelinePage: React.FC = () => {
           return dateA.localeCompare(dateB);
         }
 
-        const timeDiff = parseTimeMinutes(a.activityTime) - parseTimeMinutes(b.activityTime);
+        const timeDiff = parseTimeMinutes(getItemEffectiveTime(a)) - parseTimeMinutes(getItemEffectiveTime(b));
         if (timeDiff !== 0) return timeDiff;
 
         return (a.createdAt || '').localeCompare(b.createdAt || '');
@@ -655,13 +685,23 @@ export const ActivityTimelinePage: React.FC = () => {
   }, [sortedActivities]);
 
   // Visual style for each activity type
-  const getActivityStyle = (type: string) => {
+  const getActivityStyle = (type: string, title?: string) => {
     const t = (type || '').toLowerCase();
+    const isAssign = (title || '').toLowerCase().includes('assign');
     switch (t) {
+      case 'assignment':
+        return {
+          label: 'Assignment',
+          icon: <IconUserCheck size={23} stroke={2.2} />,
+          badgeBg: isDark ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
+          badgeText: isDark ? '#60A5FA' : '#1D4ED8',
+          iconBg: isDark ? 'rgba(59, 130, 246, 0.25)' : '#EFF6FF',
+          iconColor: isDark ? '#60A5FA' : '#2563EB',
+        };
       case 'contact':
         return {
-          label: 'Contact Ingestion',
-          icon: <IconUserPlus size={23} stroke={2.2} />,
+          label: isAssign ? 'Assignment' : 'Contact Ingestion',
+          icon: isAssign ? <IconUserCheck size={23} stroke={2.2} /> : <IconUserPlus size={23} stroke={2.2} />,
           badgeBg: isDark ? 'rgba(59, 130, 246, 0.2)' : '#EFF6FF',
           badgeText: isDark ? '#60A5FA' : '#1D4ED8',
           iconBg: isDark ? 'rgba(59, 130, 246, 0.25)' : '#EFF6FF',
@@ -1436,8 +1476,9 @@ export const ActivityTimelinePage: React.FC = () => {
             width: isTablet ? '100%' : (isLaptop ? 340 : 360),
             minWidth: isTablet ? '100%' : 320,
             maxWidth: isTablet ? '100%' : 380,
-            flex: isTablet ? 'none' : (isLaptop ? '0 0 340px' : '0 0 360px'),
+            flexGrow: 0,
             flexShrink: 0,
+            flexBasis: isTablet ? 'auto' : (isLaptop ? 340 : 360),
             height: isTablet ? 'auto' : '100%',
             minHeight: 0,
             display: 'flex',
@@ -1975,9 +2016,11 @@ export const ActivityTimelinePage: React.FC = () => {
                 flexShrink: 0,
                 borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}`,
                 width: '100%',
+                overflowX: 'auto',
+                scrollbarWidth: 'none',
               }}
             >
-              <Group gap={6} wrap="nowrap" style={{ width: '100%' }}>
+              <Group gap={8} wrap="nowrap" style={{ width: '100%', minWidth: 'max-content' }}>
                 {[
                   { id: 'discovery', label: 'Discovery', count: ribbonStageCounts.discovery },
                   { id: 'qualification', label: 'Qualification', count: ribbonStageCounts.qualification },
@@ -2000,9 +2043,9 @@ export const ActivityTimelinePage: React.FC = () => {
                         }
                       }}
                       style={{
-                        flex: 1,
-                        minWidth: 0,
-                        padding: '8px 10px',
+                        flex: '1 0 auto',
+                        minWidth: 'max-content',
+                        padding: '6px 12px',
                         borderRadius: 10,
                         backgroundColor: isActive
                           ? '#2563EB'
@@ -2177,7 +2220,7 @@ export const ActivityTimelinePage: React.FC = () => {
                 <Stack gap={12} style={{ width: '100%', minWidth: 0, paddingTop: 4 }}>
                   {displayedActivities.map((item, itemIdx) => {
                     const isGlobalFirst = itemIdx === 0;
-                    const style = getActivityStyle(item.type);
+                    const style = getActivityStyle(item.type, item.title);
                     const statusCfg = getActivityStatusConfig(item.status || style.label, isGlobalFirst);
 
                     return (
@@ -2256,13 +2299,13 @@ export const ActivityTimelinePage: React.FC = () => {
                         >
                           <Group
                             justify="space-between"
-                            align={isMobile ? 'flex-start' : 'center'}
-                            wrap={isMobile ? 'wrap' : 'nowrap'}
+                            align="center"
+                            wrap="wrap"
                             gap={isMobile ? 'xs' : 'md'}
                             style={{ width: '100%', minWidth: 0 }}
                           >
                             {/* Left: Avatar/Icon Circle + Titles */}
-                            <Group gap={isMobile ? 'xs' : 'md'} align="center" wrap="nowrap" style={{ minWidth: 0, flex: 1 }}>
+                            <Group gap={isMobile ? 'xs' : 'md'} align="center" wrap="nowrap" style={{ minWidth: isMobile ? '100%' : 220, flex: '1 1 240px' }}>
                               {/* Circle Icon Avatar */}
                               <Box
                                 style={{
@@ -2289,7 +2332,8 @@ export const ActivityTimelinePage: React.FC = () => {
                                     color: isDark ? '#FFFFFF' : '#0F172A',
                                     letterSpacing: '-0.01em',
                                     lineHeight: 1.3,
-                                    wordBreak: 'break-word',
+                                    wordBreak: 'normal',
+                                    overflowWrap: 'break-word',
                                   }}
                                 >
                                   {item.title}
@@ -2300,7 +2344,8 @@ export const ActivityTimelinePage: React.FC = () => {
                                   mt={2}
                                   style={{
                                     lineHeight: 1.4,
-                                    wordBreak: 'break-word',
+                                    wordBreak: 'normal',
+                                    overflowWrap: 'break-word',
                                     whiteSpace: 'pre-line',
                                   }}
                                 >
@@ -2311,21 +2356,19 @@ export const ActivityTimelinePage: React.FC = () => {
 
                             {/* Right: Clock Icon + Time & Status Pill Badge */}
                             <Group
-                              gap={isMobile ? 'xs' : 'md'}
+                              gap={isMobile ? 'xs' : 'sm'}
                               align="center"
                               wrap="nowrap"
-                              justify={isMobile ? 'space-between' : 'flex-end'}
+                              justify="flex-end"
                               style={{
                                 flexShrink: 0,
-                                width: isMobile ? '100%' : 'auto',
-                                marginTop: isMobile ? 2 : 0,
-                                paddingLeft: isMobile ? 44 : 0,
+                                marginLeft: isMobile ? 44 : 'auto',
                               }}
                             >
                               <Group gap={5} align="center">
                                 <IconClock size={13} stroke={1.8} color="#94A3B8" />
                                 <Text size={isMobile ? '11.5px' : '12.5px'} fw={500} c="dimmed">
-                                  {item.activityTime || '09:00 AM'}
+                                  {getItemEffectiveTime(item)}
                                 </Text>
                               </Group>
                               <Box

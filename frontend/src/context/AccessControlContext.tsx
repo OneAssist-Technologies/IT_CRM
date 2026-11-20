@@ -159,7 +159,7 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
       activeNav === 'login' ||
       activeNav === 'reset-password' ||
       (typeof window !== 'undefined' &&
-        (window.location.pathname.includes('/signup') ||
+        (window.location.pathname.includes('/itcrmsignup') ||
           window.location.pathname.includes('/login') ||
           window.location.pathname.includes('/reset-password')))
   );
@@ -223,14 +223,16 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
       roleUpper !== 'MANAGEMENT'
   );
 
-  // True Super Admin gets bypass from verified server permissions, user profile or sandy@gmail.com (when not explicitly an employee role)
+  // True Super Admin gets bypass from verified server permissions, user profile or sandy@gmail.com / sandyyy@gmail.com (when not explicitly an employee role)
   const isSuperAdmin = Boolean(
     isAuthenticated &&
-      !isPublicPage &&
       !isExplicitEmployee &&
       (roleUpper === 'SUPER_ADMIN' ||
         roleUpper === 'SUPER ADMIN' ||
-        (currentUser?.email && currentUser.email.toLowerCase() === 'sandy@gmail.com') ||
+        (currentUser?.email && (
+          currentUser.email.toLowerCase() === 'sandy@gmail.com' ||
+          currentUser.email.toLowerCase() === 'sandyyy@gmail.com'
+        )) ||
         (isUserMatchingPermissions && myPermissions?.isSuperAdmin) ||
         (isUserMatchingPermissions && roleSlugStr === 'super_admin'))
   );
@@ -257,9 +259,33 @@ export const AccessControlProvider: React.FC<{ children: React.ReactNode }> = ({
         accessControlService.getModules(),
       ]);
 
-      // Populate system modules
-      const filterLegacy = (mods: SystemModule[]) =>
-        mods.filter((m) => m.id !== 'negotiations' && m.id !== 'invoices');
+      // Populate system modules (filter obsolete aliases and deduplicate)
+      const EXCLUDED_MODULE_IDS = new Set([
+        'negotiations',
+        'invoices',
+        'activity',
+        'activities',
+        'tickets',
+        'deals',
+        'companies',
+        'calls',
+        'employees',
+        'meetings',
+        'projects_management',
+        'rbac',
+        'billing',
+      ]);
+
+      const filterLegacy = (mods: SystemModule[]) => {
+        const seenNames = new Set<string>();
+        return mods.filter((m) => {
+          if (EXCLUDED_MODULE_IDS.has(m.id)) return false;
+          const cleanName = (m.name || '').trim().toLowerCase();
+          if (seenNames.has(cleanName)) return false;
+          seenNames.add(cleanName);
+          return true;
+        });
+      };
 
       if (modulesRes.success && modulesRes.modules && modulesRes.modules.length > 0) {
         setSystemModules(filterLegacy(modulesRes.modules));
@@ -596,17 +622,17 @@ export const useAccessControl = () => {
 export const usePermissions = () => {
   const access = useAccessControl();
   return {
-    can: access.can || (() => true),
-    canView: access.canView || (() => true),
-    canCreate: access.canCreate || (() => true),
-    canEdit: access.canEdit || (() => true),
-    canDelete: access.canDelete || (() => true),
-    canExport: access.canExport || (() => true),
-    canApprove: access.canApprove || (() => true),
-    getDataScope: access.getDataScope || (() => 'All'),
-    isSuperAdmin: access.isSuperAdmin ?? true,
+    can: access.can || (() => false),
+    canView: access.canView || (() => false),
+    canCreate: access.canCreate || (() => false),
+    canEdit: access.canEdit || (() => false),
+    canDelete: access.canDelete || (() => false),
+    canExport: access.canExport || (() => false),
+    canApprove: access.canApprove || (() => false),
+    getDataScope: access.getDataScope || (() => 'Own'),
+    isSuperAdmin: access.isSuperAdmin ?? false,
     myPermissions: access.myPermissions,
-    permissionsLoaded: access.permissionsLoaded ?? true,
+    permissionsLoaded: access.permissionsLoaded ?? false,
   };
 };
 

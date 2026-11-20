@@ -1,7 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { generateCallId, formatCallLogResponse } from '../utils/callLog.util.js';
 import { io } from '../utils/socket.js';
-import { recordActivity } from './activity.service.js';
+import { recordActivity, generateActivityNumber } from './activity.service.js';
 import { getDataScope } from '../middlewares/permission.middleware.js';
 
 /**
@@ -553,37 +553,9 @@ export async function createCallLogService(data) {
     },
   });
 
-  try {
-    const actCount = await prisma.activity.count();
-    await prisma.activity.create({
-      data: {
-        activityNumber: `CAL-2026-${1001 + actCount}`,
-        type: 'call',
-        title: `Call: ${callType} - ${normalizedStatus}`,
-        description: description.trim() || '',
-        leadId: leadId || null,
-        contactId: contactId || null,
-        contactName: contactName.trim() || 'Contact',
-        customerName: data.companyName || null,
-        status: normalizedStatus,
-        performedBy: employeeName.trim() || 'Staff',
-        performedById: employeeId ? String(employeeId) : null,
-        activityDate: callDate,
-        activityTime: callTime,
-        metadata: {
-          callType,
-          phoneNumber,
-          nextFollowDate: data.nextFollowDate || data.followUpDate || undefined,
-        },
-      },
-    });
-  } catch (actErr) {
-    console.warn('[createCallLogService] Activity log notice:', actErr.message);
-  }
-
   const enrichedCall = (await enrichCallLogsWithMetadata([newCall]))[0] || formatCallLogResponse(newCall);
 
-  // Record Call Log Activity for timeline
+  // Record Call Log Activity for timeline (Single canonical activity per call)
   try {
     await recordActivity({
       type: 'call',
@@ -742,6 +714,7 @@ export function formatSectionActivity(act) {
     phone: meta.phoneNumber || meta.phone || '',
     phoneNumber: meta.phoneNumber || meta.phone || '',
     email: meta.email || '',
+    location: meta.location || meta.address || '',
     messageType: meta.messageType || (act.title?.includes('Template') ? 'Template Message' : (act.title?.includes('Direct') ? 'Direct Message' : (act.title?.includes('Incoming') ? 'Incoming' : 'Outgoing'))),
     emailType: meta.emailType || (act.title?.includes('Proposal') ? 'Proposal' : (act.title?.includes('Introduction') ? 'Introduction' : (act.title?.includes('Incoming') ? 'Incoming' : 'Outgoing'))),
     activityType: meta.activityType || (act.title?.includes('Direct Visit') ? 'Direct Visit' : (act.title?.includes('SMS') ? 'SMS' : (act.title?.includes('Social') ? 'Social Media' : (act.title?.includes('Event') ? 'Event / Exhibition' : 'Other')))),
@@ -1003,9 +976,7 @@ export async function createSectionActivityService(section, data, user) {
   const timeStr = data.activityTime || '10:00 AM';
 
   const type = sec === 'whatsapp' ? 'whatsapp' : (sec === 'email' ? 'email' : 'other');
-  const count = await prisma.activity.count();
   const prefix = sec === 'whatsapp' ? 'WA' : (sec === 'email' ? 'EML' : 'ACT');
-  const activityNumber = `${prefix}-2026-${1001 + count}`;
 
   let performedBy = data.performedBy || user?.name || 'Staff';
   let performedById = data.performedById ? String(data.performedById) : (user?.id ? String(user.id) : null);
@@ -1124,6 +1095,7 @@ export async function createSectionActivityService(section, data, user) {
     ...(data.metadata || {}),
     phoneNumber: data.phoneNumber || data.phone || undefined,
     email: data.email || undefined,
+    location: data.location || undefined,
     messageType: data.messageType || (sec === 'whatsapp' ? 'Outgoing' : undefined),
     emailType: data.emailType || (sec === 'email' ? 'Outgoing' : undefined),
     activityType: data.activityType || (sec === 'others' ? 'Direct Visit' : undefined),
@@ -1131,26 +1103,42 @@ export async function createSectionActivityService(section, data, user) {
     companyName: customerName || undefined,
   };
 
-  const activity = await prisma.activity.create({
-    data: {
-      activityNumber,
-      type,
-      title: data.title || `${sec.toUpperCase()}: ${data.status || 'Logged'}`,
-      description: data.description || '',
-      leadId: leadId || null,
-      leadCode: leadCode || null,
-      leadName: leadName || null,
-      contactId: data.contactId || null,
-      contactName: data.contactName || 'Contact',
-      customerName: customerName,
-      status: data.status || (sec === 'whatsapp' ? 'Msg Sent' : (sec === 'email' ? 'Mail Sent' : 'Interested')),
-      performedBy: performedBy,
-      performedById: performedById,
-      activityDate: todayStr,
-      activityTime: timeStr,
-      metadata: meta,
-    },
-  });
+  let activity = null;
+  let attempts = 0;
+  const maxAttempts = 5;
+
+  while (!activity && attempts < maxAttempts) {
+    attempts++;
+    const activityNumber = await generateActivityNumber(prefix);
+
+    try {
+      activity = await prisma.activity.create({
+        data: {
+          activityNumber,
+          type,
+          title: data.title || `${sec.toUpperCase()}: ${data.status || 'Logged'}`,
+          description: data.description || '',
+          leadId: leadId || null,
+          leadCode: leadCode || null,
+          leadName: leadName || null,
+          contactId: data.contactId || null,
+          contactName: data.contactName || 'Contact',
+          customerName: customerName,
+          status: data.status || (sec === 'whatsapp' ? 'Msg Sent' : (sec === 'email' ? 'Mail Sent' : 'Interested')),
+          performedBy: performedBy,
+          performedById: performedById,
+          activityDate: todayStr,
+          activityTime: timeStr,
+          metadata: meta,
+        },
+      });
+    } catch (err) {
+      if (err.code === 'P2002' && attempts < maxAttempts) {
+        continue;
+      }
+      throw err;
+    }
+  }
 
   if (leadId) {
     try {

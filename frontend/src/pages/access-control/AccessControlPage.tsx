@@ -478,21 +478,38 @@ export const AccessControlPage: React.FC = () => {
       'customers',
       'companies',
       'projects',
-      'projects_management',
-      'activity_timeline',
-      'activity',
-      'activities',
       'support_tickets',
-      'tickets',
+      'activity_timeline',
       'access_control',
       'settings',
     ];
 
     const subModuleIds = new Set(['myprofile', 'company_profile', 'calendar', 'project_catalog']);
+    const excludedModuleIds = new Set([
+      'negotiations',
+      'invoices',
+      'activity',
+      'activities',
+      'tickets',
+      'deals',
+      'companies',
+      'calls',
+      'employees',
+      'meetings',
+      'projects_management',
+      'rbac',
+      'billing',
+    ]);
+
+    const seenNames = new Set<string>();
 
     systemModules
-      .filter((mod) => mod.id !== 'negotiations' && mod.id !== 'invoices' && !subModuleIds.has(mod.id))
+      .filter((mod) => !excludedModuleIds.has(mod.id) && !subModuleIds.has(mod.id))
       .forEach((mod) => {
+        const cleanName = (mod.name || '').trim().toLowerCase();
+        if (seenNames.has(cleanName)) return;
+        seenNames.add(cleanName);
+
         const cat = mod.category || 'Main Navigation';
         if (!map.has(cat)) map.set(cat, []);
         map.get(cat)!.push(mod);

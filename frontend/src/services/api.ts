@@ -30,7 +30,21 @@ export async function fetchWithCookies<T>(endpoint: string, options: RequestInit
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(errorData.message || `API Error: ${response.status}`);
+    const errorMessage = errorData.message || `API Error: ${response.status}`;
+
+    // If an authenticated user's session is denied because account was deactivated, notify app
+    if (
+      (response.status === 401 || response.status === 403) &&
+      typeof window !== 'undefined' &&
+      !endpoint.includes('/auth/login') &&
+      errorMessage.toLowerCase().includes('inactive')
+    ) {
+      localStorage.removeItem('crm_token');
+      localStorage.removeItem('crm_user');
+      window.dispatchEvent(new CustomEvent('crm_account_deactivated', { detail: { message: errorMessage } }));
+    }
+
+    throw new Error(errorMessage);
   }
 
   return response.json();

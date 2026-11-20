@@ -252,7 +252,9 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     ) => {
       const isSilent = options?.silent ?? false;
       try {
-        setLoading(true);
+        if (!isSilent) {
+          setLoading(true);
+        }
         const res = await leadService.updateLead(id, data);
         if (res.success) {
           if (res.data) {
@@ -273,7 +275,9 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('crm_leads_updated'));
           }
-          await Promise.all([fetchLeads(), fetchStats()]);
+          if (!isSilent) {
+            await Promise.all([fetchLeads(), fetchStats()]);
+          }
           return { success: true, data: res.data };
         }
         return { success: false, message: res.message || 'Update failed.' };
@@ -287,7 +291,9 @@ export const LeadProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         return { success: false, message: err.message };
       } finally {
-        setLoading(false);
+        if (!isSilent) {
+          setLoading(false);
+        }
       }
     },
     [fetchLeads, fetchStats, selectedLead]

@@ -968,6 +968,9 @@ const inferDuration = (start?: string, end?: string): string => {
                   padding: 3,
                   borderRadius: 10,
                   border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #E2E8F0',
+                  overflowX: 'auto',
+                  maxWidth: '100%',
+                  scrollbarWidth: 'none',
                 }}
               >
                 {[
@@ -1025,7 +1028,7 @@ const inferDuration = (start?: string, end?: string): string => {
               </Box>
 
               {/* Right Search, Dropdown & Schedule Meeting Button */}
-              <Group gap="xs" wrap="wrap">
+              <Group gap="xs" wrap="wrap" style={{ flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
                 <TextInput
                   placeholder="Search meetings or leads..."
                   leftSection={<IconSearch size={15} color={isDark ? '#94A3B8' : '#64748B'} />}
@@ -1045,7 +1048,7 @@ const inferDuration = (start?: string, end?: string): string => {
                       height: 36,
                     },
                   }}
-                  style={{ width: 220 }}
+                  w={{ base: '100%', xs: 180, sm: 220 }}
                   rightSection={
                     searchInput ? (
                       <ActionIcon size="xs" variant="subtle" color="gray" onClick={() => setSearchInput('')}>
@@ -1064,6 +1067,7 @@ const inferDuration = (start?: string, end?: string): string => {
                   }}
                   size="sm"
                   radius="md"
+                  w={{ base: '100%', xs: 140, sm: 160 }}
                   styles={{
                     input: {
                       backgroundColor: isDark ? '#1F2937' : '#F8FAFC',

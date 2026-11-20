@@ -155,8 +155,19 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
-
+  const [localProjects, setLocalProjects] = useState<Project[]>([]);
+  const [forceHandoverUpdate, setForceHandoverUpdate] = useState<number>(0);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      if (!e.detail?.leadId || e.detail.leadId === lead.id) {
+        setForceHandoverUpdate((v) => v + 1);
+      }
+    };
+    window.addEventListener('crm_handover_modules_updated', handler);
+    return () => window.removeEventListener('crm_handover_modules_updated', handler);
+  }, [lead.id]);
 
 
 
@@ -242,19 +253,18 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
   // List of deliverables that have already been transferred to Handover section
   const handedOverDeliverables = useMemo(() => {
-    let list: HandoverDeliverableItem[] = [];
-    if (handover?.handoverModules && handover.handoverModules.length > 0) {
-      list = handover.handoverModules;
-    } else {
-      try {
-        const stored = localStorage.getItem(`crm_lead_handover_modules_${lead.id}`);
-        if (stored) {
-          list = JSON.parse(stored);
-        }
-      } catch (_) {}
+    if (Array.isArray(handover?.handoverModules)) {
+      return handover.handoverModules;
     }
-    return list;
-  }, [handover?.handoverModules, lead.id]);
+    try {
+      const stored = localStorage.getItem(`crm_lead_handover_modules_${lead.id}`);
+      if (stored !== null) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  }, [handover?.handoverModules, lead.id, forceHandoverUpdate]);
 
   // Helper: check if a specific module is already handed over
   const isModuleHandedOver = useCallback((projId: string, m: ProjectModuleItem, idx: number): boolean => {
@@ -282,85 +292,165 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
     return false;
   }, [handedOverDeliverables, isModuleHandedOver]);
 
-
-
   // Refresh projects on mount or when lead changes
-
   const handleRefresh = async () => {
-
     setRefreshing(true);
-
     try {
-
       await fetchProjects();
-
     } catch (_) {}
-
+    try {
+      const res = await projectService.getProjects({ limit: 1000, status: 'All', contactId: lead.id });
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setLocalProjects(res.data);
+      } else {
+        const allRes = await projectService.getProjects({ limit: 1000, status: 'All' });
+        if (allRes && allRes.success && Array.isArray(allRes.data)) {
+          setLocalProjects(allRes.data);
+        }
+      }
+    } catch (_) {}
     setRefreshing(false);
-
   };
 
-
-
   useEffect(() => {
-
     handleRefresh();
-
   }, [lead.id]);
 
-
+  // Combined real & cached projects
+  const allProjectsList = useMemo(() => {
+    const map = new Map<string, Project>();
+    (projects || []).forEach((p) => {
+      if (p?.id) map.set(p.id, p);
+    });
+    (localProjects || []).forEach((p) => {
+      if (p?.id) map.set(p.id, p);
+    });
+    try {
+      const cached = sessionStorage.getItem('crm_cache_projects');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((p) => {
+            if (p?.id && !map.has(p.id)) map.set(p.id, p);
+          });
+        }
+      }
+    } catch (_) {}
+    try {
+      const pStored = localStorage.getItem(`crm_lead_progress_project_${lead.id}`);
+      if (pStored) {
+        const parsed = JSON.parse(pStored);
+        if (parsed?.id && !map.has(parsed.id)) {
+          map.set(parsed.id, parsed);
+        }
+      }
+    } catch (_) {}
+    return Array.from(map.values());
+  }, [projects, localProjects, lead.id]);
 
   // Filter linked projects for this lead
-
   const linkedProjects = useMemo(() => {
-
     const leadNameLower = (lead.name || '').trim().toLowerCase();
-
     const leadCompanyLower = (lead.companyName || '').trim().toLowerCase();
+    const leadId = lead.id;
+    const leadCode = (lead as any).leadId;
+    const leadProjectId = (lead as any).projectId;
 
-
-
-    return projects.filter((p) => {
-
+    return allProjectsList.filter((p) => {
       // Direct ID match
-
-      if (p.contactId && (p.contactId === lead.id || p.contactId === lead.leadId)) {
-
+      if (p.contactId && (p.contactId === leadId || (leadCode && p.contactId === leadCode))) {
         return true;
+      }
 
+      // Explicit projectId match on lead
+      if (leadProjectId && (leadProjectId === p.id || leadProjectId === p.projectId)) {
+        return true;
+      }
+
+      // Handed-over deliverables match
+      if (handedOverDeliverables.length > 0) {
+        const matchesHandedOver = handedOverDeliverables.some((d) => {
+          if (d.projectId && (d.projectId === p.id || d.projectId === p.projectId)) return true;
+          if (d.projectCode && p.projectId && d.projectCode.trim().toLowerCase() === p.projectId.trim().toLowerCase()) return true;
+          if (d.projectName && p.name && d.projectName.trim().toLowerCase() === p.name.trim().toLowerCase()) return true;
+          return false;
+        });
+        if (matchesHandedOver) return true;
       }
 
       // Matching clientName
-
       if (p.clientName) {
-
         const clientLower = p.clientName.toLowerCase();
-
-        if (leadNameLower && clientLower.includes(leadNameLower)) return true;
-
-        if (leadCompanyLower && clientLower.includes(leadCompanyLower)) return true;
-
+        if (leadNameLower && (clientLower === leadNameLower || clientLower.includes(leadNameLower))) return true;
+        if (leadCompanyLower && (clientLower === leadCompanyLower || clientLower.includes(leadCompanyLower))) return true;
       }
 
       return false;
+    });
+  }, [allProjectsList, lead, handedOverDeliverables]);
 
+  // Fallback completed project synthesized from handedOverDeliverables when not found in projects list
+  const fallbackHandedOverProjects = useMemo(() => {
+    if (!handedOverDeliverables || handedOverDeliverables.length === 0) return [];
+
+    const groups = new Map<string, HandoverDeliverableItem[]>();
+    handedOverDeliverables.forEach((item) => {
+      const key = item.projectId || item.projectCode || item.projectName || 'P001';
+      const existing = groups.get(key) || [];
+      existing.push(item);
+      groups.set(key, existing);
     });
 
-  }, [projects, lead]);
+    const list: Project[] = [];
+    groups.forEach((items, key) => {
+      const first = items[0];
+      const projName = first.projectName || lead.companyName || lead.name || 'CRM';
+      const projCode = first.projectCode || (key.startsWith('P') ? key : 'P001');
+      const projId = first.projectId || `prj-${projCode}-${lead.id}`;
 
+      const alreadyLinked = linkedProjects.some(
+        (lp) => lp.id === projId || lp.projectId === projCode || (lp.name && lp.name.toLowerCase() === projName.toLowerCase())
+      );
+      if (alreadyLinked) return;
 
+      const modules: ProjectModuleItem[] = items.map((item, idx) => ({
+        id: item.moduleId || item.id || `${projId}-mod-${idx}`,
+        name: item.name,
+        description: `Delivered module for ${projName}`,
+        assignedTo: item.assignedTo || 'Unassigned',
+        deadline: item.deadline || dayjs().format('DD-MM-YYYY'),
+        progress: typeof item.progress === 'number' ? item.progress : 100,
+        status: (item.status || 'Completed') as any,
+      }));
+
+      list.push({
+        id: projId,
+        projectId: projCode,
+        name: projName,
+        clientName: lead.companyName || lead.name || 'Client',
+        contactId: lead.id,
+        category: 'Software Development',
+        projectType: 'Fixed Price',
+        status: 'Completed',
+        priority: 'High',
+        progress: 100,
+        targetEndDate: items[items.length - 1]?.deadline || dayjs().format('DD-MM-YYYY'),
+        modules: modules,
+        projectManagerName: first.assignedTo || 'Lead Developer',
+        createdAt: first.transferredAt || dayjs().toISOString(),
+        updatedAt: dayjs().toISOString(),
+      } as any);
+    });
+
+    return list;
+  }, [handedOverDeliverables, lead, linkedProjects]);
 
   // Available projects to link (projects not yet assigned to this lead)
-
   const unlinkedProjects = useMemo(() => {
-
-    return projects.filter(
-
+    return allProjectsList.filter(
       (p) => p.contactId !== lead.id && p.contactId !== lead.leadId
-
     );
-
-  }, [projects, lead]);
+  }, [allProjectsList, lead]);
 
 
 
@@ -1195,13 +1285,25 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
     }
   };
 
-  // If linked projects exist, show them; otherwise show all projects from Project Management
-
+  // If linked or handed over projects exist, show them; otherwise show all projects from Project Management
   const displayedProjects = useMemo(() => {
+    const projectsToShow = [...linkedProjects];
 
-    return linkedProjects.length > 0 ? linkedProjects : projects;
+    fallbackHandedOverProjects.forEach((fp) => {
+      const exists = projectsToShow.some(
+        (p) => p.id === fp.id || p.projectId === fp.projectId || (p.name && fp.name && p.name.toLowerCase() === fp.name.toLowerCase())
+      );
+      if (!exists) {
+        projectsToShow.push(fp);
+      }
+    });
 
-  }, [linkedProjects, projects]);
+    if (projectsToShow.length > 0) {
+      return projectsToShow;
+    }
+
+    return allProjectsList.length > 0 ? allProjectsList : projects;
+  }, [linkedProjects, fallbackHandedOverProjects, allProjectsList, projects]);
 
 
 
@@ -1455,11 +1557,23 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
     // Persist to localStorage for guaranteed availability
     try {
       localStorage.setItem(`crm_lead_handover_modules_${lead.id}`, JSON.stringify(mergedDeliverables));
+      const activeProj = displayedProjects[0];
+      if (activeProj) {
+        localStorage.setItem(`crm_lead_progress_project_${lead.id}`, JSON.stringify(activeProj));
+      }
     } catch (_) {}
 
     // Update parent handover state
     if (onUpdateHandover) {
       onUpdateHandover(updatedHandover);
+    }
+
+    if (onUpdateProgress) {
+      onUpdateProgress({
+        ...initialProgress,
+        status: 'Completed',
+        overallPercentage: 100,
+      });
     }
 
     // Success notification
@@ -1801,49 +1915,86 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
 
                   const fallbackModules: ProjectModuleItem[] = (rawModules && rawModules.length > 0)
-
                     ? rawModules
-
                     : ((isLinked && initialProgress?.milestones && initialProgress.milestones.length > 0)
-
                         ? initialProgress.milestones.map((m: any, idx: number) => ({
-
                             id: m.id || `mod-${idx + 1}`,
-
                             name: m.title || m.name || `Module ${idx + 1}`,
-
                             description: m.description || '',
-
                             assignedTo: m.assignedTo || p.projectManagerName || 'Lead Developer',
-
                             deadline: m.deadline || m.targetDate || formatDate(p.targetEndDate),
-
                             progress: typeof m.percentage === 'number' ? m.percentage : (m.status === 'Completed' ? 100 : (m.status === 'In Progress' ? 50 : 0)),
-
                             status: (m.status || (m.percentage === 100 ? 'Completed' : (m.percentage > 0 ? 'In Progress' : 'Not Started'))) as any,
-
                           }))
-
                         : []);
 
+                  const handedOverForThisProject = handedOverDeliverables.filter(
+                    (d) =>
+                      d.projectId === p.id ||
+                      (d.projectCode && p.projectId && d.projectCode.trim().toLowerCase() === p.projectId.trim().toLowerCase()) ||
+                      (d.projectName && p.name && d.projectName.trim().toLowerCase() === p.name.trim().toLowerCase())
+                  );
 
+                  const baseModules: ProjectModuleItem[] = (rawModules && rawModules.length > 0)
+                    ? rawModules
+                    : (fallbackModules && fallbackModules.length > 0)
+                      ? fallbackModules
+                      : (handedOverForThisProject.length > 0
+                          ? handedOverForThisProject.map((item, idx) => ({
+                              id: item.moduleId || item.id || `${p.id}-mod-${idx}`,
+                              name: item.name,
+                              description: '',
+                              assignedTo: item.assignedTo || p.projectManagerName || 'Unassigned',
+                              deadline: item.deadline || formatDate(p.targetEndDate),
+                              progress: typeof item.progress === 'number' ? item.progress : 100,
+                              status: (item.status || 'Completed') as any,
+                            }))
+                          : []);
 
-                  const projectModules: ProjectModuleItem[] = (rawModules && rawModules.length > 0) ? rawModules : fallbackModules;
+                  // Map modules and ensure handed-over modules reflect 100% and Completed
+                  const projectModules: ProjectModuleItem[] = baseModules.map((m, idx) => {
+                    const modId = getModId(p.id, m, idx);
+                    const handed = handedOverDeliverables.find(
+                      (d) =>
+                        d.id === modId ||
+                        d.moduleId === m.id ||
+                        d.moduleId === modId ||
+                        (d.name && m.name && d.name.trim().toLowerCase() === m.name.trim().toLowerCase())
+                    );
+                    if (handed) {
+                      return {
+                        ...m,
+                        progress: typeof handed.progress === 'number' ? handed.progress : 100,
+                        status: (handed.status || 'Completed') as any,
+                      };
+                    }
+                    return m;
+                  });
 
                   const modulesCount = projectModules.length;
 
-                  const computedProjectProgress = projectModules.length > 0
-                    ? Math.round(projectModules.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0) / projectModules.length)
-                    : (p.progress || 0);
+                  const isProjHandedOver = isProjectHandedOver(p, projectModules) || (
+                    handedOverForThisProject.length > 0 &&
+                    (projectModules.length === 0 || projectModules.every((m, idx) => isModuleHandedOver(p.id, m, idx)))
+                  );
 
-                  const computedProjectStatus = projectModules.length > 0
-                    ? (projectModules.every((m) => m.status === 'Completed' || (Number(m.progress) || 0) >= 100) ? 'Completed' : 'In Progress')
+                  const allModulesDone = projectModules.length > 0 && projectModules.every(
+                    (m) => m.status === 'Completed' || (Number(m.progress) || 0) >= 100
+                  );
+
+                  const computedProjectProgress = (isProjHandedOver || allModulesDone || p.status === 'Completed' || (p.progress || 0) >= 100)
+                    ? 100
+                    : (projectModules.length > 0
+                        ? Math.round(projectModules.reduce((acc, curr) => acc + (Number(curr.progress) || 0), 0) / projectModules.length)
+                        : (p.progress || 0));
+
+                  const computedProjectStatus = (isProjHandedOver || allModulesDone || computedProjectProgress >= 100 || p.status === 'Completed')
+                    ? 'Completed'
                     : (p.status || 'In Progress');
 
 
 
                   const pModIds = projectModules.map((m, idx) => getModId(p.id, m, idx));
-                  const isProjHandedOver = isProjectHandedOver(p, projectModules);
                   const availablePModIds = projectModules
                     .filter((m, idx) => !isModuleHandedOver(p.id, m, idx))
                     .map((m, idx) => getModId(p.id, m, idx));
@@ -1885,7 +2036,7 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
                         {/* 0. Project Selection Checkbox */}
                         <Table.Td style={{ width: 44, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                           {isProjHandedOver ? (
-                            <Tooltip label="Project and its modules already moved to Handover section" withArrow>
+                            <Tooltip label="Project already moved to Handover section." withArrow>
                               <Box style={{ display: 'inline-flex', cursor: 'not-allowed' }}>
                                 <Checkbox
                                   size="xs"
@@ -1921,7 +2072,7 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                               variant="filled"
 
-                              color={p.progress === 100 ? 'teal' : 'blue'}
+                              color={p.progress === 100 || computedProjectProgress === 100 ? 'teal' : 'blue'}
 
                               radius="sm"
 
@@ -2393,16 +2544,18 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
                                     {projectModules && projectModules.length > 0 ? (
                                       projectModules.map((m, index) => {
                                         const modId = getModId(p.id, m, index);
-                                        const isDone = m.status === 'Completed' || (m.progress || 0) === 100;
-                                        const inProgress = m.status === 'In Progress' || ((m.progress || 0) > 0 && (m.progress || 0) < 100);
                                         const isModHandedOver = isModuleHandedOver(p.id, m, index);
+                                        const isDone = m.status === 'Completed' || (m.progress || 0) === 100 || isModHandedOver;
+                                        const inProgress = !isDone && (m.status === 'In Progress' || ((m.progress || 0) > 0 && (m.progress || 0) < 100));
+                                        const modProgress = isModHandedOver ? 100 : (m.progress || 0);
+                                        const modStatus = (isModHandedOver || isDone) ? 'Completed' : (inProgress ? 'In Progress' : 'Not Started');
 
                                         return (
                                           <Table.Tr key={m.id || index}>
                                             {/* Selection Checkbox */}
                                             <Table.Td style={{ width: 44, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
                                               {isModHandedOver ? (
-                                                <Tooltip label="Module already moved to Handover section" withArrow>
+                                                <Tooltip label="Module already moved to Handover section." withArrow>
                                                   <Box style={{ display: 'inline-flex', cursor: 'not-allowed' }}>
                                                     <Checkbox
                                                       size="xs"
@@ -2555,91 +2708,93 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                                                   <Text size="11px" fw={700} style={{ color: isDone ? '#10B981' : isDark ? '#E2E8F0' : '#1E293B' }}>
 
-                                                    {m.progress || 0}% Completed
+                                                    {modProgress}% Completed
 
                                                   </Text>
 
-                                                  <Menu shadow="md" width={180} position="bottom-end">
+                                                  {!isModHandedOver && (
+                                                    <Menu shadow="md" width={180} position="bottom-end">
 
-                                                    <Menu.Target>
+                                                      <Menu.Target>
 
-                                                      <Button
+                                                        <Button
 
-                                                        size="compact-xs"
+                                                          size="compact-xs"
 
-                                                        variant="subtle"
+                                                          variant="subtle"
 
-                                                        color="blue"
+                                                          color="blue"
 
-                                                        style={{ fontSize: 10, height: 18, padding: '0 4px', fontWeight: 600 }}
+                                                          style={{ fontSize: 10, height: 18, padding: '0 4px', fontWeight: 600 }}
 
-                                                        onClick={(e) => e.stopPropagation()}
+                                                          onClick={(e) => e.stopPropagation()}
 
-                                                      >
+                                                        >
 
-                                                        Edit
+                                                          Edit
 
-                                                      </Button>
+                                                        </Button>
 
-                                                    </Menu.Target>
+                                                      </Menu.Target>
 
-                                                    <Menu.Dropdown>
+                                                      <Menu.Dropdown>
 
-                                                      <Menu.Label>Quick Progress Presets</Menu.Label>
+                                                        <Menu.Label>Quick Progress Presets</Menu.Label>
 
-                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0, projectModules, index)}>
+                                                        <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0, projectModules, index)}>
 
-                                                        0% - Not Started
+                                                          0% - Not Started
 
-                                                      </Menu.Item>
+                                                        </Menu.Item>
 
-                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25, projectModules, index)}>
+                                                        <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25, projectModules, index)}>
 
-                                                        25% - In Progress
+                                                          25% - In Progress
 
-                                                      </Menu.Item>
+                                                        </Menu.Item>
 
-                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50, projectModules, index)}>
+                                                        <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50, projectModules, index)}>
 
-                                                        50% - In Progress
+                                                          50% - In Progress
 
-                                                      </Menu.Item>
+                                                        </Menu.Item>
 
-                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75, projectModules, index)}>
+                                                        <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75, projectModules, index)}>
 
-                                                        75% - In Progress
+                                                          75% - In Progress
 
-                                                      </Menu.Item>
+                                                        </Menu.Item>
 
-                                                      <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100, projectModules, index)}>
+                                                        <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100, projectModules, index)}>
 
-                                                        100% - Completed
+                                                          100% - Completed
 
-                                                      </Menu.Item>
+                                                        </Menu.Item>
 
-                                                      <Divider my={4} />
+                                                        <Divider my={4} />
 
-                                                      <Menu.Item
+                                                        <Menu.Item
 
-                                                        leftSection={<IconEdit size={13} />}
+                                                          leftSection={<IconEdit size={13} />}
 
-                                                        onClick={() => handleOpenEditModuleModal(p, m, index, projectModules)}
+                                                          onClick={() => handleOpenEditModuleModal(p, m, index, projectModules)}
 
-                                                      >
+                                                        >
 
-                                                        Custom Slider / Details...
+                                                          Custom Slider / Details...
 
-                                                      </Menu.Item>
+                                                        </Menu.Item>
 
-                                                    </Menu.Dropdown>
+                                                      </Menu.Dropdown>
 
-                                                  </Menu>
+                                                    </Menu>
+                                                  )}
 
                                                 </Group>
 
                                                 <Progress
 
-                                                  value={m.progress || 0}
+                                                  value={modProgress}
 
                                                   size="sm"
 
@@ -2667,67 +2822,79 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
                                                     Handed Over ✓
                                                   </Badge>
                                                 )}
-                                                <Menu shadow="md" width={160} position="bottom-end">
-
-                                                <Menu.Target>
-
+                                                {isModHandedOver ? (
                                                   <Badge
-
                                                     size="xs"
-
                                                     variant="light"
-
-                                                    color={isDone ? 'teal' : inProgress ? 'orange' : 'gray'}
-
+                                                    color="teal"
                                                     radius="sm"
-
-                                                    style={{ fontWeight: 650, cursor: 'pointer' }}
-
+                                                    style={{ fontWeight: 650 }}
                                                   >
-
-                                                    {isDone ? 'Completed' : inProgress ? 'In Progress' : 'Not Started'}
-
+                                                    Completed
                                                   </Badge>
+                                                ) : (
+                                                  <Menu shadow="md" width={160} position="bottom-end">
 
-                                                </Menu.Target>
+                                                  <Menu.Target>
 
-                                                <Menu.Dropdown>
+                                                    <Badge
 
-                                                  <Menu.Label>Change Progress</Menu.Label>
+                                                      size="xs"
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0, projectModules, index)}>
+                                                      variant="light"
 
-                                                    Not Started (0%)
+                                                      color={isDone ? 'teal' : inProgress ? 'orange' : 'gray'}
 
-                                                  </Menu.Item>
+                                                      radius="sm"
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25, projectModules, index)}>
+                                                      style={{ fontWeight: 650, cursor: 'pointer' }}
 
-                                                    In Progress (25%)
+                                                    >
 
-                                                  </Menu.Item>
+                                                      {modStatus}
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50, projectModules, index)}>
+                                                    </Badge>
 
-                                                    In Progress (50%)
+                                                  </Menu.Target>
 
-                                                  </Menu.Item>
+                                                  <Menu.Dropdown>
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75, projectModules, index)}>
+                                                    <Menu.Label>Change Progress</Menu.Label>
 
-                                                    In Progress (75%)
+                                                    <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 0, projectModules, index)}>
 
-                                                  </Menu.Item>
+                                                      Not Started (0%)
 
-                                                  <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100, projectModules, index)}>
+                                                    </Menu.Item>
 
-                                                    Completed (100%)
+                                                    <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 25, projectModules, index)}>
 
-                                                  </Menu.Item>
+                                                      In Progress (25%)
 
-                                                </Menu.Dropdown>
+                                                    </Menu.Item>
 
-                                              </Menu>
+                                                    <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 50, projectModules, index)}>
+
+                                                      In Progress (50%)
+
+                                                    </Menu.Item>
+
+                                                    <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 75, projectModules, index)}>
+
+                                                      In Progress (75%)
+
+                                                    </Menu.Item>
+
+                                                    <Menu.Item onClick={() => handleUpdateModuleProgress(p, m.id, 100, projectModules, index)}>
+
+                                                      Completed (100%)
+
+                                                    </Menu.Item>
+
+                                                  </Menu.Dropdown>
+
+                                                </Menu>
+                                                )}
                                               </Group>
                                             </Table.Td>
 
@@ -2737,7 +2904,7 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                                             <Table.Td style={{ textAlign: 'right' }}>
 
-                                              <Tooltip label="Delete module" withArrow>
+                                              <Tooltip label={isModHandedOver ? "Module is in Handover." : "Delete module"} withArrow>
 
                                                 <ActionIcon
 
@@ -2747,7 +2914,15 @@ export const LeadProgressSection: React.FC<LeadProgressSectionProps> = ({
 
                                                   size="sm"
 
-                                                  onClick={() => handleDeleteModule(p, m.id, projectModules, index)}
+                                                  disabled={isModHandedOver}
+
+                                                  style={isModHandedOver ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isModHandedOver) return;
+                                                    handleDeleteModule(p, m.id, projectModules, index);
+                                                  }}
 
                                                 >
 

@@ -71,6 +71,13 @@ export const NotificationBell: React.FC = () => {
   const canViewContactsRef = React.useRef(canViewContacts);
   canViewContactsRef.current = canViewContacts;
 
+  const canViewReminders = Boolean(
+    isSuperAdmin ||
+    (permissionsLoaded && (can('calendar', 'view') || can('settings', 'view') || can('dashboard', 'view')))
+  );
+  const canViewRemindersRef = React.useRef(canViewReminders);
+  canViewRemindersRef.current = canViewReminders;
+
   const [opened, setOpened] = useState(false);
   const [loading, setLoading] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -268,11 +275,20 @@ export const NotificationBell: React.FC = () => {
       lastFetchTimeRef.current = now;
       setLoading(true);
       const hasContactsAccess = canViewContactsRef.current;
+      const hasRemindersAccess = canViewRemindersRef.current;
       const [contactsRes, remindersRes] = await Promise.allSettled([
         hasContactsAccess
-          ? contactService.getContacts({ limit: 150 })
+          ? contactService.getContacts({ limit: 150 }).catch((err) => {
+              console.warn('[NotificationBell] Could not load contacts:', err?.message);
+              return { success: false, data: [], pagination: { total: 0, page: 1, limit: 150, totalPages: 1 } };
+            })
           : Promise.resolve({ success: true, data: [], pagination: { total: 0, page: 1, limit: 150, totalPages: 1 } }),
-        settingsService.getReminders(),
+        hasRemindersAccess
+          ? settingsService.getReminders().catch((err) => {
+              console.warn('[NotificationBell] Could not load reminders:', err?.message);
+              return { success: false, data: [] };
+            })
+          : Promise.resolve({ success: true, data: [] }),
       ]);
 
       if (contactsRes.status === 'fulfilled' && contactsRes.value?.data) {

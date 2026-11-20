@@ -47,6 +47,8 @@ export const LeadMeetingsTableView: React.FC<LeadMeetingsTableViewProps> = ({
 }) => {
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   const getLeadMeetings = (lead: Lead) => {
     let leadAllMeetings = meetings.filter((m) => isMeetingForLead(m, lead));
@@ -184,15 +186,18 @@ export const LeadMeetingsTableView: React.FC<LeadMeetingsTableViewProps> = ({
   }
 
   return (
-    <Paper
-      radius="lg"
-      style={{
-        backgroundColor: isDark ? '#111827' : '#FFFFFF',
-        border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
-        boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.03)',
-        overflow: 'hidden',
-        marginTop: 16,
-      }}
+    <>
+      {/* DESKTOP / TABLET SCROLLABLE TABLE */}
+      <Paper
+        visibleFrom="sm"
+        radius="lg"
+        style={{
+          backgroundColor: isDark ? '#111827' : '#FFFFFF',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+          boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.03)',
+          overflow: 'hidden',
+          marginTop: 16,
+        }}
     >
       <Table.ScrollContainer minWidth={850}>
         <Table verticalSpacing="md" horizontalSpacing="lg" highlightOnHover>
@@ -467,5 +472,121 @@ export const LeadMeetingsTableView: React.FC<LeadMeetingsTableViewProps> = ({
         </Table>
       </Table.ScrollContainer>
     </Paper>
-  );
+
+    {/* MOBILE RESPONSIVE CARDS VIEW */}
+    <Stack hiddenFrom="sm" gap="sm" mt="md">
+      {leads.map((lead) => {
+        const leadMeets = meetings.filter((m) => isMeetingForLead(m, lead));
+        const meetingsCount = leadMeets.length;
+        const initialLetter = (lead.name || 'L').charAt(0).toUpperCase();
+
+        const activeMeets = leadMeets.filter((m) => (m.status || m.meetingStatus || '').toLowerCase() !== 'cancelled');
+        const pendingMeets = activeMeets.filter((m) => (m.status || m.meetingStatus || '').toLowerCase() !== 'completed');
+        const isAllDone = activeMeets.length > 0 && pendingMeets.length === 0;
+
+        let displayMeeting: ScheduledMeeting | undefined;
+        if (activeTab === 'COMPLETED') {
+          const compMeets = leadMeets.filter((m) => (m.status || m.meetingStatus || '').toLowerCase() === 'completed');
+          compMeets.sort((a, b) => (b.meetingDate || '').localeCompare(a.meetingDate || ''));
+          displayMeeting = compMeets[0];
+        } else if (activeTab === 'TODAY') {
+          displayMeeting = pendingMeets.find((m) => m.meetingDate === todayStr) || activeMeets.find((m) => m.meetingDate === todayStr) || leadMeets[0];
+        } else if (activeTab === 'UPCOMING') {
+          const upMeets = pendingMeets.filter((m) => m.meetingDate && m.meetingDate > todayStr);
+          upMeets.sort((a, b) => (a.meetingDate || '').localeCompare(b.meetingDate || ''));
+          displayMeeting = upMeets[0] || leadMeets[0];
+        } else {
+          displayMeeting = pendingMeets[0] || activeMeets[0] || leadMeets[0];
+        }
+
+        const lastMeetingDate = displayMeeting ? (displayMeeting.meetingDate || displayMeeting.date) : '';
+        const lastMeetingTime = displayMeeting ? (displayMeeting.startTime || displayMeeting.meetingTime || displayMeeting.time) : '';
+        const meetingStatus = isAllDone ? 'Completed' : (displayMeeting?.status || displayMeeting?.meetingStatus || (meetingsCount > 0 ? 'Scheduled' : 'No Meeting'));
+
+        return (
+          <Paper
+            key={lead.id}
+            p="sm"
+            radius="14px"
+            style={{
+              backgroundColor: isDark ? '#111827' : '#FFFFFF',
+              border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #E2E8F0',
+              boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.03)',
+              cursor: 'pointer',
+            }}
+            onClick={() => onSelectLead(lead)}
+          >
+            <Group justify="space-between" align="flex-start" wrap="nowrap" mb="xs">
+              <Group gap="xs" wrap="nowrap" style={{ flex: 1, minWidth: 0 }}>
+                <Box
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: isDark ? 'rgba(79, 70, 229, 0.2)' : 'rgba(79, 70, 229, 0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isDark ? '#818CF8' : '#4F46E5',
+                    fontWeight: 700,
+                    fontSize: 14,
+                    flexShrink: 0,
+                  }}
+                >
+                  {initialLetter}
+                </Box>
+                <Box style={{ flex: 1, minWidth: 0 }}>
+                  <Text fw={700} size="sm" truncate style={{ color: isDark ? '#818CF8' : '#4F46E5' }}>
+                    {lead.name}
+                  </Text>
+                  <Text size="11px" c="dimmed" truncate>
+                    {lead.companyName || lead.profession || 'Individual Lead'}
+                  </Text>
+                </Box>
+              </Group>
+
+              <Box style={{ flexShrink: 0 }}>
+                {renderStatusBadge(meetingStatus)}
+              </Box>
+            </Group>
+
+            <Stack gap={4} mb="xs">
+              <Group justify="space-between" align="center">
+                <Badge size="xs" variant="light" color="indigo" radius="sm">
+                  {meetingsCount} {meetingsCount === 1 ? 'Meeting' : 'Meetings'}
+                </Badge>
+                {lastMeetingDate && (
+                  <Text size="11px" c="dimmed">
+                    {formatDisplayDate(lastMeetingDate)} {lastMeetingTime ? `• ${lastMeetingTime}` : ''}
+                  </Text>
+                )}
+              </Group>
+            </Stack>
+
+            <Group justify="flex-end" gap={6} pt="xs" style={{ borderTop: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9' }} onClick={(e) => e.stopPropagation()}>
+              <ActionIcon
+                variant="light"
+                size="sm"
+                color="teal"
+                radius="md"
+                onClick={() => onScheduleMeetingForLead(lead)}
+              >
+                <IconPlus size={14} />
+              </ActionIcon>
+              <ActionIcon
+                variant="light"
+                size="sm"
+                color="blue"
+                radius="md"
+                onClick={() => onSelectLead(lead)}
+              >
+                <IconChevronRight size={14} />
+              </ActionIcon>
+            </Group>
+          </Paper>
+        );
+      })}
+    </Stack>
+  </>
+);
 };

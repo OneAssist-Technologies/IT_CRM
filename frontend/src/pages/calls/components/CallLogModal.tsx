@@ -80,7 +80,93 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
   const [status, setStatus] = useState<CallStatus>('Completed');
   const [callDate, setCallDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [callTime, setCallTime] = useState<string>('10:00 AM');
+  const [fromTime, setFromTime] = useState<string>('10:00 AM');
+  const [toTime, setToTime] = useState<string>('10:05 AM');
   const [description, setDescription] = useState<string>('');
+
+  // Helper to parse "10:00 AM" into total seconds from start of day
+  const parseTimeToSeconds = (timeStr: string): number | null => {
+    if (!timeStr) return null;
+    const match = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?$/i);
+    if (!match) return null;
+    let h = parseInt(match[1], 10);
+    const m = parseInt(match[2], 10);
+    const s = match[3] ? parseInt(match[3], 10) : 0;
+    const period = match[4]?.toUpperCase();
+
+    if (period === 'PM' && h < 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+
+    return h * 3600 + m * 60 + s;
+  };
+
+  // Calculate duration string (MM:SS) between fromTime and toTime
+  const calculateDurationFromRange = (fromStr: string, toStr: string): string | null => {
+    const fromSec = parseTimeToSeconds(fromStr);
+    const toSec = parseTimeToSeconds(toStr);
+    if (fromSec === null || toSec === null) return null;
+
+    let diff = toSec - fromSec;
+    if (diff < 0) {
+      diff += 24 * 3600;
+    }
+    const min = Math.floor(diff / 60);
+    const sec = diff % 60;
+    return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  };
+
+  // Calculate toTime from fromTime + duration (MM:SS)
+  const calculateToTime = (fromStr: string, durationStr: string): string | null => {
+    const fromSec = parseTimeToSeconds(fromStr);
+    if (fromSec === null) return null;
+    const parts = durationStr.split(':');
+    const durSec = (parseInt(parts[0] || '0', 10) * 60) + (parseInt(parts[1] || '0', 10));
+    const totalSec = (fromSec + durSec) % (24 * 3600);
+
+    const totalMin = Math.floor(totalSec / 60);
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    const period = h >= 12 ? 'PM' : 'AM';
+    let displayH = h % 12;
+    if (displayH === 0) displayH = 12;
+    return `${displayH}:${String(m).padStart(2, '0')} ${period}`;
+  };
+
+  const handleFromTimeChange = (val: string) => {
+    setFromTime(val);
+    setCallTime(val);
+    if (toTime) {
+      const diff = calculateDurationFromRange(val, toTime);
+      if (diff) {
+        setDuration(diff);
+        return;
+      }
+    }
+    if (duration) {
+      const newTo = calculateToTime(val, duration);
+      if (newTo) setToTime(newTo);
+    }
+  };
+
+  const handleToTimeChange = (val: string) => {
+    setToTime(val);
+    if (fromTime) {
+      const diff = calculateDurationFromRange(fromTime, val);
+      if (diff) {
+        setDuration(diff);
+      }
+    }
+  };
+
+  const handleDurationChange = (val: string) => {
+    setDuration(val);
+    if (fromTime) {
+      const newTo = calculateToTime(fromTime, val);
+      if (newTo) {
+        setToTime(newTo);
+      }
+    }
+  };
 
   // Helper to format/normalize duration input string (e.g. "02:30", "2:30", "2m 30s", "2 min")
   const formatDurationInput = (str: string): string => {
@@ -120,24 +206,28 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
   };
 
   const contactOptions = useMemo(() => {
+    const seen = new Set<string>();
     const list: Array<{ value: string; label: string }> = [];
 
     // 1. CRM Contacts
-    contacts.forEach((c) => {
-      list.push({
-        value: c.id,
-        label: c.companyName ? `${c.name} (${c.companyName})` : c.name,
-      });
+    contacts.forEach((c, idx) => {
+      const val = c.id ? String(c.id) : `contact_${idx}`;
+      if (!seen.has(val)) {
+        seen.add(val);
+        list.push({
+          value: val,
+          label: c.companyName ? `${c.name} (${c.companyName})` : c.name,
+        });
+      }
     });
 
     // 2. Leads (if any)
     leads.forEach((l) => {
-      const already = list.some(
-        (item) => item.value === l.id || item.label.toLowerCase() === l.name.toLowerCase()
-      );
-      if (!already) {
+      const val = `lead_${l.id}`;
+      if (!seen.has(val)) {
+        seen.add(val);
         list.push({
-          value: `lead_${l.id}`,
+          value: val,
           label: l.companyName ? `${l.name} (${l.companyName}) [Lead]` : `${l.name} [Lead]`,
         });
       }
@@ -145,12 +235,11 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
 
     // 3. If initialLead is passed and not in list
     if (initialLead && initialLead.id) {
-      const already = list.some(
-        (item) => item.value === initialLead.id || item.value === `lead_${initialLead.id}`
-      );
-      if (!already) {
+      const val = `lead_${initialLead.id}`;
+      if (!seen.has(val)) {
+        seen.add(val);
         list.unshift({
-          value: `lead_${initialLead.id}`,
+          value: val,
           label: initialLead.companyName
             ? `${initialLead.name} (${initialLead.companyName})`
             : `${initialLead.name}`,
@@ -172,12 +261,17 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
         setContactName(editingCall.contactName || '');
         setCompanyName(editingCall.companyName || '');
         setPhoneNumber(editingCall.phoneNumber || '');
-        setDuration(editingCall.duration || '02:30');
+        const editFrom = editingCall.callTime || '10:00 AM';
+        const editDur = editingCall.duration || '02:30';
+        const editTo = (editingCall as any).toTime || calculateToTime(editFrom, editDur) || '10:05 AM';
+        setDuration(editDur);
         const rawSt = (editingCall.status || 'Completed').trim();
         const normSt = rawSt.toLowerCase().includes('follow') ? 'Follow-up' : (rawSt as CallStatus);
         setStatus(normSt);
         setCallDate(editingCall.callDate || new Date().toISOString().split('T')[0]);
-        setCallTime(editingCall.callTime || '10:00 AM');
+        setCallTime(editFrom);
+        setFromTime(editFrom);
+        setToTime(editTo);
         setDescription(editingCall.description || '');
       } else if (initialLead) {
         // Pre-fill from active lead (e.g. from Activity Pipeline)
@@ -228,7 +322,11 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
         const ampm = hrs >= 12 ? 'PM' : 'AM';
         const displayH = (hrs % 12) || 12;
         const displayM = mins.toString().padStart(2, '0');
-        setCallTime(`${displayH}:${displayM} ${ampm}`);
+        const initFrom = `${displayH}:${displayM} ${ampm}`;
+        const initTo = calculateToTime(initFrom, '02:30') || '10:05 AM';
+        setCallTime(initFrom);
+        setFromTime(initFrom);
+        setToTime(initTo);
         setDescription('');
       } else {
         // Defaults for new call
@@ -251,17 +349,30 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
         const ampm = hrs >= 12 ? 'PM' : 'AM';
         const displayH = (hrs % 12) || 12;
         const displayM = mins.toString().padStart(2, '0');
-        setCallTime(`${displayH}:${displayM} ${ampm}`);
+        const initFrom = `${displayH}:${displayM} ${ampm}`;
+        const initTo = calculateToTime(initFrom, '02:30') || '10:05 AM';
+        setCallTime(initFrom);
+        setFromTime(initFrom);
+        setToTime(initTo);
         setDescription('');
       }
     }
   }, [opened, editingCall, initialLead, employees, contacts]);
 
   const employeeOptions = useMemo(() => {
-    return employees.map((e) => ({
-      value: e.id || e.empCode,
-      label: e.name,
-    }));
+    const seen = new Set<string>();
+    const list: Array<{ value: string; label: string }> = [];
+    (employees || []).forEach((e, idx) => {
+      const val = e.id ? String(e.id) : e.empCode ? String(e.empCode) : `emp_${idx}`;
+      if (!seen.has(val)) {
+        seen.add(val);
+        list.push({
+          value: val,
+          label: e.name || val,
+        });
+      }
+    });
+    return list;
   }, [employees]);
 
   // When contact is selected: auto-fill contactName AND phone number!
@@ -408,7 +519,9 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
       duration: formattedDuration,
       status,
       callDate: normalizedCallDate,
-      callTime: callTime.trim() || '10:00 AM',
+      callTime: fromTime.trim() || callTime.trim() || '10:00 AM',
+      fromTime: fromTime.trim() || undefined,
+      toTime: toTime.trim() || undefined,
       description: description.trim() || null,
     };
 
@@ -525,13 +638,13 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
           />
         </SimpleGrid>
 
-        {/* Row 3: Duration & Status */}
+        {/* Row 3: Call Date & Status */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <CallDurationPicker
-            label="Duration"
-            placeholder="MM:SS"
-            value={duration}
-            onChange={(val) => setDuration(val)}
+          <MeetingDatePicker
+            label="Call Date"
+            placeholder="DD-MM-YYYY"
+            value={callDate}
+            onChange={(val) => setCallDate(val)}
             required
           />
 
@@ -548,31 +661,50 @@ export const CallLogModal: React.FC<CallLogModalProps> = ({
               { value: 'Not Interested', label: 'Not Interested' },
             ]}
             value={status}
-            onChange={(val) => setStatus((val as CallStatus) || 'Completed')}
+            onChange={(val) => {
+              const newSt = (val as CallStatus) || 'Completed';
+              setStatus(newSt);
+              if (newSt === 'Missed' || newSt === 'No Answer' || newSt === 'Busy') {
+                setDuration('00:00');
+                if (fromTime) setToTime(fromTime);
+              }
+            }}
             required
             allowDeselect={false}
             radius="md"
           />
         </SimpleGrid>
 
-        {/* Row 4: Call Date and Time */}
+        {/* Row 4: From time & To time */}
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-          <MeetingDatePicker
-            label="Call Date"
-            placeholder="DD-MM-YYYY"
-            value={callDate}
-            onChange={(val) => setCallDate(val)}
-            required
+          <MeetingTimePicker
+            label="From time"
+            placeholder="e.g. 10:00 AM"
+            value={fromTime}
+            onChange={handleFromTimeChange}
+            zIndex={2000}
+            hideQuickSelect
           />
 
           <MeetingTimePicker
-            label="Call Time"
-            placeholder="10:00 AM"
-            value={callTime}
-            onChange={(val) => setCallTime(val)}
-            required
+            label="To time"
+            placeholder="e.g. 10:05 AM"
+            value={toTime}
+            onChange={handleToTimeChange}
+            zIndex={2000}
+            hideQuickSelect
           />
         </SimpleGrid>
+
+        {/* Row 5: Duration */}
+        <CallDurationPicker
+          label="Duration"
+          placeholder="MM:SS"
+          value={duration}
+          onChange={handleDurationChange}
+          required
+          maxWidth={220}
+        />
 
         {/* 6. Description / Notes */}
         <Textarea

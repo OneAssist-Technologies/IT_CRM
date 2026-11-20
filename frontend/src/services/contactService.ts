@@ -38,6 +38,12 @@ async function fetchWithCookies<T>(endpoint: string, options: RequestInit = {}):
     }
 
     return response.json();
+  } catch (err: any) {
+    if (!options.method || options.method === 'GET') {
+      console.warn(`[contactService] ${endpoint} request failed:`, err?.message || err);
+      return { success: false, data: [], pagination: { total: 0, page: 1, limit: 50, totalPages: 1 } } as unknown as T;
+    }
+    throw err;
   } finally {
     clearTimeout(timeoutId);
   }

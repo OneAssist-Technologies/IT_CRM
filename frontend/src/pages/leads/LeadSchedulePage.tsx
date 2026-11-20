@@ -924,8 +924,9 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
 
   // Handle Meeting Updated from Table Details Modal
   const handleMeetingUpdated = (updatedMeeting: MeetingTypeScheduledMeeting) => {
+    let nextList: ScheduledMeeting[] = [];
     setScheduledMeetings((prev) => {
-      const updated = prev.map((m) =>
+      nextList = prev.map((m) =>
         m.id === updatedMeeting.id
           ? {
               ...m,
@@ -956,10 +957,16 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
             }
           : m
       );
-      if (activeLead) {
-        try {
-          localStorage.setItem(`crm_meetings_${activeLead.id}`, JSON.stringify(updated));
-        } catch (_) {}
+      return nextList;
+    });
+
+    if (activeLead) {
+      try {
+        localStorage.setItem(`crm_meetings_${activeLead.id}`, JSON.stringify(nextList));
+      } catch (_) {}
+
+      if (activeLead.stage !== 'Meetings' || activeLead.status !== 'In Progress') {
+        setActiveLead((prev) => (prev ? { ...prev, stage: 'Meetings', status: 'In Progress' } : prev));
         updateLead(
           activeLead.id,
           {
@@ -968,13 +975,12 @@ export const LeadSchedulePage: React.FC<LeadSchedulePageProps> = ({
           },
           { silent: true }
         ).catch(() => {});
-        setActiveLead((prev) => (prev ? { ...prev, stage: 'Meetings', status: 'In Progress' } : prev));
       }
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
-      }
-      return updated;
-    });
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('crm_meetings_updated'));
+    }
   };
 
   // Map scheduledMeetings to MeetingTypeScheduledMeeting for MeetingTableView

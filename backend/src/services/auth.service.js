@@ -3,6 +3,7 @@ import { getCache, setCache, delCache } from '../config/redis.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { generateSessionToken, setAuthCookie, clearAuthCookie } from '../utils/jwt.js';
 import { logAuditEvent } from './auditService.js';
+import { isEmployeeInactive } from '../utils/employee.util.js';
 
 /**
  * 1. User Registration / Signup
@@ -114,8 +115,29 @@ export async function loginService(body, ip = '127.0.0.1', res = null) {
 
   const cleanEmail = email.toLowerCase().trim();
 
-  const user = await prisma.user.findUnique({
-    where: { email: cleanEmail },
+  // Validate Employee Active / Inactive status from database
+  const emp = await prisma.employee.findFirst({
+    where: {
+      OR: [
+        { email: { equals: cleanEmail, mode: 'insensitive' } },
+        { empCode: { equals: email.trim(), mode: 'insensitive' } },
+      ],
+    },
+  });
+
+  if (emp && isEmployeeInactive(emp.status)) {
+    const error = new Error('Your account is inactive. Please contact your administrator.');
+    error.status = 403;
+    throw error;
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: cleanEmail },
+        ...(emp?.email ? [{ email: emp.email.toLowerCase().trim() }] : []),
+      ],
+    },
   });
 
   if (!user) {
@@ -210,6 +232,19 @@ export async function getCurrentUserService(authUser) {
     const error = new Error('Not authenticated.');
     error.status = 401;
     throw error;
+  }
+
+  // Verify Active / Inactive Employee Status
+  if (authUser.email) {
+    const emp = await prisma.employee.findFirst({
+      where: { email: { equals: authUser.email.toLowerCase().trim(), mode: 'insensitive' } },
+      select: { id: true, status: true },
+    });
+    if (emp && isEmployeeInactive(emp.status)) {
+      const error = new Error('Your account is inactive. Please contact your administrator.');
+      error.status = 403;
+      throw error;
+    }
   }
 
   const cachedSession = await getCache(`crm:session:${authUser.id}`);

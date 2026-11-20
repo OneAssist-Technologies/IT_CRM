@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Stack,
@@ -19,6 +19,7 @@ import {
   IconPhone,
   IconBuilding,
   IconCalendar,
+  IconMapPin,
 } from '@tabler/icons-react';
 import { ActivityLogItem, ActivityLogSection } from '../../../types/callLog';
 import { Contact } from '../../../types/contact';
@@ -50,9 +51,11 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   const [contactId, setContactId] = useState<string | null>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [contactName, setContactName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [location, setLocation] = useState('');
   const [performedBy, setPerformedBy] = useState('');
   const [performedById, setPerformedById] = useState<string | null>(null);
   const [channelType, setChannelType] = useState('Outgoing');
@@ -68,9 +71,11 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
       setContactId(null);
       setLeadId(null);
       setContactName('');
+      setSearchQuery('');
       setCustomerName('');
       setPhone('');
       setEmail('');
+      setLocation('');
       setDescription('');
       setNextFollowDate('');
       setActivityDate(new Date().toISOString().slice(0, 10));
@@ -93,40 +98,75 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
   }, [opened, section]);
 
   const handleSelectContact = (val: string | null) => {
-    if (!val) return;
-    const found = contacts.find((c) => c.name === val || c.id === val);
+    if (!val) {
+      setContactId(null);
+      setContactName('');
+      setSearchQuery('');
+      setCustomerName('');
+      setPhone('');
+      setEmail('');
+      setLocation('');
+      setLeadId(null);
+      return;
+    }
+
+    if (val.startsWith('custom_')) {
+      const customName = val.replace('custom_', '');
+      setContactId(val);
+      setContactName(customName);
+      setSearchQuery(customName);
+      setLeadId(null);
+      setLocation('');
+      return;
+    }
+
+    setContactId(val);
+    const found = contacts.find((c) => String(c.id) === val || c.name === val);
     if (found) {
-      setContactId(found.id);
-      setLeadId(found.internalReference || (found as any).leadId || null);
       setContactName(found.name);
+      setSearchQuery(found.name);
       setCustomerName(found.companyName || '');
       setPhone(found.phone || '');
       setEmail(found.email || '');
+      setLeadId(found.internalReference || (found as any).leadId || null);
+      const loc = (found as any).location || (found as any).address || (found as any).city || '';
+      if (loc) {
+        setLocation(loc);
+      }
       if (found.assignedToName) {
         setPerformedBy(found.assignedToName);
         if (found.assignedTo) setPerformedById(found.assignedTo);
       }
     } else {
       setContactName(val);
+      setSearchQuery(val);
       setContactId(null);
       setLeadId(null);
+      setLocation('');
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contactName.trim()) return;
+    const finalContactName = contactName.trim() || searchQuery.trim();
+    if (!finalContactName) return;
+
+    const resolvedContactId =
+      contactId && !contactId.startsWith('custom_') && !contactId.startsWith('contact_')
+        ? contactId
+        : undefined;
 
     await onSubmit({
-      contactId: contactId || undefined,
+      contactId: resolvedContactId,
       leadId: leadId || undefined,
-      contactName: contactName.trim(),
+      contactName: finalContactName,
       customerName: customerName.trim() || undefined,
       performedBy: performedBy || undefined,
       performedById: performedById || undefined,
       phone: phone.trim() || undefined,
       phoneNumber: phone.trim() || undefined,
       email: email.trim() || undefined,
+      location: section === 'others' && channelType === 'Direct Visit' ? location.trim() || undefined : undefined,
       messageType: section === 'whatsapp' ? channelType : undefined,
       emailType: section === 'email' ? channelType : undefined,
       activityType: section === 'others' ? channelType : undefined,
@@ -150,10 +190,59 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
     return <IconActivity size={20} color="#F59E0B" />;
   };
 
-  const contactOptions = contacts.map((c) => ({
-    value: c.name,
-    label: `${c.name} ${c.companyName ? `(${c.companyName})` : ''}`,
-  }));
+  const contactOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<{ value: string; label: string }> = [];
+
+    (contacts || []).forEach((c, idx) => {
+      const val = c.id ? String(c.id) : `contact_${idx}_${c.name}`;
+      if (!seen.has(val)) {
+        seen.add(val);
+        const comp = c.companyName ? ` (${c.companyName})` : '';
+        const ph = c.phone ? ` • ${c.phone}` : '';
+        list.push({
+          value: val,
+          label: `${c.name || 'Unnamed'}${comp}${ph}`,
+        });
+      }
+    });
+
+    return list;
+  }, [contacts]);
+
+  const displayedContactOptions = useMemo(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return contactOptions;
+    const exists = contacts.some(
+      (c) => c.name && c.name.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (!exists) {
+      return [
+        { value: `custom_${trimmed}`, label: `+ Use "${trimmed}" (Manual Entry)` },
+        ...contactOptions,
+      ];
+    }
+    return contactOptions;
+  }, [contactOptions, contacts, searchQuery]);
+
+  const employeeOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: Array<{ value: string; label: string }> = [];
+
+    (employees || []).forEach((e, idx) => {
+      const val = e.id ? String(e.id) : e.empCode ? String(e.empCode) : `emp_${idx}`;
+      if (!seen.has(val)) {
+        seen.add(val);
+        const role = e.designation || e.role || 'Staff';
+        list.push({
+          value: val,
+          label: e.name ? `${e.name} (${role})` : val,
+        });
+      }
+    });
+
+    return list;
+  }, [employees]);
 
   const inputStyles = {
     input: {
@@ -191,10 +280,12 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
             <Select
               label="Contact Person"
               placeholder="Search or enter contact"
-              data={contactOptions}
+              data={displayedContactOptions}
+              value={contactId}
               searchable
-              searchValue={contactName}
-              onSearchChange={setContactName}
+              clearable
+              searchValue={searchQuery}
+              onSearchChange={setSearchQuery}
               onChange={handleSelectContact}
               required
               styles={inputStyles}
@@ -352,20 +443,30 @@ export const ActivityLogModal: React.FC<ActivityLogModalProps> = ({
             <Select
               label="Logged By / Assigned Employee"
               placeholder="Select employee"
-              data={employees.map((e) => ({
-                value: e.id,
-                label: e.name ? `${e.name} (${e.designation || e.role || 'Staff'})` : e.id,
-              }))}
+              data={employeeOptions}
               value={performedById}
               onChange={(val) => {
                 setPerformedById(val);
-                const emp = employees.find((e) => e.id === val);
+                const emp = employees.find((e) => String(e.id) === val || String(e.empCode) === val);
                 if (emp) setPerformedBy(emp.name);
               }}
+              searchable
+              clearable
               styles={inputStyles}
               leftSection={<IconUser size={16} stroke={1.5} />}
             />
           </SimpleGrid>
+
+          {section === 'others' && channelType === 'Direct Visit' && (
+            <TextInput
+              label="Location"
+              placeholder="Enter visit location or office address (e.g. Client Office, MG Road, Bangalore)"
+              value={location}
+              onChange={(e) => setLocation(e.currentTarget.value)}
+              styles={inputStyles}
+              leftSection={<IconMapPin size={16} stroke={1.5} />}
+            />
+          )}
 
           <Textarea
             label="Notes / Description"

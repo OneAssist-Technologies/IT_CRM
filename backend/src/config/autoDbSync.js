@@ -63,8 +63,9 @@ export async function syncExistingContactLeadMeetings() {
       JOIN "Lead" l ON (
         c."internalReference" = l."leadId" 
         OR (c.phone IS NOT NULL AND c.phone != '' AND c.phone = l.phone)
+        OR (c.email IS NOT NULL AND c.email != '' AND LOWER(c.email) = LOWER(l.email))
       )
-      WHERE (a."contactId" = c.id OR a."contactId" = c."contactId")
+      WHERE (a."contactId" = c.id OR a."contactId" = c."contactId" OR a."entityId" = c.id OR a."entityId" = c."contactId")
         AND (a."leadId" IS NULL OR a."leadId" = c.id OR a."leadId" = '')
     `).catch(() => {});
 

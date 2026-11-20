@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Grid,
   Paper,
@@ -53,6 +53,8 @@ import { useProject } from '../../context/ProjectContext';
 import { billingService } from '../../services/billingService';
 import { fetchMeetingsApi } from '../../services/meetingService';
 import { ScheduledMeeting } from '../../types/meeting';
+import { leadService } from '../../services/leadService';
+import { fetchEmployeesApi } from '../../services/employeeService';
 
 interface EmployeeDashboardProps {
   onNavigate: (nav: string) => void;
@@ -68,12 +70,14 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
   const computedColorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const isDark = computedColorScheme === 'dark';
 
-  const [dateFilter, setDateFilter] = useState<string | null>('Today');
+  const [dateFilter, setDateFilter] = useState<string | null>('All Time');
   const [currentDate, setCurrentDate] = useState<string>('');
   const [invoices, setInvoices] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [meetings, setMeetings] = useState<ScheduledMeeting[]>([]);
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [dashboardLeads, setDashboardLeads] = useState<any[]>([]);
+  const [matchedEmployee, setMatchedEmployee] = useState<any>(null);
 
   // 1. Live Date & Time
   useEffect(() => {
@@ -99,6 +103,70 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
     updateDateTime();
     const timer = setInterval(updateDateTime, 30000);
     return () => clearInterval(timer);
+  }, []);
+
+  // 1b. Fetch matching employee record for current user
+  useEffect(() => {
+    let mounted = true;
+    fetchEmployeesApi()
+      .then((res) => {
+        if (!mounted || !res) return;
+        const list = Array.isArray(res) ? res : (res as any).employees || (res as any).data || [];
+        const uEmail = (currentUser?.email || '').trim().toLowerCase();
+        const uName = (currentUser?.name || '').trim().toLowerCase();
+        const uId = (currentUser?.id || '').trim().toLowerCase();
+
+        const match = list.find((e: any) => {
+          const empEmail = (e.email || '').trim().toLowerCase();
+          const empName = (e.name || '').trim().toLowerCase();
+          const empId = (e.id || '').trim().toLowerCase();
+          const empCode = (e.empCode || '').trim().toLowerCase();
+
+          if (uEmail && empEmail && uEmail === empEmail) return true;
+          if (uName && empName && uName === empName) return true;
+          if (uId && empId && uId === empId) return true;
+          if (empCode && (empCode === uId || empCode === uEmail)) return true;
+          // Sandy / sandyyy variation
+          if (
+            (uName.startsWith('sandy') || uEmail.startsWith('sandy')) &&
+            (empName.startsWith('sandy') || empEmail.startsWith('sandy'))
+          ) {
+            return true;
+          }
+          return false;
+        });
+
+        if (match && mounted) {
+          setMatchedEmployee(match);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser?.email, currentUser?.name, currentUser?.id]);
+
+  // 1c. Fetch all leads (up to 1000) for full employee dashboard visibility
+  useEffect(() => {
+    let mounted = true;
+    const loadAllLeads = () => {
+      leadService
+        .getLeads({}, { page: 1, limit: 1000 })
+        .then((res) => {
+          if (mounted && res && res.success && Array.isArray(res.data)) {
+            setDashboardLeads(res.data);
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadAllLeads();
+    window.addEventListener('crm_leads_updated', loadAllLeads);
+    return () => {
+      mounted = false;
+      window.removeEventListener('crm_leads_updated', loadAllLeads);
+    };
   }, []);
 
   const greeting = useMemo(() => {
@@ -158,63 +226,141 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
   const myId = (currentUser?.id || '').trim().toLowerCase();
   const myEmail = (currentUser?.email || '').trim().toLowerCase();
 
-  const isAssignedToUser = (val?: string | null) => {
-    if (!val || typeof val !== 'string') return false;
-    const clean = val.trim().toLowerCase();
-    if (!clean) return false;
-    return (
-      (myName && clean === myName) ||
-      (myId && clean === myId) ||
-      (myEmail && clean === myEmail)
-    );
-  };
+  // Set of all user and employee identifiers for flexible assignment matching
+  const userIdentifiers = useMemo(() => {
+    const ids = new Set<string>();
+    const add = (v?: string | null) => {
+      if (!v || typeof v !== 'string') return;
+      const clean = v.trim().toLowerCase();
+      if (clean) ids.add(clean);
+    };
 
-  // 1. Scoped Leads (Only leads assigned to or created by current user)
+    add(myId);
+    add(myName);
+    add(myEmail);
+    add((currentUser as any)?.empCode);
+    add((currentUser as any)?.employeeId);
+
+    if (myName.startsWith('sandy') || myEmail.startsWith('sandy')) {
+      ids.add('sandy');
+      ids.add('sandyyy');
+    }
+
+    if (matchedEmployee) {
+      add(matchedEmployee.id);
+      add(matchedEmployee.empCode);
+      add(matchedEmployee.name);
+      add(matchedEmployee.email);
+    }
+
+    return ids;
+  }, [currentUser, myName, myId, myEmail, matchedEmployee]);
+
+  const isAssignedToUser = useCallback(
+    (val?: string | null) => {
+      if (!val || typeof val !== 'string') return false;
+      const clean = val.trim().toLowerCase();
+      if (!clean) return false;
+
+      if (userIdentifiers.has(clean)) return true;
+
+      const isUserSandy = myName.startsWith('sandy') || myEmail.startsWith('sandy');
+      if (isUserSandy && clean.startsWith('sandy')) {
+        return true;
+      }
+
+      const firstName = myName.split(' ')[0];
+      if (firstName && firstName.length >= 3 && clean === firstName) {
+        return true;
+      }
+
+      return false;
+    },
+    [userIdentifiers, myName, myEmail]
+  );
+
+  const sourceLeads = dashboardLeads.length > 0 ? dashboardLeads : leads;
+
+  // 1. Scoped Leads (Only leads strictly assigned to current employee / user)
   const userLeads = useMemo(() => {
-    if (!currentUser || (!myName && !myId && !myEmail)) return [];
-    return leads.filter((l) => {
-      return (
+    if (!currentUser) return [];
+    return sourceLeads.filter((l) => {
+      // Direct check: is this lead assigned to this user / employee?
+      const isAssigned =
         isAssignedToUser(l.assignedTo) ||
         isAssignedToUser(l.assignedToName) ||
         isAssignedToUser((l as any).assignedToId) ||
-        isAssignedToUser((l as any).assignedToEmail) ||
-        isAssignedToUser(l.createdBy) ||
-        isAssignedToUser((l as any).createdByName) ||
-        isAssignedToUser((l as any).createdById) ||
-        isAssignedToUser((l as any).employeeId)
+        isAssignedToUser((l as any).assignedToEmail);
+
+      if (isAssigned) return true;
+
+      // If the lead has an explicit assignee that is someone else, it does NOT belong to this user
+      const hasOtherAssignee = Boolean(
+        (l.assignedTo && !isAssignedToUser(l.assignedTo)) ||
+        (l.assignedToName && !isAssignedToUser(l.assignedToName)) ||
+        ((l as any).assignedToId && !isAssignedToUser((l as any).assignedToId))
       );
+      if (hasOtherAssignee) return false;
+
+      // Only if the lead has no assignee at all, include if created by this employee
+      const isUnassigned = !l.assignedTo && !l.assignedToName && !(l as any).assignedToId;
+      if (isUnassigned) {
+        return (
+          isAssignedToUser(l.createdBy) ||
+          isAssignedToUser((l as any).createdByName) ||
+          isAssignedToUser((l as any).createdById) ||
+          isAssignedToUser((l as any).employeeId)
+        );
+      }
+
+      return false;
     });
-  }, [leads, myName, myId, myEmail, currentUser]);
+  }, [sourceLeads, isAssignedToUser, currentUser]);
 
   // 2. Scoped Customers (Only accounts managed by or assigned to current user)
   const userCustomers = useMemo(() => {
-    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    if (!currentUser) return [];
     return customers.filter((c) => {
-      return (
+      const isAssigned =
         isAssignedToUser(c.accountManager) ||
         isAssignedToUser(c.accountManagerId) ||
         isAssignedToUser((c as any).assignedTo) ||
         isAssignedToUser((c as any).assignedToName) ||
-        isAssignedToUser((c as any).assignedToId) ||
-        isAssignedToUser((c as any).createdBy) ||
-        isAssignedToUser((c as any).createdByName) ||
-        isAssignedToUser((c as any).createdById)
+        isAssignedToUser((c as any).assignedToId);
+
+      if (isAssigned) return true;
+
+      const hasOtherManager = Boolean(
+        (c.accountManager && !isAssignedToUser(c.accountManager)) ||
+        (c.accountManagerId && !isAssignedToUser(c.accountManagerId)) ||
+        ((c as any).assignedTo && !isAssignedToUser((c as any).assignedTo)) ||
+        ((c as any).assignedToName && !isAssignedToUser((c as any).assignedToName))
       );
+      if (hasOtherManager) return false;
+
+      const isUnassigned = !c.accountManager && !c.accountManagerId && !(c as any).assignedTo && !(c as any).assignedToName;
+      if (isUnassigned) {
+        return (
+          isAssignedToUser((c as any).createdBy) ||
+          isAssignedToUser((c as any).createdByName) ||
+          isAssignedToUser((c as any).createdById)
+        );
+      }
+
+      return false;
     });
-  }, [customers, myName, myId, myEmail, currentUser]);
+  }, [customers, isAssignedToUser, currentUser]);
 
   // 3. Scoped Projects (Managed by, assigned to, or team member)
   const userProjects = useMemo(() => {
-    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    if (!currentUser) return [];
     return projects.filter((p) => {
       if (
         isAssignedToUser(p.projectManagerName) ||
         isAssignedToUser(p.projectManagerId) ||
         isAssignedToUser((p as any).assignedTo) ||
         isAssignedToUser((p as any).assignedToName) ||
-        isAssignedToUser((p as any).assignedToId) ||
-        isAssignedToUser(p.createdBy) ||
-        isAssignedToUser((p as any).createdById)
+        isAssignedToUser((p as any).assignedToId)
       ) {
         return true;
       }
@@ -229,25 +375,53 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
       ) {
         return true;
       }
+
+      const hasOtherManager = Boolean(
+        (p.projectManagerName && !isAssignedToUser(p.projectManagerName)) ||
+        (p.projectManagerId && !isAssignedToUser(p.projectManagerId))
+      );
+      if (hasOtherManager) return false;
+
+      const isUnmanaged = !p.projectManagerName && !p.projectManagerId;
+      if (isUnmanaged) {
+        return isAssignedToUser(p.createdBy) || isAssignedToUser((p as any).createdById);
+      }
+
       return false;
     });
-  }, [projects, myName, myId, myEmail, currentUser]);
+  }, [projects, isAssignedToUser, currentUser]);
 
   // 4. Scoped Meetings (Organized by, assigned to, or involving current user)
   const userMeetings = useMemo(() => {
-    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    if (!currentUser) return [];
     return meetings.filter((m) => {
-      return (
+      const isAssigned =
         isAssignedToUser(m.employeeName) ||
         isAssignedToUser(m.employeeId) ||
         isAssignedToUser(m.employeeEmail) ||
         isAssignedToUser(m.assignedTo) ||
-        isAssignedToUser((m as any).assigned_to) ||
-        isAssignedToUser((m as any).createdBy) ||
-        isAssignedToUser((m as any).createdById)
+        isAssignedToUser((m as any).assigned_to);
+
+      if (isAssigned) return true;
+
+      const hasOtherEmployee = Boolean(
+        (m.employeeName && !isAssignedToUser(m.employeeName)) ||
+        (m.employeeId && !isAssignedToUser(m.employeeId)) ||
+        (m.assignedTo && !isAssignedToUser(m.assignedTo))
       );
+      if (hasOtherEmployee) return false;
+
+      const isUnassigned = !m.employeeName && !m.employeeId && !m.assignedTo;
+      if (isUnassigned) {
+        return (
+          isAssignedToUser((m as any).createdBy) ||
+          isAssignedToUser((m as any).createdById)
+        );
+      }
+
+      return false;
     });
-  }, [meetings, myName, myId, myEmail, currentUser]);
+  }, [meetings, isAssignedToUser, currentUser]);
 
   // Client/account identifiers associated with current user
   const userAssociatedNames = useMemo(() => {
@@ -269,7 +443,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
   // 5. Scoped Invoices
   const userInvoices = useMemo(() => {
-    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    if (!currentUser) return [];
     return invoices.filter((inv) => {
       const createdBy = (inv.createdBy || '').trim().toLowerCase();
       const salesRep = (inv.salesRep || (inv as any).salesPerson || '').trim().toLowerCase();
@@ -277,9 +451,14 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
       const contactName = (inv.contactName || inv.clientName || '').trim().toLowerCase();
       const custId = (inv.customerId || inv.contactId || '').trim().toLowerCase();
 
+      // If invoice has an explicit sales rep assigned to someone else, exclude it
+      if (salesRep && !isAssignedToUser(salesRep)) {
+        return false;
+      }
+
       const matchesUser =
-        (myName && (createdBy === myName || salesRep === myName)) ||
-        (myId && createdBy === myId);
+        isAssignedToUser(createdBy) ||
+        isAssignedToUser(salesRep);
 
       const matchesClient =
         (compName && userAssociatedNames.has(compName)) ||
@@ -288,19 +467,17 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
       return matchesUser || matchesClient;
     });
-  }, [invoices, myName, myId, userAssociatedNames, currentUser]);
+  }, [invoices, isAssignedToUser, userAssociatedNames, currentUser]);
 
   // 6. Scoped Payments
   const userPayments = useMemo(() => {
-    if (!currentUser || (!myName && !myId && !myEmail)) return [];
+    if (!currentUser) return [];
     return payments.filter((pay) => {
       const recordedBy = (pay.recordedBy || (pay as any).createdBy || '').trim().toLowerCase();
       const clientName = (pay.clientName || '').trim().toLowerCase();
       const contactId = (pay.contactId || '').trim().toLowerCase();
 
-      const matchesUser =
-        (myName && recordedBy === myName) ||
-        (myId && recordedBy === myId);
+      const matchesUser = isAssignedToUser(recordedBy);
 
       const matchesClient =
         (clientName && userAssociatedNames.has(clientName)) ||
@@ -308,7 +485,7 @@ export const EmployeeDashboard: React.FC<EmployeeDashboardProps> = ({ onNavigate
 
       return matchesUser || matchesClient;
     });
-  }, [payments, myName, myId, userAssociatedNames, currentUser]);
+  }, [payments, isAssignedToUser, userAssociatedNames, currentUser]);
 
   // Date Filter helper
   const matchesDateFilter = (dateStr?: string | null) => {

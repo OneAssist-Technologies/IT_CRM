@@ -7,9 +7,9 @@ import { recordActivity } from './activity.service.js';
 import { getDataScope } from '../middlewares/permission.middleware.js';
 
 /**
- * Scope projects by user (Super Admin or All-Scope sees all, Employees only see projects created by them)
+ * Scope projects by user (Super Admin or All-Scope sees all, Employees only see projects created by them or where they are assigned / PM)
  */
-async function resolveProjectScopeFilter(currentUser) {
+async function resolveProjectScopeFilter(currentUser, queryParams = {}) {
   if (!currentUser) return null;
   const roleUpper = String(currentUser.role || '').toUpperCase();
   if (roleUpper === 'SUPER_ADMIN' || roleUpper === 'SUPER ADMIN') {
@@ -31,6 +31,11 @@ async function resolveProjectScopeFilter(currentUser) {
     }
   }
 
+  // If queried by a specific contactId or leadId, allow retrieving the project for that lead
+  if (queryParams.contactId) {
+    return null;
+  }
+
   const emp = await prisma.employee.findFirst({
     where: {
       OR: [
@@ -44,9 +49,18 @@ async function resolveProjectScopeFilter(currentUser) {
   const identifiers = [currentUser.name, currentUser.email, emp?.name].filter(Boolean);
   for (const ident of identifiers) {
     orConditions.push({ createdBy: { equals: ident, mode: 'insensitive' } });
+    orConditions.push({ projectManagerName: { equals: ident, mode: 'insensitive' } });
   }
-  if (currentUser.id) orConditions.push({ createdBy: currentUser.id });
-  if (emp?.id) orConditions.push({ createdBy: emp.id });
+  if (currentUser.id) {
+    orConditions.push({ createdBy: currentUser.id });
+    orConditions.push({ projectManagerId: currentUser.id });
+    orConditions.push({ teamMembers: { has: currentUser.id } });
+  }
+  if (emp?.id) {
+    orConditions.push({ createdBy: emp.id });
+    orConditions.push({ projectManagerId: emp.id });
+    orConditions.push({ teamMembers: { has: emp.id } });
+  }
 
   return orConditions.length > 0 ? { OR: orConditions } : { createdBy: currentUser.id };
 }
@@ -78,7 +92,7 @@ export async function getProjectsService(queryParams = {}, currentUser = null) {
 
   const where = buildProjectFilterQuery(queryParams);
 
-  const scopeFilter = await resolveProjectScopeFilter(currentUser);
+  const scopeFilter = await resolveProjectScopeFilter(currentUser, queryParams);
   if (scopeFilter) {
     where.AND = where.AND || [];
     where.AND.push(scopeFilter);
@@ -88,12 +102,13 @@ export async function getProjectsService(queryParams = {}, currentUser = null) {
   const finalSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
   const finalSortOrder = sortOrder.toLowerCase() === 'asc' ? 'asc' : 'desc';
 
-  // Synchronize status for projects with modules: Incomplete modules -> 'In Progress', All complete -> 'Completed'
+  // Synchronize status for projects with modules: Incomplete modules -> 'In Progress' (if progress < 100), All complete -> 'Completed'
   try {
     await prisma.$executeRawUnsafe(`
       UPDATE "Project"
       SET "status" = 'In Progress'
       WHERE "status" = 'Completed'
+        AND "progress" < 100
         AND "modules" IS NOT NULL
         AND jsonb_array_length("modules") > 0
         AND EXISTS (

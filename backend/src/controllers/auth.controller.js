@@ -5,6 +5,7 @@ import { setCache, getCache, delCache } from '../config/redis.js';
 import { hashPassword, comparePassword } from '../utils/password.js';
 import { generateSessionToken, generateToken, setAuthCookie } from '../utils/jwt.js';
 import { logAuditEvent } from '../services/auditService.js';
+import { isEmployeeInactive } from '../utils/employee.util.js';
 import * as authService from '../services/auth.service.js';
 
 /**
@@ -180,7 +181,7 @@ export async function login(req, res) {
     if (cleanId.includes('nela')) variations.push(cleanId.replace('nela', 'neela'));
 
     // 1. Check if identifier matches an Employee by empCode, email, or name
-    const matchedEmployee = await prisma.employee.findFirst({
+    let matchedEmployee = await prisma.employee.findFirst({
       where: {
         OR: [
           { empCode: { equals: identifier, mode: 'insensitive' } },
@@ -204,8 +205,26 @@ export async function login(req, res) {
       },
     });
 
+    // 3. If employee was not found in step 1, but user was found, resolve employee record by user email
+    if (!matchedEmployee && user?.email) {
+      matchedEmployee = await prisma.employee.findFirst({
+        where: {
+          email: { equals: user.email.toLowerCase().trim(), mode: 'insensitive' },
+        },
+      });
+    }
+
+    // 4. Employee Login Access Control: Check Active / Inactive status directly from database
+    if (matchedEmployee && isEmployeeInactive(matchedEmployee.status)) {
+      return res.status(200).json({
+        success: false,
+        inactive: true,
+        message: 'Your account is inactive. Please contact your administrator.',
+      });
+    }
+
     if (!user) {
-      return res.status(401).json({
+      return res.status(200).json({
         success: false,
         message: 'Invalid email address/Employee ID or password.',
       });
@@ -213,7 +232,7 @@ export async function login(req, res) {
 
     const isPasswordValid = await comparePassword(password, user.passwordHash);
     if (!isPasswordValid) {
-      return res.status(401).json({
+      return res.status(200).json({
         success: false,
         message: 'Invalid email address/Employee ID or password.',
       });
@@ -228,6 +247,7 @@ export async function login(req, res) {
       department: user.department || matchedEmployee?.department,
       avatar: user.avatar,
       empCode: matchedEmployee?.empCode || null,
+      status: matchedEmployee?.status || 'Active',
     };
 
     const sessionToken = generateToken({
@@ -324,6 +344,18 @@ export async function forgotPassword(req, res) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+
+    // Check if employee account is inactive
+    const matchedEmployee = await prisma.employee.findFirst({
+      where: { email: { equals: cleanEmail, mode: 'insensitive' } },
+      select: { id: true, status: true },
+    });
+    if (matchedEmployee && isEmployeeInactive(matchedEmployee.status)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is inactive. Please contact your administrator.',
+      });
+    }
 
     // Check if user exists
     const user = await prisma.user.findUnique({
@@ -663,6 +695,18 @@ export async function resetPassword(req, res) {
       return res.status(400).json({
         success: false,
         message: 'Invalid or expired password reset link. Please request a new link.',
+      });
+    }
+
+    // Check if employee account is inactive
+    const matchedEmployee = await prisma.employee.findFirst({
+      where: { email: { equals: targetEmail, mode: 'insensitive' } },
+      select: { id: true, status: true },
+    });
+    if (matchedEmployee && isEmployeeInactive(matchedEmployee.status)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Your account is inactive. Please contact your administrator.',
       });
     }
 

@@ -32,8 +32,11 @@ export const FuturisticAuthLayout: React.FC<FuturisticAuthLayoutProps> = ({
       style={{
         position: 'relative',
         minHeight: '100vh',
+        height: '100%',
         width: '100%',
-        overflow: 'hidden',
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
         background: 'radial-gradient(ellipse at 85% 15%, #E1EEFD 0%, #F5F9FE 45%, #EAF2FC 100%)',
         display: 'flex',
         flexDirection: 'column',
@@ -328,12 +331,13 @@ export const FuturisticAuthLayout: React.FC<FuturisticAuthLayoutProps> = ({
           zIndex: 10,
           padding: '16px 16px 40px',
           width: '100%',
+          boxSizing: 'border-box',
         }}
       >
         <Box
           style={{
             width: '100%',
-            maxWidth: 440,
+            maxWidth: 520,
             display: 'flex',
             justifyContent: 'center',
           }}
